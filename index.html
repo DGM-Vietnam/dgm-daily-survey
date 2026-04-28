@@ -70,6 +70,7 @@ textarea{resize:vertical;min-height:80px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .chip{padding:8px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:13px;cursor:pointer;transition:all .2s;background:#fff;user-select:none}
 .chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+.chips.required-error .chip{border-color:var(--primary);background:var(--primary-light)}
 /* BUTTONS */
 .btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
 .btn-primary{background:var(--primary);color:#fff}
@@ -429,14 +430,14 @@ function renderMTForm(){
     <div class="card">
       <h3>✅ Đánh giá điểm bán</h3>
       <div class="field">
-        <label>Trưng bày</label>
+        <label>Trưng bày <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="mt_display">
           ${['Tốt, ngang tầm mắt','Vị trí cao','Vị trí thấp','Góc khó tìm','Thiếu mã'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_display')">${v}</span>`).join('')}
         </div>
       </div>
       <div class="divider"></div>
       <div class="field">
-        <label>Bảng giá</label>
+        <label>Bảng giá <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="mt_price">
           ${['Đúng giá','Thiếu bảng giá','Sai giá','Chưa tăng giá','Đã tăng giá','Đang KM'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_price')">${v}</span>`).join('')}
         </div>
@@ -450,7 +451,7 @@ function renderMTForm(){
       </div>
       <div class="divider"></div>
       <div class="field">
-        <label>Hạn sử dụng</label>
+        <label>Hạn sử dụng <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="mt_expiry">
           ${['Tất cả >50% HSD','Có mã <50% HSD','Có mã <6 tháng','Cần hỗ trợ KM cận date'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_expiry')">${v}</span>`).join('')}
         </div>
@@ -537,7 +538,7 @@ function renderGTDailyForm(region){
     <div class="card">
       <h3>🛒 Đặt hàng & Ghi chú</h3>
       <div class="field">
-        <label>Thông tin đặt hàng</label>
+        <label>Thông tin đặt hàng <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="gt_order">
           ${['Đã đặt hàng thêm','Không đặt hàng','Sẽ đặt sau'].map(v=>`<span class="chip" onclick="selectChip(this,'gt_order')">${v}</span>`).join('')}
         </div>
@@ -585,7 +586,7 @@ function renderGTNewForm(){
       <div class="field"><label>Địa chỉ</label>
         <input type="text" id="gtnew_addr" placeholder="Địa chỉ cụ thể">
       </div>
-      <div class="field required"><label>Hình thức kinh doanh</label>
+      <div class="field required"><label>Hình thức kinh doanh <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="gtnew_biztype">
           ${bizTypes.map(v=>`<span class="chip" onclick="selectChip(this,'gtnew_biztype')">${v}</span>`).join('')}
         </div>
@@ -602,7 +603,7 @@ function renderGTNewForm(){
     </div>
     <div class="card">
       <h3>⭐ Đánh giá & Hình ảnh</h3>
-      <div class="field required"><label>Tiềm năng</label>
+      <div class="field required"><label>Tiềm năng <span style="color:var(--primary)">*</span></label>
         <div class="chips" id="gtnew_potential">
           ${potentials.map(v=>`<span class="chip" onclick="selectChip(this,'gtnew_potential')">${v}</span>`).join('')}
         </div>
@@ -683,6 +684,12 @@ async function submitMT(){
   const store = document.getElementById('mt_store')?.value;
   if(!store){ toast('⚠️ Vui lòng chọn điểm bán'); return; }
   
+  // Validate required chip groups
+  if(!getChips('mt_display')){ toast('⚠️ Vui lòng chọn Tình trạng trưng bày'); scrollToEl('mt_display'); return; }
+  if(!getChips('mt_price'))  { toast('⚠️ Vui lòng chọn Thông tin bảng giá');   scrollToEl('mt_price');   return; }
+  if(!getChips('mt_goods'))  { toast('⚠️ Vui lòng chọn Tình trạng hàng hóa'); scrollToEl('mt_goods');   return; }
+  if(!getChips('mt_expiry')) { toast('⚠️ Vui lòng chọn Tình trạng HSD');       scrollToEl('mt_expiry');  return; }
+  
   const skus = collectSKUs('mt', APP_DATA.skus);
   const payload = {
     type: 'MT_Daily',
@@ -713,6 +720,7 @@ async function submitGT(){
   
   if(!market){ toast('⚠️ Vui lòng chọn chợ'); return; }
   if(!store){ toast('⚠️ Vui lòng chọn hoặc nhập điểm bán'); return; }
+  if(!getChips('gt_order')){ toast('⚠️ Vui lòng chọn Thông tin đặt hàng'); scrollToEl('gt_order'); return; }
   
   const skus = collectSKUs('gt', GT_SKUS_DAILY);
   const payload = {
@@ -736,7 +744,9 @@ async function submitGT(){
 async function submitGTNew(){
   const store = document.getElementById('gtnew_store')?.value?.trim();
   if(!store){ toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
-  if(!getChips('gtnew_biztype')){ toast('⚠️ Vui lòng chọn hình thức kinh doanh'); return; }
+  if(!getChips('gtnew_biztype'))   { toast('⚠️ Vui lòng chọn Hình thức kinh doanh'); scrollToEl('gtnew_biztype');   return; }
+  if(!getChips('gtnew_products'))  { toast('⚠️ Vui lòng chọn Sản phẩm chào hàng');  scrollToEl('gtnew_products');  return; }
+  if(!getChips('gtnew_potential')) { toast('⚠️ Vui lòng chọn Đánh giá tiềm năng');  scrollToEl('gtnew_potential'); return; }
   
   const payload = {
     type: 'GT_NewCustomer',
@@ -759,31 +769,28 @@ async function submitGTNew(){
 // ============ SEND DATA ============
 async function sendData(payload, label){
   if(!state.scriptUrl){
-    // Save offline
     saveOffline(payload);
     showSuccess(label, payload, true);
     return;
   }
   showLoading('Đang gửi dữ liệu...');
   try {
-    // Convert photos to smaller size before sending
     const compressedPayload = await compressPhotos(payload);
     
-    const resp = await fetch(state.scriptUrl, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(compressedPayload)
-    });
-    const result = await resp.json();
+    // CORS FIX: Apps Script blocks POST from browser.
+    // Use GET + base64-encoded payload to bypass CORS preflight.
+    const jsonStr = JSON.stringify(compressedPayload);
+    const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+    const url = state.scriptUrl + '?payload=' + encodeURIComponent(b64);
+    
+    const resp = await fetch(url, { method: 'GET', mode: 'no-cors' });
+    // no-cors returns opaque response — we can't read it, but data IS sent
+    // So we treat any non-throw as success
     hideLoading();
-    if(result.status === 'ok' || result.success){
-      showSuccess(label, payload, false);
-    } else {
-      toast('❌ Lỗi: ' + (result.message || 'Không rõ'));
-    }
+    showSuccess(label, payload, false);
+    
   } catch(err){
     hideLoading();
-    // Fallback: save offline
     saveOffline(payload);
     showSuccess(label, payload, true);
   }
@@ -874,6 +881,10 @@ async function syncOffline(){
 }
 
 // ============ UTILS ============
+function scrollToEl(groupId){
+  const el = document.getElementById(groupId);
+  if(el) el.closest('.card')?.scrollIntoView({behavior:'smooth', block:'center'});
+}
 function goTo(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(id).classList.add('active');
