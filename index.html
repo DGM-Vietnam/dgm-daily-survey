@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>DGM Sales Survey</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#C8102E;--primary-dark:#9e0c24;--primary-light:#fde8ec;
+  --green:#2e7d32;--green-light:#e8f5e9;
+  --blue:#1565c0;--blue-light:#e3f2fd;
+  --gray:#f5f5f5;--border:#ddd;--text:#212121;--text2:#666;
+  --radius:10px;--shadow:0 2px 8px rgba(0,0,0,.12);
+}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f0f2f5;color:var(--text);min-height:100vh;font-size:15px}
+.screen{display:none;min-height:100vh;flex-direction:column}
+.screen.active{display:flex}
+/* HEADER */
+.header{background:var(--primary);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.header h1{font-size:16px;font-weight:700;flex:1}
+.header .sub{font-size:12px;opacity:.85}
+.btn-back{background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+/* CONTENT */
+.content{flex:1;padding:16px;overflow-y:auto;padding-bottom:80px}
+/* CARDS */
+.card{background:#fff;border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card h3{font-size:14px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:600}
+/* FORM ELEMENTS */
+label{display:block;font-size:13px;color:var(--text2);margin-bottom:4px;font-weight:500}
+input[type=text],input[type=number],select,textarea{
+  width:100%;padding:11px 12px;border:1.5px solid var(--border);border-radius:8px;
+  font-size:15px;color:var(--text);background:#fff;outline:none;
+  transition:border-color .2s;-webkit-appearance:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--primary)}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+textarea{resize:vertical;min-height:80px}
+.field{margin-bottom:14px}
+.field.required label::after{content:" *";color:var(--primary)}
+/* PHOTO UPLOAD */
+.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+.photo-slot{aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;background:#fafafa;transition:border-color .2s}
+.photo-slot:hover{border-color:var(--primary)}
+.photo-slot img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
+.photo-slot .slot-label{font-size:11px;color:var(--text2);text-align:center;padding:4px;z-index:1}
+.photo-slot .slot-icon{font-size:24px;margin-bottom:4px;z-index:1}
+.photo-slot input{display:none}
+.photo-slot .del-btn{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;z-index:2;display:none}
+.photo-slot.has-img .del-btn{display:flex;align-items:center;justify-content:center}
+/* GPS */
+.gps-box{background:var(--green-light);border:1.5px solid #a5d6a7;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-top:6px}
+.gps-box .icon{font-size:20px}
+.gps-info{flex:1;font-size:13px}
+.gps-info strong{display:block;color:var(--green);font-size:12px}
+.gps-fail{background:#fff3e0;border-color:#ffcc80}
+.gps-fail strong{color:#e65100}
+/* SKU TABLE */
+.sku-table{width:100%;border-collapse:collapse}
+.sku-table th{font-size:11px;background:#f5f5f5;padding:7px 6px;text-align:center;border-bottom:2px solid var(--border);position:sticky;top:0}
+.sku-table th:first-child{text-align:left;min-width:130px}
+.sku-table td{padding:6px;border-bottom:1px solid #f0f0f0;vertical-align:middle}
+.sku-table td:first-child{font-size:13px;font-weight:500;color:var(--text)}
+.sku-table td.qty-cell{text-align:center}
+.qty-input{width:62px;padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:14px;text-align:center}
+.qty-input:focus{border-color:var(--primary);outline:none}
+.status-sel{font-size:12px;padding:5px 4px;border:1.5px solid var(--border);border-radius:6px;width:100%;min-width:90px;-webkit-appearance:none;background:#fff}
+.cat-header td{background:var(--primary-light);font-size:11px;font-weight:700;color:var(--primary);letter-spacing:.3px;padding:5px 6px}
+/* CHIP SELECTS */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip{padding:8px 12px;border:1.5px solid var(--border);border-radius:20px;font-size:13px;cursor:pointer;transition:all .2s;background:#fff;user-select:none}
+.chip.active{background:var(--primary);border-color:var(--primary);color:#fff}
+/* BUTTONS */
+.btn{width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:all .2s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:active{background:var(--primary-dark)}
+.btn-secondary{background:#fff;color:var(--primary);border:2px solid var(--primary)}
+.btn-green{background:var(--green);color:#fff}
+.btn-disabled{background:#ccc;color:#fff;cursor:not-allowed}
+/* BOTTOM BAR */
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:12px 16px;box-shadow:0 -2px 8px rgba(0,0,0,.1);z-index:99}
+/* LOGIN SCREEN */
+.login-logo{text-align:center;padding:40px 20px 20px}
+.login-logo img{width:80px;height:80px;border-radius:16px;object-fit:contain;background:var(--primary);padding:10px}
+.login-logo h2{margin-top:12px;color:var(--primary);font-size:20px}
+.login-logo p{color:var(--text2);font-size:13px;margin-top:4px}
+.staff-list{display:flex;flex-direction:column;gap:8px}
+.staff-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;transition:all .2s;text-align:left}
+.staff-btn:hover{border-color:var(--primary);background:var(--primary-light)}
+.staff-avatar{width:38px;height:38px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
+.staff-info{flex:1}
+.staff-name{font-weight:600;font-size:14px}
+.staff-team{font-size:12px;color:var(--text2);margin-top:2px}
+.team-badge{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+.badge-mt{background:#e3f2fd;color:#1565c0}
+.badge-gtn{background:#f3e5f5;color:#6a1b9a}
+.badge-gtc{background:#fff3e0;color:#e65100}
+.badge-gts{background:#e8f5e9;color:#2e7d32}
+/* SURVEY TYPE */
+.type-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.type-card{padding:16px 12px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff}
+.type-card:hover{border-color:var(--primary);background:var(--primary-light)}
+.type-card .icon{font-size:30px;margin-bottom:8px}
+.type-card .title{font-size:13px;font-weight:700}
+.type-card .desc{font-size:11px;color:var(--text2);margin-top:3px}
+/* SUCCESS */
+.success-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:32px;text-align:center}
+.success-icon{font-size:72px;margin-bottom:16px}
+.success-title{font-size:22px;font-weight:700;color:var(--green)}
+.success-sub{color:var(--text2);margin-top:8px;font-size:14px}
+.success-detail{background:var(--green-light);border-radius:10px;padding:14px;margin-top:20px;font-size:13px;color:var(--green);width:100%;text-align:left}
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#323232;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;z-index:999;opacity:0;transition:all .3s;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* LOADING */
+.loading{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center;flex-direction:column;gap:12px}
+.loading.show{display:flex}
+.spinner{width:44px;height:44px;border:4px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}
+.loading p{color:#fff;font-size:14px}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* DIVIDER */
+.divider{height:1px;background:var(--border);margin:4px 0 14px}
+/* Step indicator */
+.steps{display:flex;gap:4px;padding:0 16px 12px}
+.step{flex:1;height:4px;border-radius:2px;background:#ddd;transition:background .3s}
+.step.done{background:var(--primary)}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+<!-- LOADING -->
+<div class="loading" id="loading"><div class="spinner"></div><p id="loadingMsg">Đang gửi...</p></div>
+
+<!-- ============ SCREEN: LOGIN ============ -->
+<div class="screen active" id="scLogin">
+  <div style="background:var(--primary);padding:24px 20px 20px;text-align:center;color:#fff">
+    <div style="font-size:36px;margin-bottom:8px">🏷️</div>
+    <h2 style="font-size:20px;font-weight:700">DGM Sales Survey</h2>
+    <p style="font-size:13px;opacity:.85;margin-top:4px">Ayam Brand · Denis G.M.</p>
+  </div>
+  <div class="content">
+    <div class="card">
+      <h3>Chọn tên nhân viên</h3>
+      <div class="staff-list" id="staffList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SCREEN: SURVEY TYPE ============ -->
+<div class="screen" id="scType">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('scLogin')">←</button>
+    <div><h1 id="typeTitle">Chọn loại khảo sát</h1><div class="sub" id="typeSubtitle"></div></div>
+  </div>
+  <div class="content">
+    <div class="card" id="typeCards"></div>
+  </div>
+</div>
+
+<!-- ============ SCREEN: MT FORM ============ -->
+<div class="screen" id="scMT">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('scType')">←</button>
+    <div><h1>Khảo Sát MT</h1><div class="sub" id="mtSubtitle"></div></div>
+  </div>
+  <div class="steps" id="mtSteps"></div>
+  <div class="content" id="mtContent"></div>
+  <div class="bottom-bar"><button class="btn btn-primary" id="mtSubmitBtn" onclick="submitMT()">📤 Gửi Báo Cáo</button></div>
+</div>
+
+<!-- ============ SCREEN: GT DAILY FORM ============ -->
+<div class="screen" id="scGTDaily">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('scType')">←</button>
+    <div><h1>Khảo Sát GT Daily</h1><div class="sub" id="gtSubtitle"></div></div>
+  </div>
+  <div class="content" id="gtContent"></div>
+  <div class="bottom-bar"><button class="btn btn-primary" onclick="submitGT()">📤 Gửi Báo Cáo</button></div>
+</div>
+
+<!-- ============ SCREEN: GT NEW CUSTOMER ============ -->
+<div class="screen" id="scGTNew">
+  <div class="header">
+    <button class="btn-back" onclick="goTo('scType')">←</button>
+    <div><h1>Điểm Bán Mới</h1><div class="sub" id="gtnewSubtitle"></div></div>
+  </div>
+  <div class="content" id="gtnewContent"></div>
+  <div class="bottom-bar"><button class="btn btn-primary" onclick="submitGTNew()">📤 Gửi Báo Cáo</button></div>
+</div>
+
+<!-- ============ SCREEN: SUCCESS ============ -->
+<div class="screen" id="scSuccess">
+  <div class="content">
+    <div class="success-screen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Đã gửi thành công!</div>
+      <div class="success-sub" id="successSub">Dữ liệu đã được lưu vào hệ thống</div>
+      <div class="success-detail" id="successDetail"></div>
+      <button class="btn btn-primary" style="margin-top:24px;max-width:300px" onclick="goTo('scType')">Khảo sát tiếp</button>
+      <button class="btn btn-secondary" style="margin-top:10px;max-width:300px" onclick="goTo('scLogin')">Đổi người dùng</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ DATA ============
+const APP_DATA = {"mt_stores":["Co.Opxtra Linh Trung","Co.Opxtra Long Bình","Co.Opxtra Phạm Văn Đồng","Co.Opxtra Tân Phong","Co.Opxtra Vạn Hạnh","Coop Xtra Tạ Quang Bửu","Finelife Foodstore Hà Đô","Finelife Lumier An Phú","Finelife Riviera Point","Finelife Supermarket Saigon Mia","Finelife Supermarket Urban Hill","Genshai Empire City","Genshai Lavita Charm","Genshai Richmond City","Genshai Riverside Complex","Genshai Saigon Pearl","Genshai Sunrise Riverside","Genshai The Vista An Phú","Genshai Vista Verde","K-Market Binh Duong","K-Market Grandview","K-Market Green Valley","K-Market Lexington","K-Market Masteri","K-Market Mid Town 1","K-Market Millennium","K-Market Park View","K-Market Rivergate","K-Market Scenic Valley","K-Market Sky Garden","K-Market Sky Garden 2","K-Market Sky Garden 3","K-Market Ssr","K-Market Sun Avenue 2","K-Market Sunrise","K-Market Thái Văn Lung","K-Market Thảo Điền","K-Market Vh Golden River","K-Market Vinhomes","K-Market Vinhomes 2","K-Market Vinhomes 3","Mega Market An Giang","Mega Market An Phú","Mega Market Biên Hòa","Mega Market BìNh Dương","Mega Market BìNh ĐịNh","Mega Market Bình Phú","Mega Market Buôn Ma ThuộT","Mega Market Đà NẵNg","Mega Market Hà Đông","Mega Market HảI PhòNg","Mega Market HiệP Phú","Mega Market Hoàng Mai","Mega Market Hồng Bàng","Mega Market Hưng LợI","Mega Market Hưng Phú","Mega Market Kiên Giang","Mega Market Nha Trang","Mega Market QuảNg Ninh","Mega Market Super Centar Đà Nẵng","Mega Market Thanh Xuân","Mega Market Thăng Long","Mega Market VũNg TàU","Mekong Gourmet","Nam An Mai Chí Thọ","Nam An Nguyễn Lương Bằng","Nam An Nguyễn Thị Minh Khai","Nam An Nguyễn Văn Trổi","Nam An Thảo Điền","Root Organic Store","St An Phú","St Mena Trường Sơn","St Menas Celesta Rise","Lotte Bình Dương","Lotte Cần Thơ","Lotte Đà Nẵng","Lotte Đồng Nai","Lotte Gò Vấp","Lotte Hanoi Center","Lotte Nam Sài Gòn","Lotte Nha Trang","Lotte Nha Trang Gold Coast","Lotte Phan Thiết","Lotte Phú Thọ","Lotte Tân Bình","Lotte Vinh","Lotte Vũng Tàu","Lotte West Lake","Go! An Lạc","Go! An Nhơn","Go! Bà Rịa","Go! Bắc Giang","Go! Bạc Liêu","Go! Bến Tre","Go! Bình Định","Go! Bình Dương","Go! Buôn Ma Thuột","Go! Cần Thơ","Go! Đà Lạt","Go! Đà Nẵng","Go! Dĩ An","Go! Điện Bàn","Go! Đồng Nai","Go! Gò Dầu","Go! Gò Vấp","Go! Hà Đông","Go! Hạ Long","Go! Hà Nam","Go! Hải Dương","Go! Hải Phòng","Go! Hòa Thành","Go! Hồng Ngự","Go! Huế","Go! Hưng Yên","Go! Hương Trà","Go! Lào Cai","Go! Lấp Vò","Go! Lộc Ninh","Go! Long Biên","Go! Mê Linh","Go! Miền Đông","Go! Mỹ Tho","Go! Nam Định","Go! Nguyễn Thị Thập","Go! Nha Trang","Go! Nhơn Trạch","Go! Ninh Bình","Go! Ninh Thuận","Go! Phú Mỹ","Go! Phú Thạnh","Go! Quảng Ngãi","Go! Rạch Giá","Go! Tam Kỳ","Go! Tân Hiệp","Go! Tân Uyên","Go! Thái Bình","Go! Thái Nguyên","Go! Thăng Long","Go! Thanh Bình ","Go! Thanh Hóa","Go! Trà Vinh","Go! Trường Chinh","Go! Việt Trì","Go! Vinh","Go! Vĩnh Phúc","Tops Market An Phú","Tops Market Âu Cơ","Tops Market Eco Green","Tops Market Garden","Tops Market Hồ Gươm","Tops Market Lê Trọng Tấn","Tops Market Moonlight","Tops Market Parkcity","Tops Market Thảo Điền","Ân Nam 41 Thảo Điền (An Phú)","Ân Nam Ascentia (Nguyễn Lương Bằng)","Ân Nam Estella","Ân Nam Feliz En Vista","Ân Nam Gourmet Q2 (Võ Trường Toản)","Ân Nam Hai Bà Trưng","Ân Nam Landmark 81","Ân Nam Nguyễn Văn Trỗi","Ân Nam Phú Mỹ Hưng (Nguyễn Đức Cảnh)","Ân Nam Sài Gòn Pearl","Ân Nam Saigon Center","Ân Nam Thảo Điền Green","King Food 0.01 Chung cư An Cư An Phú","King Food 01 Đường Số 10 Tân Kiểng","King Food 01.18 Pegasuite","King Food 0105 B4 Era Town","King Food 17 Hồ Thị Nhung","King Food 09 Lâm Văn Bền","King Food 10 Phạm Hùng","King Food 107 Bình Quới","King Food 108 Ngô Tất Tố","King Food 116 Gò Dầu","King Food 1-19 The Privia","King Food 126 Chợ Lớn","King Food 128 Vườn Lài","King Food 14 Huỳnh Tịnh Của","King Food 1426 Nguyễn Duy Trinh","King Food 15 Nguyên Hồng","King Food 165 Hoàng Hoa Thám","King Food 166E Lê Văn Lương","King Food 195 Thống Nhất","King Food 22 Hoàng Hoa Thám","King Food 222-224 Lê Văn Thịnh","King Food 233 Phạm Hữu Lầu","King Food 305 Nguyễn Duy Trinh","King Food 308 Lê Văn Thọ","King Food 31 Tân Mỹ","King Food 367 Nguyễn Văn Tăng","King Food 371 Nguyễn Kiệm","King Food 372 Dương Quảng Hàm","King Food 410 Phan Huy Ích","King Food 42 Nguyễn Văn Đậu","King Food 43 Bùi Văn Ba","King Food 436 Nguyễn Thị Thập","King Food 46 Nguyễn Thị Tú","King Food 48 CN1","King Food 511 Quốc Lộ 50","King Food 539 Đỗ Xuân Hợp","King Food 54 Vũ Huy Tấn","King Food 571 Huỳnh Tấn Phát","King Food 59 Quốc Hương","King Food 63 Đường Số 3","King Food 64A Cửu Long","King Food 85 Cây Keo","King Food 86B Vũ Tùng","King Food 97 Lê Thị Chợ","King Food 98 Khánh Hội","King Food 99 Đường Số 7","King Food A10-0.02 Ehome 3","King Food A7-8 Valora Mizuki","King Food T4, T5 Block D Chung Cư Akari City","King Food AS19 Block A Prosper Plaza","King Food BB17 Trường Sơn","King Food 66/70 Bình Thành","King Food Block B Imperia An Phú","King Food C0.01 Riverside Phú Mỹ Hưng","King Food Lô H10-05 Chung Cư Citihome Cát Lái","King Food Chung Cư CT1 MT Eastmark City","King Food D1-1.24 Safira Khang Điền","King Food D-2.01A Westgate An Gia","King Food Block C Diamond Riverside","King Food E72 Phú Thuận","King Food A0.01 EhomeS Phú Hữu","King Food Block D Gia Hòa The Art","King Food Block C Harmona","King Food Him Lam Phú Đông","King Food Him Lam Riverside","King Food 296 Hoàng Ngân","King Food Block B1 Hưng Ngân Garden","King Food Block A Jamila Khang Điền","King Food 10D Kỳ Đồng","King Food Lô CD L1-12 Q7 Riverside Đào Trí","King Food 39 Lý Phục Man","King Food B0.07-B0.08 Nam Sài Gòn Residences","King Food 160A Nguyễn Thị Định","King Food 75 Nguyễn Trãi","King Food 299 Nguyễn Văn Khối","King Food 678 Nguyễn Văn Quá","King Food Tháp B Tầng 1 Opal Skyline","King Food R13 Hưng Vượng 2","King Food RS4 Richstar","King Food S01.05 Vinhomes Grand Park","King Food S01.11 Block A1 Charm Sapphire ","King Food S03.05 Vinhomes Grand Park","King Food S06.06 Vinhomes Grand Park","King Food S07.02 Vinhomes Grand Park","King Food S1.0.38 Block A5 Diamond Celadon City","King Food S10.02 Vinhomes Grand Park","King Food SAV_04-00.03 The Sun Avenue","King Food B0.02 Lô MD4-4 Scenic Valley","King Food SH01 Bcons Garden","King Food SH14-15 Saigon South Residences","King Food SH16 Eco Green","King Food 229A Tân Hoà Đông","King Food TMDV2 Mizuki Park","King Food 46 Trần Não","King Food 66 Trương Vĩnh Ký","King Food Vạn Phúc City","King Food 27 Tân Lập","King Food 446 - 448 Phạm Văn Bạch","King Food 02 Tạ Hiện","King Food 128A Kha Vạn Cân","King Food Vinhomes Grandpark 1.10-1.15-1.16 GH5","King Food Vinhomes Grandpark 1.06-1.07 BS11","Emart Gò Vấp","Emart Phan Huy Ích","Emart Sala","King Food Cây Keo - Thủ Đức","King Food Trần Trọng Cung","King Food Nguyễn Trọng Tuyển","King Food Phan Văn Hân","King Food Hà Đô","Go! Vũng Tàu"],"gt_north":{"60 Nguyễn Thiện Thuật- Hoàn Kiếm":["Mai Quang"],"1B Cao Thắng- Hoàn Kiếm":["Hà Chính ( Ms Hương )"],"3 Hàng Khoai- Hoàn Kiếm":["Hải Trang"],"11 Cao Thắng- Hoàn Kiếm":["Mai Thoa ( Tuyết Tiếp )"],"dãy a3 chợ long biên kho mận hùng":["Cô Mận"],"chợ đồng xuân - 26 cao thắng":["Cô Thoa"],"15 chợ cao thắng":["Bình Chung","Hồng Ngọc"],"Chợ 19.12, Hoàn Kiếm":["Long Thoa","Hào Hương","Hạnh Anh","Bình Hoan","Cô Lê (Chị Thêu -1985)","Cô Thu"],"chợ 19.12 - HOÀN KIẾM":["Cô Tâm"],"18 Phùng Hưng- Hoàn Kiếm":["Cô Liên Hoa"],"HOME CITY 177 TRUNG KÍNH":["Siêu Thi K&K"],"118 quán thánh":["Aus Food"],"29 Hàng Vôi":["L'S Place Hang Voi"],"63 Lý Thường Kiệt":["L'S Place Ly Thuong Kiet"],"166 Quán Thánh- Ba Đình":["Qt Mart"],"chợ hàng da":["Kios Mùi Hoà"],"Chợ Hôm- Trần Xuân Soạn- Hai Bà Trưng":["Chị Quyên","Đặng Dung- Kiot 14","Cô Loan- Kiot 15,16","Tuân Thúy Kiot 4"],"40 Yên Phụ- Ba Đình":["Top5 Mart"],"Tòa Park 7, Time City":["Đà Lạt Mart"],"toà g2 s03 sunshie garden - dương văn bé":["Td Mart"],"A5 12 sunshie city ciputra":["Ausfood"],"24 Phú Gia":["Hung Long Phu Gia"],"Khu Đô Thị Ciputra":["L'S G3 Ciputra","L'S Place E5 Ciputra"],"S6 SUNSHINE CITY CIPUTRA":["Green Potota Mart"],"L4 KĐT Ciputra":["Dailys Mart"],"S6 KĐT Ciputra":["Smart"],"105 Xuân Diệu- Tây Hồ":["Fresh Food"],"1 Xuân Diêu":["L'S Place Xuân Diệu"],"71b  Xuân Diệu":["Minimart Hung Long Xuan Dieu"],"74 Tô Ngọc Vân":["Minimart Quang Ba"],"3 Tây Hồ":["Minimart Sedona"],"15c ngõ 12 Đặng Thái Mai":["Sieu Thi Xóm Chùa"],"1 Đặng Thái Mai":["Thanh Long Food"],"22 Từ Hoa":["Thủy Thành"],"76 Từ Hoa":["Minan Mart"],"19 Tô Ngọc Vân":["Mini Food"],"21 Tô Ngọc Vân":["Houseing"],"Chợ Ngô Sỹ Liên- Đống Đa":["Cô Lan Đức","Cô Vinh Nhuân"],"Chợ Ngô Sỹ Liên":["Hùng Thơm"],"Trần phú - Hà đông":["Fuji Mart"],"TÂN MAI":["Fuji Mart"],"89 Lạc long quân":["Fuji Mart"],"134 Lạc Long QUân":["Fuji Mart"],"1 Thái Thịnh- Đống Đa":["Fuji Mart Thái Thịnh"],"142 Lê Duẩn- Đống Đa":["Fuji Mart Lê Duẩn"],"36 Hoàng Cầu- Đống Đa":["Fuji Mart Hoàng Cầu"],"b11 kim liên":["Siêu Thị Tự Chọn Kim Liên"],"Trần Phú - BA ĐÌNH":["Fuji Mart"],"36 vạn bảo":["Teekiu Mart"],"thành công":["Brg Thành Công"],"59 châu long - ba đình":["Shop Thành Tâm"],"Hòa Bình Green - 376 Đường Bưởi":["Dan'S Shop"],"195 Nghi Tàm":["L'S Place Nghi Tàm"],"26 Liễu Giai":["L'Splace Liễu Giai"],"Chợ Đồng Xuân- Hoàn Kiếm":["Loan Thuận"],"Sảnh chung cư 162 Thụy Khuê":["Chị Huyền Anh"],"KĐT Vinsmartcity":["Tk Mart","Chị Hằng Vinsmart"],"masteri smart city":["One Mart","St Đức Thành"],"Kđt Vinsmartcity":["Tomo Mart"],"tòa zone 4 Kdt vinsmartcity":["Daily Mart Zone 4"],"tòa s105 kdt vinsmartcity":["Daily Mart S105"],"MỄ TRÌ HẠ":["St Hà Đăng"],"THÀNH THÁI":["Hà Đăng Mart"],"CT1 Trần Văn Lai":["L'S Place Mỹ Đình"],"6 Chính Kinh":["Fuji Mart Chính Kinh"],"6 Lê Văn Thiêm- Thanh Xuân":["Family Mart"],"65 vũ trọng phụng":["Won Mart"],"ocean park s2-02":["Đức Loan Mart"],"ocean park":["Thực Phẩm Sạch Mini Mart","Tý Mart","Daily Mart"],"ocean park s1-08":["Xanh Mart"],"Kdt oceanpark":["24H Mart"],"HH2B Linh Đường,quận hoàng mai":["Mường Thanh Mart"],"KĐT Định Công- Thanh Xuân":["St Đức Thành"],"176 định công,quận hoàng mai":["Daily Mart Định Công"],"37a bà triệu chợ Hà Đông":["Shop Hương Vĩnh"],"8 đinh tiên hoàng chợ Hà Đông":["Shop Mai Tá"],"N01-T4 KĐT Ngoại Giao Đoàn- Bắc Từ Liêm":["St Đức Thành"],"3-T 1-10 chung cư starlake":["Linh Mart"],"N03 -T5 KĐT Ngoại Giao Đoàn":["Đồng Xanh Food"],"CHỢ HÀNG DA KIOT B461-B463":["Ch Mùi Hòa Chợ Hàng Da"],"KIOT 1+4 KHU B DÃY 1 chợ ngọc hà":["Ch Cô Phương"],"5 CHỢ NGỌC HÀ":["Ch A Dũng Đại Lý Gạo"],"94/10 QUỲNH MAI":["Ch Cô Miến"],"30 NGÕ 10 QUỲNH MAI":["Ch Cô Hương"],"KIOT 63 TRONG CHỢ 8-3":["Ch Bác Khuê"],"KIOT I14 CHỢ KHƯƠNG ĐÌNH":["Ch Vũ Thị Dung ( C Ngọc )"],"KIOT TRONG CHƠ GIA LÂM":["Ch Cô Minh Lý"],"17T9 Nguyễn Thị Định":["Tiện Lợi Mart"],"park 7 time city":["Hoồng Phúc Mart"],"3 Lò đúc":["Aus Food"],"240 Chợ khâm thiên":["Anh Đào Mart"],"Shop house VL2–SP-20 Vinsmart city":["Td Mart"],"số 1 ngách 36/58/44 ngõ 44 Phố Đức Giang,Việt Hưng-Long Biên":["C Ngân Anh"],"81 ngõ chợ khâm thiên":["Đại Lý Hậu Dung"]},"gt_central":{"Chợ Mai":["Cô Nguyệt","Chị Lộc","Chị Tâm","Cô Thủy","Chị Thanh","Cô Thu","Chị Bé","Dì Một","Chị Duyên","Chị Hiệp","Cô Nga"],"Chợ Mân Thái":["Chị Thu","Chị Thảo","Chị Trinh","Chị Xuân","Chị Tý","Cô Tứ","Cô Hà","Chị Vân"],"Chợ Nại Hiên Đông":["Chị Vương","Chị Lung","Chị Lòng","Chị Hoa","Chị Hải","Chị Thanh","Cô Muôn","Cô Gái","Chị Chúc","Cô Phúc","Chị Thảo","Chị Hiền","Chị Ngân","Chị Tây(Âu Lạc)"],"Chợ An Hải Bắc":["Chị Tuyết","Cúc Na","Cúc Quỳnh","Cô Sương","Phượng Hồng","Cô Bông","Chị Duyên","Chị Hạnh","Cô Thạnh","Cô Hài","Chị Bé","Chị Bài","Chị Mười","Cô Hương","Cô Hoàng"],"Chợ Hà Thân":["Chị Nhung","Cô Liêm","Chị Huệ","Chị Xí","Cô Sửu","Cô Lời","Cô Liễu","Chị Lan"],"Chợ Siêu Thị":["Chị Thúy","Cô Thủy","Cô Gái","Cô Phượng","Hà Thanh","Cô Chờ","Cô Nhạn","Cô Sen","Cô Hồng","Mai B","Lan (Thôi )","Nhơn Hồng","Chị Vy","Cô Đông","Thùy Linh","Kim Lan","Chị Vân","Thanh Vẫn","Hải Hà","Tí Huyền","Anh Diệp","Kim Khánh","Cô Hạnh","Cô Mai"],"Chợ Thanh Khê":["Cô Nhân","Chị Liên","Vân Anh","Cô Nhật","Cô Định","Chị  Nguyên","Chị B Ốm","Thái Hòa","Cô Châu","Chị Sương ( Trong )","Chị Thúy","Chị B Mập","Chi Sương ( Ngoài )","Cô Chốt","Chị Chín","Chị Thanh","Chị Yến Vẹn","Chị Nỡ","Cô Cương"],"Chợ Kim Liên":["Cô Cúc","Cô Kim","Chị Chúng","Chị Hát","Chị Hải"],"Chợ Nam Ô":["Cô Nhựt","Cô Hòa","Cô Thêm","Cô Hà","Vân Cam","Cô Đấu","Cô Huệ","Cô Tròn","Chị Châu","Cô Liễu","Chị Hạnh","Cô Tự","Cô Hồng","Cô Nhỏ","Chị Mai"],"Chợ Hòa Khánh( Đình Dưới )":["Cô Huế","Cô Tuyết","Dì Bính","Cô Sang","Cô Đường","Chị Toàn","Cô Thu"],"Chợ Hòa Khánh":["Bé Thúy","Bé Thu","Hà Sơn","Chị Bông","Cô Đường","Thu Phương","Tuyên Cúc","Chín Thương","Chị Xuân","Nga Bảy","Hồng Thao","Chị Thảo"],"Chợ Hòa Mỹ":["Chị Hải","Cô Một","Ngọc Trai","Cô Tầm","Bé Út","Ngọc Lan","Cô Hải","Chị Ty","Cô Quý( Bé Ù)","Cô Thứ","Cô Vân","Cô Hường","Chị Nguyệt","Chị Đông"],"Chợ Hòa An":["Chị Hạnh","Minh Lễ","Chị Lào","Minh Phụng","Chị Hay","Chị Lan","Cô Đông"],"Chợ Non Nước":["Cô Thu","Cô Linh","Cô Hoài","Cô Bé","Cô Kiều","Chị Oanh","Chị Ngọc","Chị Hạnh","Cô Nữ","Chị Liên","Cô Tám","Cô Tín","Cô Giỏi","Cô Vân","Cô Lộc","Cô Loan","Ngọc Nhỏ","Chị Minh","Cô Nhi"],"Chợ Bắc Mỹ An":["Chị Liên","Chị Yên","Thanh Hồng","Cô Yên","Chị Hồng","Cô Lai","Cô Tâm","Cô Bình","Cô Hoa"],"Chợ An Hải Đông":["Cô Sáu","Cô Quý","Cô Nhàn","Cô Vân","Kim Liên","Cô Hòa","Cô Thanh","Chị Xuân","Chị Hoa","Chị Hạnh","Bích Hường","Chị Phượng","Chị Hương","Kiều Vân","Dì Hoa","Cô Xuân"],"Chợ Phước Mỹ":["Cô Vân","Bé Tuyền","Chị Huyền","Cô Tân","Cô Thái","Chị Tú","Cô Nhi","Cô Ca","Cô Đăng","Cô Tường","Cô Châu"],"Chợ Đầu Mối":["Chị Phước","Út Đủ","Chị Tuyên","Chị Bé ( Tuyết )","Phương Thảo","Kim Bằng","Kim Anh","Gái Chay","Chị Hiền","Dì Chánh","Phú Hoa","Phương Mai","Cô Hương"],"Chợ Mới":["Lam Ngọc","Thu Nhi","Ty Quế","Lan Lan","Trâm Anh","Mười Đào","Cô Hạnh","Thịnh Thịnh","Thủy Vinh","Tuấn Ngọc","Ngọc Hoa","Kiều Oanh","An Giàu","Dạ Thủy","Loan Ty","Hà Miên","Diệu Hằng","Thanh Tý"],"Chợ Nại Hiên":["Cô Anh","Cô Nhung","Cô Thanh","Chị Hằng","Cô Hương","Cô Mãn"],"Chợ Hòa Cường":["Kim Thành","Lài Gạo","Thủy Gạo","Cô Huệ","Mai Ly","Chị Tâm","Tuấn Phương"],"Chợ Hàn":["Dì Thu","Ngọc Ánh","Kiều Chinh","Thuận Nhung","Bé Xíu","Chị Bê","Chị Sương","Chị Thúy"],"Chợ Nguyễn Tri Phương":["Chị Hiền","Minh Trang","Bích Hòa","Chị Hà","Cô Yến"],"Chợ Cẩm Lệ":["Cô Lý","Chị Hòa","Cô Hải","Kim Ánh","Cô Hoàng","Cô Lương","Chị Hải","Cô Trung","Chị Phương","Cô Mốt","Cô Bờ","Cô Tám","Hồng Phượng","Kim Thảo","Cô Thanh","Chị Cẩm"],"Chợ Hòa Xuân":["Lan Phương","Nhuận Vương","Cô Hai","Chị Sinh","Cô Tám","Cô Liên"],"Chợ Hòa xuân":["Bích Nhung","Chị Mận"],"Chợ Tân Chính":["Thiện Hà","Cô Huệ","Chị Thủy","Cô Hồng"],"Chợ Chính Gián":["Cô Hoa","Bé Uyên","Cô Nguyệt","Cô Huyền"],"Chợ Phú Lộc":["Hồng Vân","Ngọc Liên","Kim Lý","Cô Mới","Thuận Thảo","Chị Thuyền","Thùy Hoa"],"Chợ Quán Hộ":["Dì Mười","Chị Vinh","Cô Có","Cô Thảo","Chị Sương","Chị Hòa"],"Chợ Thuận An":["Cô Hương","Chị Châu","Cô Thúy","Cô Vân","Cô Nga","Cô Cảnh","Cô Anh","Cô Chi","Dì Hiền","Dì Hóa","Dì The","Dì Bé"],"Chợ Tân An":["Chị Mỹ","Cô Nguyệt","Chị Thảo","Cô Hoa","Chị Nha"],"Chợ Đống Đa":["Thùy Lan","Hoàng Hồng","Thanh Thủy","Cô Thương","Ngọc Quý","Hạ Liên","Chị Thu","Trang Ty","Tường Vân","Khánh Lạng","Tuyết Xù","Kim Nhung","Cô Hà","Thanh Nga","Cô Chanh","Cô Thủy","Cô Dung","Thục Mỹ","Cô Mật","Thu Sang","Thùy Nhi","Hoàng Anh"],"Chợ Cồn":["Chị Hạnh","Thanh Tằm","Kim Chi","Dì Hữu","Cô Thương","Cô Gái ( Huệ )","Chị Mai (Lai )","Cô Thu","Cô Tuất","Túy Nga","Bích Hòa","Lợi Mỹ","Vân Minh","Hạnh Hùng","Cô Phia","Vân Nga","Thanh Hà","Hoa Xí","Mai Lành","Thúy Hòa","Cô Thời","Kim Cúc","Thanh Nga (Thảo)","Cô Dung","Chị Cẩm","Cô Hương","Dì Bê","Dì Thắng","Dì Mừng","Dì Bé","Dì Hương","Dì Mẫn"],"Chợ Thanh Bình":["Cô Thu","Cô Đan","Thu Cao"],"Chợ Thuận Thành":["Chị Liên","Chị Vân","Chị Bé"],"Chợ Tam Thuận":["Cô Vinh","Cô Lài","Chị Hạ","Chị Trang","Cô Tầu","Chị Loan","Dì Nhung","Chị Nhung","Cô Ngô","Chị Thủy"],"Chợ Ái Nghĩa":["Cô Mười","Cô B","Cô Phương","Cô Phước","Cô Hoa","Cô Điểm","Cô Chắc","Cô Bông","Cô Xanh","Chị Thuận","Chị Nhung","Cô Ba","Cô Liên","Cô Hoàng"],"Chợ Bà Lê":["Cô Mỹ","Chị Huế","Chị Lý","Chị Yến"],"Chợ Vĩnh Điện":["Chị Lụa","Chị Hạnh","Chị Viện","Chị Thu","Chị An","Chị Phong","Trúc Anh","Mai Đậu","Cô Hải","Cô Hà","Chị Hoàng","Chị Trang","Chị Chị Phượng","Mai Diệu","Cô Sen (Chay)"],"Chợ Miếu Bông":["Chị Mười","Cô Nga(Hàng Rau)","Cô Hạnh","Bốn Hồng","Cô Bốn","Cô Hòa","Chị Ngân"],"Chợ Trà Kiệu":["Bích Tho","Hai Ngàn","Chị Nga"],"Chợ Thần Phù":["Dì Á","Dì Bẹp","Chị Bé Em","Dì Đức","Chị Lớn","Chị Nhung"],"Chợ Dạ Lê":["Dì Tuyết","Chị Thuỷ"],"Chợ Thôn 1 Thuỷ Dương":["Chị Dung","Dì Nguyệt","Dì Hạnh","Chị Quyên"],"Chợ Mai Thuỷ Dương":["Mệ Lê","Mệ Lợi","Chị Ty","Bà Sen","Dì Khế","Dì Trang","Dì Nga","Bà Hạnh","Dì Bé"],"Chợ Phú Bài":["Bé Nhi","Cô Lợi","Cô Bá","Chị Phượng","Dì Hòa Tin","Dì Nhung","Dì Hồng","Thắm Kha","Dì Nhỏ","Thu Thanh","Dì Na","Dì Sương"],"Chợ Phù Bài":["Chị Ngàu","Chị Lan","Bà Sen","Bà Sương"],"Chợ Đông Ba":["Cô Mậu","Cô Hiu","Cô Trang","Cô Nga","Cô Yến","Cô Thiệu","Cô Tính","Hạnh Dương","Cô Hiếu","Cô Tám","Cô Thanh","Yến Sơn","Chị Chi Ngoài","Cô Chế","Cô Lộc","Hiền Chi","Dì Hảo Túy","Dì Diệp","Bà Đính","Cô Ngăn","Bạch Vân","Bà Hạnh","Chú Vinh","Mỹ Ngọc","Cô Nhung","Chị Chi Lao","Cô Nở","Bé Luật","Ty Cau","Cô Hương","Cô Thảo","Cô Tỷ","Dì Vân","Dì Xuân","Bà Xê","Chị Bé Tâm","Chị Điểm","Dì Hóa","Bà Đô","Dì Dung","Chị Hằng","Dì Lục","Dì Ly"],"Chợ Phú Bình":["Dì Hạnh","Dì Tuân","Dì Nở","Dì Tý"],"Chợ Tứ Hạ":["Chị Chi","Chị Thủy","Chị Hiền"],"Chợ An Lỗ":["Chị Bé","Chị Phúc","Chị Xê","Chị Phượng","Chị Hường","Bà Thọ","Chị Bê","Cô Đua","Cô Hòa","Cô Mong","Chị Dàng","Cô Nhỏ","Dì Gái"],"Chợ Văn Xá":["Dì Hoa","Dì Lê","Dì Thảo"],"Chợ Kim Long":["Chị Diệu","Anh Vĩnh Nhân","Cô Bé","Dì Hương","Dì Cẩm","Chị Bé","Chị Thúy"],"Chợ Bến Ngự":["Dì Vui","Dì Cần","Dì Trung","Dì Nhỏ","Kim Chi","Dì Hương","Chị Yến","Chị Nguyệt","Dì Lai","Dì Cúc","Dì Thu","Dì Toàn","Dì Bờm","Dì Nhớ","Dì Ty","Hà Khiêm","Dì Lan","Dì Hà"],"49 Phan Đình Phùng":["Chị Hoa"],"Chợ Phước Vĩnh":["Dì Ty","Dì Huyền","Bà Hạnh","Chị Trúc","Dì Hương","Dì Xuân","Dì Cúc"],"Chợ Trường An":["Chị Hà","Bà Tùng","Dì Diệu","Dì Ý","Dì Lý","Dì Yến","Dì Phúc","Chị Kim Anh","Dì Năm","Tiểu Hương","Hùng Lộc","Th Cô Thiện","Chị Yến","Dì Vy"],"Chợ Fafim":["Cô Sinh","Chị Lan","Chị Đức","Cô Hạnh"],"Chợ Tây Lộc":["Cô Duyên","Dì Oanh","Dì Trinh","Dì Liễu","Dì Gái","Chị Phượng"],"Chợ Xép Thuận Lộc":["Cô Ni","Chị Huệ","Cô Gái Thọ","Dì Na","Dì Bê","Dì Như","Dì Nga","Dì Hải","Dì Ngọc"],"Chợ Thuận Hòa":["Cô Ngân","Chị Bé","Cô Hàng","Cô Huyền","Dì Thảo"],"Chợ Cống":["Chị Bo","Chị Nga","Cô Gái","Chị Hà","Cô Tý","Cô Tám","Chị Hoa","Chị Hiền","Chị Lập","Chị Thủy"],"Chợ Cống NĐ":["Chị Xuân","Chị Hoa","Chị Mai"],"Chợ Vỹ Dạ":["Chị Phúc","Cô Cư","Cô Hiền","Cô Giàu","Cô Tâm","Chị Bé","Cô Thế","Dì Ni"],"Chợ An Cựu":["Cô Hùng","Cô Bưởi","Chị Hiền","Chị Cúc","Cô Phú","Cô Hương","Cô Hồng","Cô Cúc","Cô Thu","Cô Chinh","Chị Trâm","Chị Ty","Cô Én","Cô Ngọc","Chị Nghi","Dì Nghĩa","Bà Mẫn","Chị Hải"],"Chợ Nam Phổ":["Chị Út","Chị Nga"]},"gt_south":{"Sạp 645- Chợ Tân Định":["Kim Duyên"],"Sạp 4- Chợ Tân Định":["Kim Nguyên"],"Sạp 1- Chợ Tân Định":["Thanh Nhã"],"Sạp 666- Chợ Tân Định":["Từ Lang"],"Sạp 637- Chợ Tân Định":["Cô Châu"],"Sạp 72- Chợ Tân Định":["Cô Hồng"],"Sạp  928- Chợ Tân Định":["Cô Ánh"],"Sạp 838- Chợ Tân Định":["Mỹ Hà"],"Sạp 656- Chợ Tân Định":["Thiên Châu"],"Sạp 473- Chợ Tân Định":["Minh Uyên"],"Sạp 926- Chợ Tân Định":["Kim Khuyên"],"Sạp 467- Chợ Tân Định":["Cô Hoàng"],"Sạp 2- Chợ Tân Định":["Lan Anh"],"Sạp 915- Chợ Tân Định":["Cô Hứng"],"Sạp 914- Chợ Tân Định":["Cô Ba"],"Sạp 934- Chợ Tân Định":["Cô Huệ"],"Sạp 932- Chợ Tân Định":["Cô Thu"],"Shop 36 Mã Lộ, Q1- Chợ Tân Định":["Hồng Đào"],"Shop 22 Mã Lộ, Q1- Chợ Tân Định":["Shop Cô Tư"],"Sạp 132- Chợ Thái Bình":["Dì Sáu"],"Sạp 101- Chợ Thái Bình":["Chị Trinh"],"Sạp 188- Chợ Thái Bình":["Cô Hạnh"],"Sạp 305- Chợ Thái Bình":["Cô Dung"],"Sạp 157- Chợ Thái Bình":["Minh Châu"],"Sạp 62- Chợ Thái Bình":["Khanh"],"Sạp 75- Chợ Thái Bình":["Tâm Uyên"],"Sạp 267- Chợ Thái Bình":["Cô Hoàng"],"Shop 574 Cô Bắc, Q1":["Cô Thu"],"Sạp 108- Chợ Đakao":["Cô Lan"],"Sạp 47- Chợ Đakao":["Nguyệt Thường"],"Shop 21 Trương Hán Siêu- Chợ Đakao":["Cô Hai"],"Shop 48 Trương Hán Siêu- Chợ Đakao":["Chị Nhung"],"Sạp 110- Chợ Đakao":["Cô Hảo"],"Sạp 94- Chợ Đakao":["Chị Hà"],"Shop 50 Trương Hán Siêu, Q1":["Thảo"],"60 Hàm Nghi, Q1":["Thái Hòa"],"71 Hàm Nghi, Q1":["Phương Hà"],"114 Cống Quỳnh":["Cường Dung"],"18A/67 Nguyễn Thị Minh Khai, Q1":["Cocotte"],"Sạp 187- Chợ Hoà Hưng":["Chị Hương"],"Sạp 53- Chợ Hoà Hưng":["Cô Thương"],"Sạp 65- Chợ Hoà Hưng":["Cô Sáu"],"Sạp 67- Chợ Hoà Hưng":["Bác Hải"],"Sạp 71- Chợ Hoà Hưng":["Cô Trợ"],"Sạp 48- Chợ Hoà Hưng":["Chính Lành"],"Sạp 91- Chợ Hoà Hưng":["Chị Thuyền"],"Sạp 51- Chợ Hoà Hưng":["Chị Xuân"],"193E Trần Văn Đang, Q3":["Chị Mai"],"219E Trần Văn Đang, Q3":["Sang"],"219 Trần Văn Đang, Q3":["Chị Lợi"],"372E Trần Văn Đang, Q3":["Chị Nga"],"366 Trần Văn Đang, Q3":["Chị Kim"],"372 Trần Văn Đang, Q3":["Cô Tư"],"Sạp 151- Chợ Nguyễn Văn Trỗi":["Cô Nghĩa"],"Sạp 142- Chợ Nguyễn Văn Trỗi":["Chị Anh"],"Sạp 138- Chợ Nguyễn Văn Trỗi":["Chị Lan"],"Sạp 137- Chợ Nguyễn Văn Trỗi":["Cô Đạm"],"Sạp 176- Chợ Nguyễn Văn Trỗi":["Huỳnh Như"],"Sạp 141- Chợ Nguyễn Văn Trỗi":["Hà Phượng"],"Sạp 103- Chợ Nguyễn Văn Trỗi":["Hồng"],"Sạp 4- Chợ Nguyễn Văn Trỗi":["Cô Lan"],"Sạp 8- Chợ Nguyễn Văn Trỗi":["Cô Hiếu"],"Sạp 152- Chợ Nguyễn Văn Trỗi":["Chị Bích"],"Sạp 148- Chợ Nguyễn Văn Trỗi":["Chị Hương"],"Sạp 44- Chợ Nguyễn Văn Trỗi":["Chị Yến"],"Sạp 69- Chợ Nguyễn Văn Trỗi":["Cô Nhân"],"Sạp 68- Chợ Nguyễn Văn Trỗi":["Chị Hưởng"],"Sạp 170- Chợ Nguyễn Văn Trỗi":["Chị Kiều"],"Sạp 23E- Chợ Vườn Chuối":["Cô Cam"],"Shop 430/46 Chợ Vườn Chuối":["Long Tuyết"],"Shop 430/40 Chợ Vườn Chuối":["Cô Hạnh"],"Shop 430/52 Chợ Vườn Chuối":["Chú Thái"],"Shop 430/43 Chợ Vườn Chuối":["Chị Kiều"],"Sạp 69- Chợ Xóm Chiếu":["Tư Dừa"],"Sạp 71- Chợ Xóm Chiếu":["Ngọc Phượng"],"Sạp 55- Chợ Xóm Chiếu":["Xuân Yến"],"Sạp 58- Chợ Xóm Chiếu":["Ngọc Ánh"],"Sạp 29- Chợ Xóm Chiếu":["Chị Ba"],"Sạp 57- Chợ Xóm Chiếu":["Cô Nguyên"],"Sạp 107- Chợ Xóm Chiếu":["Tỷ Huê"],"Sạp 224- Chợ Xóm Chiếu":["Chị Ba"],"89 Lê Văn Linh, Q4":["Thanh"],"Sạp 67- Chợ Xóm Chiếu":["Chị Quỳnh"],"Sạp 35- Chợ Xóm Chiếu":["Kim Phượng"],"Shop 68 Lê Văn Linh, Q4":["Tế Sanh Hòa"],"Shop 113 Lê Văn Linh, Q4":["Phương Trần"],"Shop 162 Lê Quốc Hưng, Q4":["Chị Liên"],"Sạp 77- Chợ Xóm Chiếu":["Chú Sồi"],"Shop 74 Lê Văn Linh, Q4":["Anh Tâm"],"Shop 194/8 Lê Quốc Hưng, Q4":["Cô Thuỷ"],"Shop 200 Đoàn Văn Bơ, Q4":["Như Trang"],"Shop 193 Đoàn Văn Bơ, Q4":["Anh Thái"],"Sạp 132A Chợ Hoà Bình":["Hồng Phát"],"Sạp 138A Chợ Hoà Bình":["Cô Bích"],"Sạp 139A Chợ Hoà Bình":["Triệu Hưng"],"Sạp 136B Chợ Hoà Bình":["Cô Thanh"],"Sạp 145A Chợ Hoà Bình":["A.Mành"],"Sạp 135A Chợ Hoà Bình":["Quốc Ký"],"Sạp 140A Chợ Hoà Bình":["Chị Trân"],"Sạp 129B Chợ Hoà Bình":["Chị Linh"],"Kios 2- 37 Bạch Vân- Chợ Hoà Bình":["Shop Cô Nguyệt"],"Kios 9- 37 Bạch Vân- Chợ Hoà Bình":["Anh Thanh"],"Kios 6- 37 Bạch Vân- Chợ Hoà Bình":["Shop Chị Quyên"],"Kios 1- 37 Bạch Vân- Chợ Hoà Bình":["Shop Anh Sơn"],"Sạp D4- Chợ Thực Phẩm An Đông":["Chị Hạnh"],"Sạp D9- Chợ Thực Phẩm An Đông":["Long Nga"],"Sạp D5- Chợ Thực Phẩm An Đông":["Chị Phượng"],"Sạp D1- Chợ Thực Phẩm An Đông":["Hoa Phượng"],"Sạp D19- Chợ Thực Phẩm An Đông":["Thảo Dừa"],"165 Nguyễn Tri Phương, Q5":["Vĩnh Phát"],"Chợ Xã Tây":["Cô Thu"],"Sạp 457 Chợ Phú Lâm":["Chị Liên"],"Shop 35 Đường Sô 3- Chợ Phú Lâm":["Phước Trường"],"Sạp 205- Chợ Bình Tiên":["Thạnh Phát"],"Sạp 248- Chợ Bình Tiên":["Bửu Châu"],"Sạp 305- Chợ Bình Tiên":["Nam Hương"],"Shop 234/36/2 Phạm Phú Thứ- Chợ Bình Tiên":["Bình Dùng"],"Sạp 190- Chợ Bình Tiên":["Trường Hưng"],"Sạp 289- Chợ Bình Tiên":["Khả Quyên"],"Shop 180/10 Phạm Phú Thứ- Chợ Bình Tiên":["Nguyệt"],"Shop 7 Lô D- Chợ Bình Tiên":["Chị Linh"],"Shop 234/33 Phạm Phú Thứ- Chợ Bình Tiên":["Em Hiền"],"Shop 73 Nguyễn Đình Chi, Q6":["Tuyết Mai"],"Shop 26- Trần Bình- Chợ Bình Tây":["Hiệp Thái"],"Sạp 19- Trần Bình- Chợ Bình Tây":["Hòa Mỹ"],"Sạp 69- Trần Bình- Chợ Bình Tây":["Linh"],"Shop 13 Nguyễn Xuân Phụng- Chợ Bình Tây":["Cô Mí"],"Shop 108 Phan Văn Khoẻ- Chợ Bình Tây":["Linh Hồng"],"Kios 1- Chợ Tân Mỹ":["Sạp Bé Na"],"Kios 12- Chợ Tân Mỹ":["Dì Ngân"],"Kios 28- Chợ Tân Mỹ":["Nga Thiện"],"Kios B29- Chợ Tân Mỹ":["Tuy Lý"],"Shop 35 Đường Số 8- Chợ Tân Mỹ":["Hòa Ca"],"Shop 2H Đường Số 8- Chợ Tân Mỹ":["Bảo"],"Shop 33 Đường Số 8- Chợ Tân Mỹ":["Chị Phương"],"Sạp 23- Chợ Tân Quy":["Chú Toàn"],"Sạp 27- Chợ Tân Quy":["Cô Út"],"Sạp 14- Chợ Tân Quy":["Cô Thạch"],"Sạp 21- Chợ Tân Quy":["Cô Nhã"],"Sạp 10- Chợ Tân Quy":["Chị Thắm"],"Sạp 26- Chợ Tân Quy":["Chị Mai"],"Shop 247 Đường Số 17- Chợ Tân Quy":["Chị Sương"],"Shop 208 Đường Số 17- Chợ Tân Quy":["Shop 208"],"Shop Đường Số 15- Chợ Tân Quy":["Hân Linh"],"Shop 49 Đường Số 15- Chợ Tân Quy":["Mỹ Nhi"],"Shop 81 Đường Số 15- Chợ Tân Quy":["Cô Giàu"],"18, Bến Nghé, Q7- KCX TT":["Cty Thịt Tươi Vina"],"42, Bến Nghé, Q7- KCX TT":["Cô Loan"],"Phú Mỹ Hưng- Q7":["Nhà Hàng Jin Sundae"],"Shop 180 Ba Tơ, Q8- Chợ Phú Lợi 2":["Út Hài"],"Sạp 23E- Chợ Phú Lợi 2":["Kim Vân"],"Sạp 23D- Chợ Phú Lợi 2":["Út Sang"],"Sạp 24E- Chợ Phú Lợi 2":["Phụng Nhung"],"Shop 205 Ba Tơ, Q8- Chợ Phú Lợi 2":["Văn Cường"],"2884 Phạm Thế Hiển- Q8":["Vũ Khanh"],"Sạp 78 Chợ Nhị Thiên Đường":["Liên Liên"],"Sạp 75 Chợ Nhị Thiên Đường":["Thanh Hồng"],"Sạp 81 Chợ Nhị Thiên Đường":["Phương Thanh"],"Sạp 116 Chợ Nhị Thiên Đường":["Kim Nga"],"Shop 113 Hoàng Minh Đạo, P5, Q8":["Chị Trâm"],"Shop 15B Hoàng Minh Đạo,P5, Q8":["Nguyễn Cường"],"Shop Hoàng Minh Đạo, P5, Q8":["Cô Phượng"],"Shop 166 Bùi Minh Trực, P5, Q8":["Ngọc Hân"],"Sạp 21- Chợ Xóm Củi":["Ánh"],"Sạp 130- Chợ Xóm Củi":["Chị Yến"],"Shop 134 Bến Cần Giuộc- Chợ Xóm Củi":["Cô Huế"],"Sạp 224- Chợ Xóm Củi":["Cô Duyên"],"Sạp 262- Chợ Xóm Củi":["Thiên Phú"],"Sạp 91- Chợ Xóm Củi":["Chị Nguyệt"],"Sạp 269- Chợ Xóm Củi":["Kim Phú"],"Sạp 18B- Chợ Xóm Củi":["Hồng"],"Sạp 222- Chợ Xóm Củi":["Cô Liên"],"Sạp 275- Chợ Xóm Củi":["Kim Toàn"],"Sạp 272- Chợ Xóm Củi":["Cô Lan"],"Sạp 135- Chợ Xóm Củi":["Cô Mai"],"Sạp 216- Chợ Xóm Củi":["Cô Út"],"Sạp 266- Chợ Xóm Củi":["Thúy Nga"],"Sạp 93- Chợ Xóm Củi":["Kim Vân"],"Sạp 3- Chợ Nguyễn Chế Nghĩa":["Chú Tỷ"],"Sạp 5- Chợ Nguyễn Chế Nghĩa":["Anh Tuấn"],"Shop 129/6 Nguyễn Chế Nghĩa, Q8":["Chị Hà"],"Sạp 50- Chợ Rạch Ông":["Cô Hồng"],"Sạp 29- Chợ Rạch Ông":["Chị Oanh"],"Sạp 24- Chợ Rạch Ông":["Chị Diễm","Bửu Trân"],"Sạp 3- Chợ Rạch Ông":["Khoái Hương"],"Sạp 56- Chợ Rạch Ông":["Chị Yến"],"Sạp 12- Chợ Rạch Ông":["Cô Khôi"],"Shop 6L Nguyễn Thị Tần- Chợ Rạch Ông":["Chị Mỹ"],"Shop 3L Nguyễn Thị Tần- Chợ Rạch Ông":["Ngọc Linh"],"Shop 19F Nguyễn Thị Tần- Chợ Rạch Ông":["Cô Linh"],"Shop 119/68/59 Nguyễn Thị Tần- Chợ Rạch Ông":["Cô Cẩm"],"Sạp 112- Chợ Phạm Thế Hiển":["Tuyết Nho"],"Sạp 110- Chợ Phạm Thế Hiển":["Cô Thủy"],"Sạp 228- Chợ Phạm Thế Hiển":["Chị Lên"],"Sạp 108- Chợ Phạm Thế Hiển":["Duyên Vân"],"Sạp 10- Chợ Phạm Thế Hiển":["Minh Lý"],"Shop 92 Đào Cam Mộc- Chợ Phạm Thế Hiển":["Chị Thủy"],"Shop 22C cc Phạm Thế Hiển, Q8":["Cô Thu"],"Shop 71 Đào Cam Mộc- Chợ Phạm Thế Hiển":["Chị Yến"],"Shop 94 Bis, Đào Cam Mộc- Chợ Phạm Thế Hiển":["Chị Muối"],"Shop 44 Đường Tám Danh, Q8":["Hoàng Linh Anh"],"Sạp 21- Chợ Phú Lợi 1":["Cô Tuyết"],"Sạp k3- Chợ Phú Lợi 1":["Hoài Thu"],"Sạp 32- Chợ Phú Lợi 1":["Khanh"],"Sạp 12c1- Chợ Phú Lợi 1":["Thanh Hương"],"Sạp 10- Chợ Phú Lợi 1":["Cô Bình"],"Shop 2828 Phạm Thế Hiển, Q8":["Cô Mai"],"Sạp 85- Chợ Bình Đông":["Chị Minh"],"Sạp 21- Chợ Bình Đông":["Chị Phương"],"Kios 15- Chợ Bình Đông":["Chị Út"],"Sạp 5- Chợ Bình Đông":["Cô Lài"],"Kios 19- Chợ Bình Đông":["Sạp Đạt Tâm"],"Shop 301 Bến Bình Đông, Q8":["Shop Phô Mai"],"Shop 8 Mễ Cốc, Q8":["Shop Anh Thực"],"Shop 671 Ba Đình- Chợ Ba Đình":["Cô Diệu"],"Shop 70B BA ĐÌNH, Q8 (CHỢ BA ĐÌNH)":["Cao Phát"],"Shop 731 Ba Đình- Chợ Ba Đình":["Chị Tú"],"Shop 72 Ba Đình- Chợ Ba Đình":["Cô Ngân"],"Shop 691 Ba Đình- Chợ Ba Đình":["Cô Hồng"],"Sạp 15A- Chợ Ba Đình":["Cô Phượng"],"Shop 396 Ba Đình- Chợ Ba Đình":["Cô Bông"],"Chợ Bình An":["Cô Vân"],"Shop 6 Trần Văn Thành, Q8":["Cô Hạnh"],"Sạp 582 Khu C- Chợ Nguyễn Tri Phương":["Đức Huê"],"Sạp 581 Khu C- Chợ Nguyễn Tri Phương":["Thanh Nhi"],"Sạp 212 Khu B- Chợ Nguyễn Tri Phương":["Cô Tuyết"],"Sạp 216 Khu B- Chợ Nguyễn Tri Phương":["Viễn Oanh"],"Sạp 225 Khu B- Chợ Nguyễn Tri Phương":["Bạch Tuyết"],"Sạp 168 Khu B- Chợ Nguyễn Tri Phương":["Cô Linh"],"Sạp 338 Khu B- Chợ Nguyễn Tri Phương":["Thảo Linh"],"Sạp 334 Khu B- Chợ Nguyễn Tri Phương":["Cô Hoàng"],"Sạp 341 Khu B- Chợ Nguyễn Tri Phương":["Hồng Phương"],"Sạp 264 Khu B- Chợ Nguyễn Tri Phương":["Chị Hoàng"],"Sạp 210 Khu B- Chợ Nguyễn Tri Phương":["Chị Trang"],"Sạp 326 Khu B- Chợ Nguyễn Tri Phương":["Cô Liên","Dương Phụng"],"Sạp 570 Khu C- Chợ Nguyễn Tri Phương":["Cô Ánh"],"145 Nguyễn Lâm- Chợ Nguyễn Tri Phương":["Hiệp Cường"],"135 Nguyễn Lâm- Chợ Nguyễn Tri Phương":["Luân Thủy"],"62 Nguyễn Lâm- Chợ Nguyễn Tri Phương":["Cô Hữu"],"66D Nguyễn Lâm- Chợ Nguyễn Tri Phương":["Quảng Châu"],"Sạp 572 Khu B- Chợ Nguyễn Tri Phương":["Cô Ba"],"Sạp 204 Khu B- Chợ Nguyễn Tri Phương":["Hồng Sen"],"Sạp 344 Khu B- Chợ Nguyễn Tri Phương":["Tú Bình"],"Sạp 2- Chợ Nhật Tảo":["Cô Linh"],"Shop 383/21 Bà Hạt- Chợ Nhật Tảo":["Cô Hạnh"],"Shop 78 Nhật Tảo- Chợ Nhật Tảo":["Cô Hà"],"Sạp 4B- Chợ Nhật Tảo":["Cô Lý"],"Sạp 15- Chợ Nhật Tảo":["Hồng Anh"],"Shop 383/2 Bà Hạt- Chợ Nhật Tảo":["Minh Tuấn"],"Shop 383/6 Bà Hạt- Chợ Nhật Tảo":["Cô Phương"],"Sạp 2- Chợ Lê Hồng Phong":["Chị Tuyết"],"Sạp C4- Chợ Lê Hồng Phong":["Cô Hoá"],"Shop 384/55 Lý Thái Tổ -Q10":["Cô Nga"],"Shop 384/44 Lý Thái Tổ -Q10":["Thuỳ Trinh"],"Shop 31 Nguyển Ngọc Lộc- Q10":["Diệu Diễm"],"Shop U2 Cửu Long- Q10":["Chị Út"],"Shop 135/3 Thành Thái- Q10":["Cô Hạnh"],"Shop 3/102 Thành Thái- Q10":["Cô Dung"],"Sạp K1- Chợ Bình Thới":["Cô Anh"],"Sạp K10- Chợ Bình Thới":["Bún Biên"],"Sạp K3- Chợ Bình Thới":["Cô Sương"],"Sạp K30- Chợ Bình Thới":["Cẩm Nhung"],"Sạp K51- Chợ Bình Thới":["Ngọc Anh"],"Sạp K21- Chợ Bình Thới":["Thành Trung"],"Sạp K52- Chợ Bình Thới":["Thư Thịnh"],"Sạp K69- Chợ Bình Thới":["Tuyết Em"],"Sạp K40- Chợ Bình Thới":["Xa Giang"],"Shop 218 Xóm Đất- Chợ Bình Thới":["Hoàng Thụy"],"Shop 308/11 Xóm Đất- Chợ Bình Thới":["Cô Tâm"],"Shop 190/4 Xóm Đất- Chợ Bình Thới":["Cô Vân"],"Shop 186 Xóm Đất- Chợ Bình Thới":["Năm Mau"],"Shop 293 Xóm Đất- Chợ Bình Thới":["Loan"],"Shop 308/14 Xóm Đất- Chợ Bình Thới":["Anh Khoa"],"Shop 377/27 Xóm Đất- Chợ Bình Thới":["Hương Dừa"],"Shop 377/39 Xóm Đất- Chợ Bình Thới":["Anh Giàu"],"Sạp 92- Chợ Thiếc":["Cô Ánh"],"Sạp 16- Chợ Thiếc":["Chị Mười"],"Sạp 53- Chợ Thiếc":["Ngọc Trân"],"Sạp 22- Chợ Thiếc":["Cô Phương"],"Sạp 69- Chợ Thiếc":["Chị Thúy"],"Sạp 13- Chợ Thiếc":["Cô Lài"],"Sạp 68- Chợ Thiếc":["Cô Bình"],"Sạp 28- Chợ Thiếc":["Minh Ký"],"Sạp 29- Chợ Thiếc":["Khì Sạp Khô"],"Sạp 15- Chợ Thiếc":["Thuân Khanh"],"Sạp - Chợ Thiếc":["Ngọc Linh"],"Shop 281 Tân Phước- Chợ Thiếc":["Chị Vân"],"Sạp 12- Chợ Thiếc":["Dì Bảy"],"Shop 80/1 Trần Quý- Chợ Thiếc":["Chị Liên"],"Shop 80/15 Trần Quý- Chợ Thiếc":["Cô Phương"],"Shop 267 Tân Phước- Chợ Thiếc":["Cô Thu"],"Sạp 544- Chợ Bà Chiểu":["Cô Hòa"],"Sạp 555- Chợ Bà Chiểu":["Cô Tám"],"Sạp 563- Chợ Bà Chiểu":["Hoàng Khanh"],"Sạp 560- Chợ Bà Chiểu":["Cô Phụng"],"Sạp 607- Chợ Bà Chiểu":["Ngọc Anh"],"Sạp 558- Chợ Bà Chiểu":["Cô Há"],"Sạp 611- Chợ Bà Chiểu":["Tuấn Mỹ"],"Sạp 552- Chợ Bà Chiểu":["Chị Hiền"],"Shop 324 Bùi Hữu Nghĩa- Chợ Bà Chiểu":["Tiến Anh"],"Sạp 565- Chợ Bà Chiểu":["Cô Hoa"],"Sạp 625- Chợ Bà Chiểu":["Cô Liên"],"Sạp 602- Chợ Bà Chiểu":["Bảy Tình"],"Sạp 594- Chợ Bà Chiểu":["Cô Tư"],"Shop 314 Bùi Hữu Nghĩa- Chợ Bà Chiểu":["Anh Bình"],"Sạp 1465- Chợ Bà Chiểu":["Kim Loan"],"Shop 316 Bùi Hữu Nghĩa- Chợ Bà Chiểu":["Diệu Thủy"],"Sạp 511- Chợ Bà Chiểu":["Chị Ngọc"],"Sạp 508- Chợ Bà Chiểu":["Ngọc Hương"],"Sạp 507- Chợ Bà Chiểu":["Cô Ngân"],"Sạp 588- Chợ Bà Chiểu":["Chị Phương"],"Shop 322 Bùi Hữu Nghĩa- Chợ Bà Chiểu":["Bé Hai"],"Sạp 9- Chợ Phú Nhuận":["Cô Bảy"],"23 Cao Thắng- Chợ Phú Nhuận":["Cô Thanh"],"58 Cao Thắng- Chợ Phú Nhuận":["Thanh Bình"],"15 Cao Thắng- Chợ Phú Nhuận":["Lộc Thọ"],"17 Cao Thắng- Chợ Phú Nhuận":["Cô Gái"],"102 Cao Thắng- Chợ Phú Nhuận":["Cô Liên"],"Cao Thắng- Chợ Phú Nhuận":["Chị Loan"],"Sạp 62- Chợ Phú Nhuận":["Cô Hồng"],"Sạp 98- Chợ Phú Nhuận":["Chị Phượng"],"Shop 40B Cao Thắng- Chợ Phú Nhuận":["Cô Vân"],"Sạp 10- Chợ Nguyễn Đình Chiểu":["Kim Hải"],"Sạp 12- Chợ Nguyễn Đình Chiểu":["Anh Phương"],"Shop I05- Chợ Nguyễn Đình Chiểu":["Cô Vân"],"Sạp 31- Chợ Nguyễn Đình Chiểu":["Cô Được"],"Sạp 28- Chợ Nguyễn Đình Chiểu":["Chị Linh"],"Sạp 30- Chợ Nguyễn Đình Chiểu":["Cô Hiền"],"Sạp 33- Chợ Nguyễn Đình Chiểu":["Cô Ba"],"Shop 30 Lê Tự Tài- Chợ Nguyễn Đình Chiểu":["Chị Đào"],"Shop I01- Chợ Nguyễn Đình Chiểu":["Chị Nhi"],"Shop 32/74- Chợ Nguyễn Đình Chiểu":["Chị Diễm"],"Shop C2 Lê Tự Tài- Chợ Nguyễn Đình Chiểu":["Chị Yến"],"Sạp C1- Chợ Nguyễn Đình Chiểu":["Chị Quyên"],"Shop 606 Nguyễn Kiệm- Q. Phú Nhuân":["Chị Hiếu"],"Shop 11 Đỗ Tấn Phong, Q. Phú Nhuận":["Chị Hương"],"Sạp 395- Chợ Trần Hữu Trang":["Văn Toàn"],"Sạp 394- Chợ Trần Hữu Trang":["Cô Hảo"],"Sạp 429- Chợ Trần Hữu Trang":["Chị Thủy"],"Kios 37- Chợ Trần Hữu Trang":["Chị Trương"],"Sạp 393- Chợ Trần Hữu Trang":["Chị Hạnh"],"Sạp 428- Chợ Trần Hữu Trang":["Chị Xuân"],"Sạp 397- Chợ Trần Hữu Trang":["Cô Yến"],"Sạp 380- Chợ Trần Hữu Trang":["Chị Kim"],"Sạp 33- Chợ Trần Hữu Trang":["Chị Hồng"],"Shop 84A/1D- Chợ Trần Hữu Trang":["Shop Lệ"],"Sạp C47- Chợ Hoàng Hoa Thám":["Kim Chi"],"Sạp C28- Chợ Hoàng Hoa Thám":["Ngọc Hà"],"Shop 19/8 HHT- Chợ Hoàng Hoa Thám":["Kim Anh"],"Shop 19/48 HHT- Chợ Hoàng Hoa Thám":["Dì Tư Dừa"],"Shop 19/4 HHT- Chợ Hoàng Hoa Thám":["Cô Thanh"],"Shop 17/2/11 HHT- Chợ Hoàng Hoa Thám":["Hồng Nam"],"Sạp 18 Khu FB- Chợ Tân Bình":["Dũng Phương"],"Sạp 19 Khu FB- Chợ Tân Bình":["Phương"],"Sạp 20 Khu FB- Chợ Tân Bình":["Năm Mai"],"Sạp 24 Khu FB- Chợ Tân Bình":["Ba Hường"],"Sạp B070- Chợ Phạm Văn Hai":["Xuân Hòa"],"Sạp B87- Chợ Phạm Văn Hai":["Quý"],"Sạp B180- Chợ Phạm Văn Hai":["Chị Loan"],"Sạp B195- Chợ Phạm Văn Hai":["Cô Chiến"],"Shop 99 PHV- Chợ Phạm Văn Hai":["Chuyên"],"Sạp B204- Chợ Phạm Văn Hai":["Hồng Nga"],"Sạp B174- Chợ Phạm Văn Hai":["Cô Dung"],"Sạp B150- Chợ Phạm Văn Hai":["Triển Dung"],"Sạp B181- Chợ Phạm Văn Hai":["Cô Hạnh"],"Sạp B134- Chợ Phạm Văn Hai":["Cô Hoàng"],"Sạp B100- Chợ Phạm Văn Hai":["Luật"],"Shop 16 Tân Sơn Hoà- Chợ Phạm Văn Hai":["Út Rau"],"Sạp 15/16- Chợ Hiệp Tân":["Mỹ Liên"],"Sạp H9- Chợ Hiệp Tân":["Cô Hạnh"],"Sạp F1- Chợ Hiệp Tân":["Cô Cúc"],"Sạp H2- Chợ Hiệp Tân":["Cô Mười"],"Sạp H18- Chợ Hiệp Tân":["Thu Vân"],"Shop 68/20 Cây Keo- Chợ Hiệp Tân":["Cô Hương"],"Sạp 16G- Chợ Hiệp Tân":["Chị Duyên"],"Shop 65 Chu Thiên- Chợ Hiệp Tân":["Chị Nga"],"Sạp H11- Chợ Tân Phú 1":["Ngọc Hường"],"Sạp K2- Chợ Tân Phú 1":["Thiện Thảo"],"Shop 40 Phố Chợ- Chợ Tân Phú 1":["Tuyết Sương"],"Shop 44 Phố Chợ- Chợ Tân Phú 1":["Dũng Phượng"],"Shop 94/12 Phố Chợ- Chợ Tân Phú 1":["Minh Sen"],"Shop 48 Phố Chợ- Chợ Tân Phú 1":["Yến Trung"],"Shop 18/3 Hoàng Ngọc Phách- Chợ Tân Phú 2":["Ngọc Anh"],"Shop 35 Hoàng Ngọc Phách- Chợ Tân Phú 2":["Chị Bình"],"Shop 18/9 Hoàng Ngọc Phách- Chợ Tân Phú 2":["Cô Phượng"],"Shop 37 Hoàng Ngọc Phách- Chợ Tân Phú 2":["Chị Hằng"],"Cc Hoàng Ngọc Phách- Chợ Tân Phú 2":["Dì Ba"],"Shop 35 Lê Đại- Chợ Tân Phú 2":["Chị Hồng"],"Sạp 9R- Chợ Tân Phú 2":["Dì Tư"],"Shop 53 Hoàng Ngọc Phách- Chợ Tân Phú 2":["Chị Thùy"],"Sạp B90- Chợ Thị Nghè":["Mộng Trinh"],"Sạp B101- Chợ Thị Nghè":["Anh Cường"],"Sạp 101- Chợ Thị Nghè":["Kim Hằng"],"Sạp 84- Chợ Thị Nghè":["Chị Nguyệt"],"Shop 01 Phan Huy Ôn- Chợ Thị Nghè":["Anh Lâm"],"Shop 52 Phan Huy Ôn- Chợ Thị Nghè":["Chị Kiều"],"Shop 22 Phan Huy Ôn- Chợ Thị Nghè":["Cô Dung"],"Sạp 45- Chợ Thị Nghè":["Đào"],"Shop 56 Nguyễn Ngọc Phương- Chợ Thị Nghè":["Chị Liên"],"Sạp 1- Chợ Thị Nghè":["Cô Hoàng"],"Kios KB10- Chợ Tân Hương":["Ngọc Hường"],"Kios- Chợ Tân Hương":["Chị Mỹ"],"Sạp C3/1- Chợ Tân Hương":["Cô Loan"],"Sạp B1/15- Chợ Tân Hương":["Chị Ty"],"Shop 101 Trần Mai Ninh- Chợ Phường 11":["Chị Phượng"],"Shop 137 Trần Mai Ninh- Chợ Phường 11":["Chị Huỳnh"],"Shop 140 Trần Mai Ninh- Chợ Phường 11":["Anh Hòa"],"Shop 123 Trần Mai Ninh- Chợ Phường 11":["Chị Tâm"],"Shop 120 Trần Mai Ninh- Chợ Phường 11":["Chị Dung"],"Shop 150 Trần Mai Ninh- Chợ Phường 11":["Chị Thúy"],"Shop 132 Trần Mai Ninh- Chợ Phường 11":["Chị Hiền"],"Shop 100 Sơn Hưng- Chợ Phường 11":["Chị Linh"],"Shop 101 Bùi Thế Mỹ- Chợ Phường 11":["Kim Anh"],"Shop 79 Nghĩa Phát- Chợ Nghĩa Hoà":["Cô Phượng"],"Shop 146 Nghĩa Phát- Chợ Nghĩa Hoà":["Cô Phượng"],"Shop 53 Nghĩa Phát- Chợ Nghĩa Hoà":["Chị Nga"],"Shop 156 Nghĩa Phát- Chợ Nghĩa Hoà":["Chị Thùy"],"Shop 373/95/4 Lý Thường Kiệt- Chợ Tân Hưng":["Cô Lan"],"Shop 373/95/6 Lý Thường Kiệt- Chợ Tân Hưng":["Chị Hằng"],"Shop 373/95/18 Lý Thường Kiệt- Chợ Tân Hưng":["Chị Hiền"],"Sạp 12- Chợ Tân Hưng":["Cô Hương"],"Shop 373/65/54 Lý Thường Kiệt- Chợ Tân Hưng":["Cô Loan"],"Shop 373/95/1 Lý Thường Kiệt- Chợ Tân Hưng":["Chị Ngọc"],"Shop 204 Đất Thánh- Chợ Nam Hoà":["Chị Quyên"],"Sạp- Chợ Nam Hoà":["Chị Linh"],"Shop 88 Đất Thánh- Chợ Nam Hoà":["Cô Lan"],"Sạp C16- Chợ Bình Chánh":["Cô Thủy"],"Sạp C18- Chợ Bình Chánh":["Chị Linh"],"Shop D7/66 Trịnh Như Khuê- Chợ Bình Chánh":["Sáu Đáng"],"Shop 11 Trịnh Như Khuê- Chợ Bình Chánh":["7 Dạo"],"Sạp A18- Chợ Bình Chánh":["Chị Tám"],"Shop 84 ĐS18- Chợ Bình Chánh":["Thanh Tuyền"],"Shop 19A Trịnh Như Khuê- Chợ Bình Chánh":["Chị Loan"],"Sạp 301- Chợ An Lạc":["Chị Oanh"],"Sạp 103- Chợ An Lạc":["Chị Hạnh"],"Sạp 100- Chợ An Lạc":["Cô Huế"],"Sạp 303- Chợ An Lạc":["Chị Thủy"],"Sạp 302- Chợ An Lạc":["Cô Đức"],"Sạp G15- Chợ Phú Trung":["Thanh"],"Sạp 24- Chợ Bình Trị Đông":["Dì Tư"],"Shop 29 Bình Trị Đông- Chợ Bình Trị Đông Cũ":["Cô Lan"],"Shop 254 Lê Văn Quới- Bình Tân":["Gia Phát"],"Shop 79 Bình Trị Đông- Chợ Bình Trị Đông Cũ":["Kim Phụng"],"Shop 77 Bình Trị Đông- Chợ Bình Trị Đông Cũ":["Anh Vinh"],"Shop 483/8 Hồ Ngọc Lãm- Chợ Khu Phố 2":["An Lộc Sơn"],"Sạp 6- Chợ Khu Phố 2":["Chị Mai"],"Shop 483/21 Hồ Ngọc Lãm- Chợ Khu Phố 2":["Mỹ Anh"],"Kios 62 Chợ Hưng Long":["Thành Đạt"],"Sạp Rau- Chợ Hưng Long":["Chú Bình"],"Sạp 8- Chợ Hưng Long":["Chị Hiếu"],"Sạp 97- Chợ Hưng Long":["Chị Chi"],"Kios 49A/A16- Chợ Bình Long":["Cô Nga","Cắm Lìn"],"Kios 16- Chợ Bình Long":["Cô Yên"],"Kios 49A/A10- Chợ Bình Long":["Chị Thanh"],"Sạp 18- Chợ Bình Long":["Chị Vân"],"Sạp 43- Chợ Thuận Đạt":["Chị Lan"],"Sạp- Chợ Thuận Đạt":["Chị Mười"],"Sạp 89- Chợ Thuận Đạt":["Chị Xuân"],"Shop 332/13 An Phú Tây":["Chị Hằng"],"Shop 326A/13 An Phú Tây":["Thanh Thuý"],"Sạp 183 - Chợ An Dương Vương":["Cô Lượm"],"Shop 598 - Chợ An Dương Vương":["Út Bún Tươi"],"Shop 21 Lê Đình Cẩn- Bình Tân":["Shop 21"],"Shop 234B Lê Đình Cẩn- Bình Tân":["Lài Sơn"],"Shop 213 Lê Đình Cẩn- Bình Tân":["Chị Tâm"],"Shop 248 Lê Đình Cẩn- Bình Tân":["Bảo Khanh"],"Shop 232 Lê Đình Cẩn- Bình Tân":["Phương Nam"],"Kios 5- Chợ Đệm":["Chị Linh"],"Kios 28- Chợ Đệm":["Chị Hà"],"Sạp 15B- Chợ Đệm":["Cô Quang"],"Sạp E11- Chợ Đệm":["Cô Cúc"],"Shop 1B2- Chợ Đệm":["Cô Cách"],"Sạp 6 - Chợ Tân Phước":["Chị Huệ"],"Sạp 15- Chợ Tân Phước":["Chị Chầu"],"Shop 86/38- Chợ Tân Phước":["Cô Kiều"],"Sạp 8- Chợ Tân Phước":["Cô Phương."],"Shop 142A Tân Hoà Đông- Bình Tân":["Shop Bún Tươi"],"Chợ Bốn Xã":["Kim Liên"],"Shop 272 Phan Anh- Chợ Bốn Xã":["Chị Duyên"],"Shop 295 Phan Anh- Bình Tân":["Shop Dừa"],"Shop 295/5 Ấp Chiến Lược- Bình Tân":["Chị Phượng"],"Shop 732 Hương Lộ 2- Bình Tân":["Chị Nhung"],"Shop 710/27- Chợ Phú Định":["Chị Hương"],"Sạp 3- Chợ Phú Định":["Cô Vàng"],"Sạp 79- Chợ Hồ Trọng Quý":["Cô Chỉ"],"Shop 14 Lô U- Chợ Hồ Trọng Quý":["Bà Hai"],"Sạp 70- Chợ Hồ Trọng Quý":["Xuân Thư"],"Shop 19 Lô U- Chợ Hồ Trọng Quý":["Ngọc Vân"],"Chợ Linh Trung":["Chị Tuyết","Liên Tâm","Hồng Nhung","Chị Châu"],"Sạp K04- Chợ Bình Khánh":["Chị Thảo"],"Sạp K53- Chợ Bình Khánh":["Cô Tư"],"Sạp - Chợ Bình Khánh":["Kim Liên"],"Sạp K160- Chợ Thảo Điền":["Chị Nhung"],"Sạp K52- Chợ Thảo Điền":["Cô Dung"],"Shop 267/7A Lê Văn Việt- Chợ Hiệp Phú":["Duy Ngọ"],"Sạp 48- Chợ Tân Nhơn Phú A":["Thu Vân"],"Chợ Tân Nhơn Phú B":["Quỳnh Mai"],"Sạp 314- Chợ Thủ Đức":["Cô Na"],"Sạp 313- Chợ Thủ Đức":["Khánh Linh"],"Shop 18 Đoàn Công Hớn- Chợ Thủ Đức":["Hồng Hoa"],"Sạp 238B- Chợ Thủ Đức":["Ngọc Huyền"],"Shop 144/9- Chợ Thủ Đức":["Chị Châu","Cô Sen"]},"skus":["Đậu Sốt Cà Chua 230g","Đậu Sốt Cà Chua 425g","Đậu Sốt Cà Chua Phô Mai 425g","Đậu Trắng 425g","Đậu Gà 425g","Đậu Đỏ 425g","Puree Cà Chua 220g","Puree Cà Chua 430g","Nước Cốt Dừa Nguyên Chất 270ml","Nước Cốt Dừa NC 400ml","Nước Cốt Dừa 400ml","Nước Cốt Dừa 65ml","Cá Trích Sốt Cà Chua 155g","Cá Trích Sốt Cà Chua 120g","Cá Trích Ngâm Olive 120g","Cá Trích Ngâm Ớt Olive 120g","Cá Thu Sốt Cà Chua 155g","Cá Thu Sốt Cà Chua 230g","Cá Ngừ Ngâm Nước 150g","Cá Ngừ Ít Béo Ngâm Nước 150g","Cá Ngừ Dầu Hướng Dương 150g","Cá Ngừ Khúc Dầu HĐ 150g","Cá Ngừ Dầu Olive 150g","Cá Ngừ Khúc Dầu Olive 150g","Cá Ngừ Ngâm Ớt 160g","Tương Ớt Sriracha 235ml","Bắp Hạt 425g","Mỳ Ý Hữu Cơ Alce Nero 500g","Nui Ống Hữu Cơ Alce Nero 500g","Sốt Mỳ Ý Hữu Cơ Alce Nero 350g"],"team":[{"name":"Hồ Anh Tài","team":"MT"},{"name":"Nguyễn Hoàng Thiên Thanh","team":"MT"},{"name":"Liêu Văn Vủ","team":"MT"},{"name":"Hồ Thị Thắm","team":"MT"},{"name":"Lê Thị Cẩm Loan","team":"MT"},{"name":"Hồ Ngọc Anh","team":"GT Central"},{"name":"Đặng Thị Thanh Hoa","team":"GT Central"},{"name":"Nguyễn Thị Thùy Nhung","team":"GT Central"},{"name":"Phương Ngọc Chánh","team":"GT South"},{"name":"Nguyễn Thị Thúy Oanh","team":"GT South"},{"name":"Hồ Ngọc Giàu","team":"GT South"},{"name":"Nguyễn Thanh Tùng","team":"GT South"},{"name":"Nguyễn Xuân Đức","team":"GT North"},{"name":"Bùi Thị Thoa","team":"GT North"},{"name":"Nguyễn Thị Phương","team":"GT North"},{"name":"Đặng Thị Phương Thi","team":"Back Office"},{"name":"Ngô Thị Hạnh","team":"Back Office"},{"name":"Bùi Quang Quý","team":"Back Office / Manager"}]};
+
+const CATEGORIES = {
+  "Đậu & Đậu Hạt": ["Đậu Sốt Cà Chua 230g","Đậu Sốt Cà Chua 425g","Đậu Sốt Cà Chua Phô Mai 425g","Đậu Trắng 425g","Đậu Gà 425g","Đậu Đỏ 425g"],
+  "Cà Chua": ["Puree Cà Chua 220g","Puree Cà Chua 430g"],
+  "Nước Cốt Dừa": ["Nước Cốt Dừa Nguyên Chất 270ml","Nước Cốt Dừa NC 400ml","Nước Cốt Dừa 400ml","Nước Cốt Dừa 65ml"],
+  "Cá Trích": ["Cá Trích Sốt Cà Chua 155g","Cá Trích Sốt Cà Chua 120g","Cá Trích Ngâm Olive 120g","Cá Trích Ngâm Ớt Olive 120g"],
+  "Cá Thu": ["Cá Thu Sốt Cà Chua 155g","Cá Thu Sốt Cà Chua 230g"],
+  "Cá Ngừ": ["Cá Ngừ Ngâm Nước 150g","Cá Ngừ Ít Béo Ngâm Nước 150g","Cá Ngừ Dầu Hướng Dương 150g","Cá Ngừ Khúc Dầu HĐ 150g","Cá Ngừ Dầu Olive 150g","Cá Ngừ Khúc Dầu Olive 150g","Cá Ngừ Ngâm Ớt 160g"],
+  "Khác": ["Tương Ớt Sriracha 235ml","Bắp Hạt 425g","Mỳ Ý Hữu Cơ Alce Nero 500g","Nui Ống Hữu Cơ Alce Nero 500g","Sốt Mỳ Ý Hữu Cơ Alce Nero 350g"]
+};
+
+// GT_Daily SKUs (simplified — cá gộp)
+const GT_SKUS_DAILY = [
+  "Đậu Sốt Cà Chua 230g","Đậu Sốt Cà Chua 425g","Đậu Sốt Cà Chua Phô Mai 425g",
+  "Đậu Trắng 425g","Đậu Gà 425g","Đậu Đỏ 425g",
+  "Puree Cà Chua 220g","Puree Cà Chua 430g",
+  "Nước Cốt Dừa 65ml","Nước Cốt Dừa Nguyên Chất 270ml","Nước Cốt Dừa NC 400ml","Nước Cốt Dừa 400ml",
+  "Cá Trích (tổng kệ)","Cá Thu (tổng kệ)","Cá Ngừ (tổng kệ)",
+  "Tương Ớt Sriracha 235ml","Bắp Hạt 425g"
+];
+
+// State
+let state = {
+  user: null,
+  gps: null,
+  photos: {},
+  skuData: {},
+  scriptUrl: localStorage.getItem('dgm_script_url') || ''
+};
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderStaffList();
+  initGPS();
+  if(!state.scriptUrl){
+    promptScriptUrl();
+  }
+});
+
+function promptScriptUrl(){
+  // Non-blocking: only prompt if no URL saved
+  if(!state.scriptUrl){
+    setTimeout(()=>{
+      const url = prompt("🔧 SETUP — Nhập URL Apps Script Web App:\n(Nhấn Cancel để dùng offline mode)");
+      if(url && url.startsWith("https://")){
+        state.scriptUrl = url;
+        localStorage.setItem('dgm_script_url', url);
+        toast('✅ Đã lưu URL Apps Script');
+      }
+    }, 500);
+  }
+}
+
+// ============ GPS ============
+function initGPS(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      state.gps = {lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6)};
+      updateGPSDisplays();
+    }, err=>{
+      state.gps = null;
+      updateGPSDisplays();
+    }, {enableHighAccuracy:true, timeout:10000});
+  }
+}
+
+function refreshGPS(boxId){
+  const box = document.getElementById(boxId);
+  if(box) box.innerHTML = gpsBoxHTML(boxId, true);
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      state.gps = {lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6)};
+      if(box) box.innerHTML = gpsBoxHTML(boxId, false);
+    }, ()=>{
+      state.gps = null;
+      if(box) box.innerHTML = gpsBoxHTML(boxId, false);
+    }, {enableHighAccuracy:true, timeout:8000});
+  }
+}
+
+function gpsBoxHTML(id, loading){
+  if(loading) return `<div class="gps-box"><span class="icon">🔄</span><div class="gps-info"><strong>Đang lấy GPS...</strong></div></div>`;
+  if(state.gps){
+    return `<div class="gps-box"><span class="icon">📍</span><div class="gps-info"><strong>GPS đã xác định</strong>${state.gps.lat}, ${state.gps.lng}</div><button onclick="refreshGPS('${id}')" style="background:none;border:none;font-size:18px;cursor:pointer">🔄</button></div>`;
+  }
+  return `<div class="gps-box gps-fail"><span class="icon">⚠️</span><div class="gps-info"><strong>Không lấy được GPS</strong>Cho phép truy cập vị trí</div><button onclick="refreshGPS('${id}')" style="background:none;border:none;font-size:18px;cursor:pointer">🔄</button></div>`;
+}
+
+function updateGPSDisplays(){
+  ['gpsBoxMT','gpsBoxGT','gpsBoxGTNew'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.innerHTML = gpsBoxHTML(id, false);
+  });
+}
+
+// ============ STAFF LIST ============
+function renderStaffList(){
+  if(!state.scriptUrl){
+    const card = document.getElementById('urlSetupCard');
+    if(card) card.style.display = 'block';
+  }
+  const list = document.getElementById('staffList');
+  const badges = {'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts','Back Office':'badge-gtn','Back Office / Manager':'badge-gtn'};
+  list.innerHTML = APP_DATA.team.map(s=>`
+    <button class="staff-btn" onclick="selectUser(${JSON.stringify(s).replace(/"/g,'&quot;')})">
+      <div class="staff-avatar">${s.name[0]}</div>
+      <div class="staff-info">
+        <div class="staff-name">${s.name}</div>
+        <div class="staff-team"><span class="team-badge ${badges[s.team]||'badge-mt'}">${s.team}</span></div>
+      </div>
+      <span style="color:#ccc;font-size:18px">›</span>
+    </button>
+  `).join('');
+}
+
+function selectUser(user){
+  state.user = user;
+  document.getElementById('typeTitle').textContent = `Xin chào, ${user.name.split(' ').pop()}!`;
+  document.getElementById('typeSubtitle').textContent = user.team;
+  renderTypeCards(user.team);
+  goTo('scType');
+  initGPS();
+}
+
+// ============ TYPE SELECTION ============
+function renderTypeCards(team){
+  const cards = document.getElementById('typeCards');
+  let html = '<h3>Chọn loại khảo sát</h3>';
+  if(team === 'MT'){
+    html += `<div class="type-cards">
+      <div class="type-card" onclick="startMT()"><div class="icon">🏪</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán MT hàng ngày</div></div>
+    </div>`;
+  } else if(team.startsWith('GT')){
+    html += `<div class="type-cards">
+      <div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán GT hàng ngày</div></div>
+      <div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">Điểm Bán Mới</div><div class="desc">Khảo sát & chào hàng điểm mới</div></div>
+    </div>`;
+  } else {
+    html += `<div style="padding:20px;text-align:center;color:var(--text2)">
+      <div style="font-size:40px">👁️</div>
+      <p style="margin-top:12px">Tài khoản Back Office chỉ có quyền xem dashboard.<br>Vui lòng dùng Looker Studio để xem báo cáo.</p>
+    </div>`;
+  }
+  cards.innerHTML = html;
+}
+
+// ============ MT FORM ============
+function startMT(){
+  state.photos = {};
+  state.skuData = {};
+  document.getElementById('mtSubtitle').textContent = state.user.name;
+  renderMTForm();
+  goTo('scMT');
+}
+
+function renderMTForm(){
+  const content = document.getElementById('mtContent');
+  
+  // Store select
+  let storeOpts = APP_DATA.mt_stores.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+  
+  // SKU table by category
+  let skuRows = '';
+  Object.entries(CATEGORIES).forEach(([cat, skus])=>{
+    skuRows += `<tr class="cat-header"><td colspan="3">📦 ${cat}</td></tr>`;
+    skus.forEach(sku=>{
+      skuRows += `<tr>
+        <td>${escHtml(sku)}</td>
+        <td class="qty-cell"><input type="number" class="qty-input" id="mt_qty_${escId(sku)}" min="0" placeholder="0" inputmode="numeric"></td>
+        <td><select class="status-sel" id="mt_st_${escId(sku)}">
+          <option value="OK">OK</option>
+          <option value="Sắp hết">⚠ Sắp hết</option>
+          <option value="Hết hàng">❌ Hết</option>
+          <option value="Ngưng mã">🚫 Ngưng</option>
+          <option value="Chưa bán">— Chưa bán</option>
+        </select></td>
+      </tr>`;
+    });
+  });
+
+  content.innerHTML = `
+    <!-- THÔNG TIN -->
+    <div class="card">
+      <h3>📋 Thông tin khảo sát</h3>
+      <div class="field required"><label>Điểm bán</label>
+        <select id="mt_store"><option value="">— Chọn điểm bán —</option>${storeOpts}</select>
+      </div>
+      <div class="field"><label>Ghi chú địa chỉ (nếu cần)</label>
+        <input type="text" id="mt_addr" placeholder="Tầng, khu vực...">
+      </div>
+      <div class="field"><label>GPS vị trí</label>
+        <div id="gpsBoxMT">${gpsBoxHTML('gpsBoxMT',false)}</div>
+      </div>
+    </div>
+    <!-- PHOTOS -->
+    <div class="card">
+      <h3>📷 Hình ảnh (tối đa 4)</h3>
+      <div class="photo-grid">
+        ${[1,2,3,4].map(i=>`
+        <div class="photo-slot" id="mtPhotoSlot${i}" onclick="triggerPhoto('mtPhoto${i}')">
+          <span class="slot-icon">📷</span>
+          <span class="slot-label">${['Tổng quan','Mặt tiền','Sản phẩm 1','Sản phẩm 2'][i-1]}</span>
+          <input type="file" id="mtPhoto${i}" accept="image/*" capture="environment" onchange="previewPhoto(this,'mtPhotoSlot${i}','mtP${i}')">
+          <button class="del-btn" onclick="delPhoto(event,'mtPhotoSlot${i}','mtPhoto${i}','mtP${i}')">✕</button>
+        </div>`).join('')}
+      </div>
+    </div>
+    <!-- STOCK COUNT -->
+    <div class="card" style="padding:12px 8px">
+      <h3 style="padding:0 8px 8px">📦 Tồn kho trên kệ</h3>
+      <p style="font-size:12px;color:var(--text2);padding:0 8px 8px">Nhập số lượng lon còn trên kệ + trạng thái</p>
+      <div style="overflow-x:auto">
+        <table class="sku-table">
+          <thead><tr><th style="text-align:left">Sản phẩm</th><th>Tồn (lon)</th><th>Trạng thái</th></tr></thead>
+          <tbody>${skuRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <!-- ĐÁNH GIÁ -->
+    <div class="card">
+      <h3>✅ Đánh giá điểm bán</h3>
+      <div class="field">
+        <label>Trưng bày</label>
+        <div class="chips" id="mt_display">
+          ${['Tốt, ngang tầm mắt','Vị trí cao','Vị trí thấp','Góc khó tìm','Thiếu mã'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_display')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Bảng giá</label>
+        <div class="chips" id="mt_price">
+          ${['Đúng giá','Thiếu bảng giá','Sai giá','Chưa tăng giá','Đã tăng giá','Đang KM'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_price')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Tình trạng hàng</label>
+        <div class="chips" id="mt_goods">
+          ${['Đủ mã listing','Một số mã khóa','Một số mã OOS'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_goods')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Hạn sử dụng</label>
+        <div class="chips" id="mt_expiry">
+          ${['Tất cả >50% HSD','Có mã <50% HSD','Có mã <6 tháng','Cần hỗ trợ KM cận date'].map(v=>`<span class="chip" onclick="toggleChip(this,'mt_expiry')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Ghi chú thêm</label>
+        <textarea id="mt_note" placeholder="Ghi chú tình trạng, yêu cầu hỗ trợ..."></textarea>
+      </div>
+    </div>
+  `;
+}
+
+// ============ GT DAILY FORM ============
+function startGTDaily(){
+  state.photos = {};
+  state.skuData = {};
+  const region = state.user.team;
+  document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
+  renderGTDailyForm(region);
+  goTo('scGTDaily');
+}
+
+function renderGTDailyForm(region){
+  const content = document.getElementById('gtContent');
+  const regionKey = region === 'GT North' ? 'gt_north' : region === 'GT Central' ? 'gt_central' : 'gt_south';
+  const markets = Object.keys(APP_DATA[regionKey]).sort();
+
+  let marketOpts = markets.map(m=>`<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
+  
+  let skuRows = GT_SKUS_DAILY.map(sku=>`
+    <tr>
+      <td>${escHtml(sku)}</td>
+      <td class="qty-cell"><input type="number" class="qty-input" id="gt_qty_${escId(sku)}" min="0" placeholder="0" inputmode="numeric"></td>
+      <td><select class="status-sel" id="gt_st_${escId(sku)}">
+        <option value="OK">OK</option>
+        <option value="Sắp hết">⚠ Sắp hết</option>
+        <option value="Hết hàng">❌ Hết</option>
+        <option value="Ngưng mã">🚫 Ngưng</option>
+        <option value="Chưa bán">— Chưa bán</option>
+      </select></td>
+    </tr>
+  `).join('');
+
+  content.innerHTML = `
+    <div class="card">
+      <h3>📋 Thông tin khảo sát</h3>
+      <div class="field required"><label>Chợ / Khu vực</label>
+        <select id="gt_market" onchange="loadGTStores(this.value,'${regionKey}')">
+          <option value="">— Chọn chợ —</option>${marketOpts}
+        </select>
+      </div>
+      <div class="field required"><label>Điểm bán</label>
+        <select id="gt_store"><option value="">— Chọn chợ trước —</option></select>
+      </div>
+      <div class="field"><label>Hoặc nhập tên điểm bán mới</label>
+        <input type="text" id="gt_store_manual" placeholder="Nhập nếu không có trong danh sách">
+      </div>
+      <div class="field"><label>GPS vị trí</label>
+        <div id="gpsBoxGT">${gpsBoxHTML('gpsBoxGT',false)}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📷 Hình ảnh (tối đa 4)</h3>
+      <div class="photo-grid">
+        ${[1,2,3,4].map(i=>`
+        <div class="photo-slot" id="gtPhotoSlot${i}" onclick="triggerPhoto('gtPhoto${i}')">
+          <span class="slot-icon">📷</span>
+          <span class="slot-label">${['Tổng quan','Mặt tiền','Sản phẩm 1','Sản phẩm 2'][i-1]}</span>
+          <input type="file" id="gtPhoto${i}" accept="image/*" capture="environment" onchange="previewPhoto(this,'gtPhotoSlot${i}','gtP${i}')">
+          <button class="del-btn" onclick="delPhoto(event,'gtPhotoSlot${i}','gtPhoto${i}','gtP${i}')">✕</button>
+        </div>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="padding:12px 8px">
+      <h3 style="padding:0 8px 8px">📦 Tồn kho trên kệ</h3>
+      <div style="overflow-x:auto">
+        <table class="sku-table">
+          <thead><tr><th style="text-align:left">Sản phẩm</th><th>Tồn (lon)</th><th>Trạng thái</th></tr></thead>
+          <tbody>${skuRows}</tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🛒 Đặt hàng & Ghi chú</h3>
+      <div class="field">
+        <label>Thông tin đặt hàng</label>
+        <div class="chips" id="gt_order">
+          ${['Đã đặt hàng thêm','Không đặt hàng','Sẽ đặt sau'].map(v=>`<span class="chip" onclick="selectChip(this,'gt_order')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field"><label>Ghi chú</label>
+        <textarea id="gt_note" placeholder="Ghi chú tình trạng, yêu cầu..."></textarea>
+      </div>
+    </div>
+  `;
+  // Store regionKey for loadGTStores
+  content.dataset.regionKey = regionKey;
+}
+
+function loadGTStores(market, regionKey){
+  const sel = document.getElementById('gt_store');
+  if(!market){sel.innerHTML='<option value="">— Chọn chợ trước —</option>';return;}
+  const stores = APP_DATA[regionKey][market] || [];
+  sel.innerHTML = '<option value="">— Chọn điểm bán —</option>' + stores.map(s=>`<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+}
+
+// ============ GT NEW CUSTOMER ============
+function startGTNew(){
+  state.photos = {};
+  document.getElementById('gtnewSubtitle').textContent = state.user.name;
+  renderGTNewForm();
+  goTo('scGTNew');
+}
+
+function renderGTNewForm(){
+  const content = document.getElementById('gtnewContent');
+  const products = [
+    "Đậu sốt cà","Puree cà chua","Đậu Hà Lan","Đậu trắng","Đậu gà",
+    "Cá ngừ","Cá trích","Cá thu","Bắp","Nước cốt dừa","Tương ớt Sriracha"
+  ];
+  const bizTypes = ["Tiệm tạp hóa","Siêu thị mini / CVS","Nhà buôn (bán sỉ)","Sạp trong chợ","Nhà hàng / Khách sạn"];
+  const potentials = ["Cao - Nên mở ngay","Trung bình - Theo dõi thêm","Thấp - Không phù hợp"];
+
+  content.innerHTML = `
+    <div class="card">
+      <h3>📍 Thông tin điểm bán</h3>
+      <div class="field required"><label>Tên điểm bán</label>
+        <input type="text" id="gtnew_store" placeholder="Tên cửa hàng, sạp...">
+      </div>
+      <div class="field"><label>Địa chỉ</label>
+        <input type="text" id="gtnew_addr" placeholder="Địa chỉ cụ thể">
+      </div>
+      <div class="field required"><label>Hình thức kinh doanh</label>
+        <div class="chips" id="gtnew_biztype">
+          ${bizTypes.map(v=>`<span class="chip" onclick="selectChip(this,'gtnew_biztype')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="field"><label>GPS vị trí</label>
+        <div id="gpsBoxGTNew">${gpsBoxHTML('gpsBoxGTNew',false)}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>🛒 Sản phẩm chào hàng</h3>
+      <div class="chips" id="gtnew_products">
+        ${products.map(v=>`<span class="chip" onclick="toggleChip(this,'gtnew_products')">${v}</span>`).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <h3>⭐ Đánh giá & Hình ảnh</h3>
+      <div class="field required"><label>Tiềm năng</label>
+        <div class="chips" id="gtnew_potential">
+          ${potentials.map(v=>`<span class="chip" onclick="selectChip(this,'gtnew_potential')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field"><label>Ghi chú & nhận xét</label>
+        <textarea id="gtnew_note" placeholder="Mô tả tiềm năng, ghi chú đặc biệt..."></textarea>
+      </div>
+      <div class="field"><label>Hình ảnh (tối đa 4)</label>
+        <div class="photo-grid">
+          ${[1,2,3,4].map(i=>`
+          <div class="photo-slot" id="gtnewPhotoSlot${i}" onclick="triggerPhoto('gtnewPhoto${i}')">
+            <span class="slot-icon">📷</span><span class="slot-label">Ảnh ${i}</span>
+            <input type="file" id="gtnewPhoto${i}" accept="image/*" capture="environment" onchange="previewPhoto(this,'gtnewPhotoSlot${i}','gtnewP${i}')">
+            <button class="del-btn" onclick="delPhoto(event,'gtnewPhotoSlot${i}','gtnewPhoto${i}','gtnewP${i}')">✕</button>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ============ PHOTO HELPERS ============
+function triggerPhoto(inputId){ document.getElementById(inputId).click(); }
+
+function previewPhoto(input, slotId, key){
+  if(!input.files[0]) return;
+  const slot = document.getElementById(slotId);
+  const reader = new FileReader();
+  reader.onload = e=>{
+    let img = slot.querySelector('img');
+    if(!img){ img = document.createElement('img'); slot.appendChild(img); }
+    img.src = e.target.result;
+    slot.classList.add('has-img');
+    slot.querySelectorAll('.slot-icon,.slot-label').forEach(el=>el.style.display='none');
+    state.photos[key] = e.target.result;
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function delPhoto(e, slotId, inputId, key){
+  e.stopPropagation();
+  const slot = document.getElementById(slotId);
+  const img = slot.querySelector('img');
+  if(img) img.remove();
+  slot.classList.remove('has-img');
+  slot.querySelectorAll('.slot-icon,.slot-label').forEach(el=>el.style.display='');
+  document.getElementById(inputId).value = '';
+  delete state.photos[key];
+}
+
+// ============ CHIP SELECTS ============
+function toggleChip(el, groupId){
+  el.classList.toggle('active');
+}
+function selectChip(el, groupId){
+  document.querySelectorAll(`#${groupId} .chip`).forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+}
+function getChips(groupId){
+  return Array.from(document.querySelectorAll(`#${groupId} .chip.active`)).map(c=>c.textContent).join(', ');
+}
+
+// ============ COLLECT SKU DATA ============
+function collectSKUs(prefix, skuList){
+  const result = {};
+  skuList.forEach(sku=>{
+    const id = escId(sku);
+    const qty = document.getElementById(`${prefix}_qty_${id}`)?.value || '0';
+    const st = document.getElementById(`${prefix}_st_${id}`)?.value || 'OK';
+    result[sku] = {qty, status: st};
+  });
+  return result;
+}
+
+// ============ SUBMIT MT ============
+async function submitMT(){
+  const store = document.getElementById('mt_store')?.value;
+  if(!store){ toast('⚠️ Vui lòng chọn điểm bán'); return; }
+  
+  const skus = collectSKUs('mt', APP_DATA.skus);
+  const payload = {
+    type: 'MT_Daily',
+    timestamp: new Date().toISOString(),
+    date: today(),
+    salesperson: state.user.name,
+    channel: 'MT',
+    store_name: store,
+    address_note: document.getElementById('mt_addr')?.value || '',
+    gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    display: getChips('mt_display'),
+    price_info: getChips('mt_price'),
+    goods_status: getChips('mt_goods'),
+    expiry_status: getChips('mt_expiry'),
+    note: document.getElementById('mt_note')?.value || '',
+    sku_data: skus,
+    photos: state.photos
+  };
+  await sendData(payload, 'MT Daily');
+}
+
+// ============ SUBMIT GT DAILY ============
+async function submitGT(){
+  const market = document.getElementById('gt_market')?.value;
+  const storeDropdown = document.getElementById('gt_store')?.value;
+  const storeManual = document.getElementById('gt_store_manual')?.value?.trim();
+  const store = storeManual || storeDropdown;
+  
+  if(!market){ toast('⚠️ Vui lòng chọn chợ'); return; }
+  if(!store){ toast('⚠️ Vui lòng chọn hoặc nhập điểm bán'); return; }
+  
+  const skus = collectSKUs('gt', GT_SKUS_DAILY);
+  const payload = {
+    type: 'GT_Daily',
+    timestamp: new Date().toISOString(),
+    date: today(),
+    salesperson: state.user.name,
+    region: state.user.team,
+    market: market,
+    store_name: store,
+    gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    order_info: getChips('gt_order'),
+    note: document.getElementById('gt_note')?.value || '',
+    sku_data: skus,
+    photos: state.photos
+  };
+  await sendData(payload, 'GT Daily');
+}
+
+// ============ SUBMIT GT NEW ============
+async function submitGTNew(){
+  const store = document.getElementById('gtnew_store')?.value?.trim();
+  if(!store){ toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
+  if(!getChips('gtnew_biztype')){ toast('⚠️ Vui lòng chọn hình thức kinh doanh'); return; }
+  
+  const payload = {
+    type: 'GT_NewCustomer',
+    timestamp: new Date().toISOString(),
+    date: today(),
+    salesperson: state.user.name,
+    region: state.user.team,
+    store_name: store,
+    address: document.getElementById('gtnew_addr')?.value || '',
+    biz_type: getChips('gtnew_biztype'),
+    products_pitched: getChips('gtnew_products'),
+    potential: getChips('gtnew_potential'),
+    note: document.getElementById('gtnew_note')?.value || '',
+    gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    photos: state.photos
+  };
+  await sendData(payload, 'GT New Customer');
+}
+
+// ============ SEND DATA ============
+async function sendData(payload, label){
+  if(!state.scriptUrl){
+    // Save offline
+    saveOffline(payload);
+    showSuccess(label, payload, true);
+    return;
+  }
+  showLoading('Đang gửi dữ liệu...');
+  try {
+    // Convert photos to smaller size before sending
+    const compressedPayload = await compressPhotos(payload);
+    
+    const resp = await fetch(state.scriptUrl, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(compressedPayload)
+    });
+    const result = await resp.json();
+    hideLoading();
+    if(result.status === 'ok' || result.success){
+      showSuccess(label, payload, false);
+    } else {
+      toast('❌ Lỗi: ' + (result.message || 'Không rõ'));
+    }
+  } catch(err){
+    hideLoading();
+    // Fallback: save offline
+    saveOffline(payload);
+    showSuccess(label, payload, true);
+  }
+}
+
+async function compressPhotos(payload){
+  const out = {...payload, photos:{}};
+  for(const [key, dataUrl] of Object.entries(payload.photos||{})){
+    out.photos[key] = await resizeImage(dataUrl, 800);
+  }
+  return out;
+}
+
+function resizeImage(dataUrl, maxSize){
+  return new Promise(res=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const canvas = document.createElement('canvas');
+      let w=img.width, h=img.height;
+      if(w>maxSize||h>maxSize){
+        if(w>h){h=Math.round(h*maxSize/w);w=maxSize;}
+        else{w=Math.round(w*maxSize/h);h=maxSize;}
+      }
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      res(canvas.toDataURL('image/jpeg',0.75));
+    };
+    img.src = dataUrl;
+  });
+}
+
+function saveOffline(payload){
+  const queue = JSON.parse(localStorage.getItem('dgm_offline')||'[]');
+  queue.push(payload);
+  localStorage.setItem('dgm_offline', JSON.stringify(queue));
+}
+
+function showSuccess(label, payload, offline){
+  hideLoading();
+  const surveyId = genID(payload.type);
+  document.getElementById('successSub').textContent = offline 
+    ? '⚠️ Chưa có kết nối — dữ liệu đã lưu offline, sẽ gửi khi có mạng' 
+    : `Đã lưu vào Google Sheet · ID: ${surveyId}`;
+  document.getElementById('successDetail').innerHTML = `
+    <b>📋 ${label}</b><br>
+    👤 ${payload.salesperson}<br>
+    🏪 ${payload.store_name||payload.market||''}<br>
+    📅 ${payload.date}<br>
+    📍 GPS: ${payload.gps||'Không xác định'}<br>
+    ${offline ? '💾 <b>Offline mode</b> — sẽ sync khi có mạng' : '✅ Đã lưu thành công'}
+  `;
+  goTo('scSuccess');
+
+  // Auto-return to survey type screen after 4 seconds, keeping user logged in
+  let countdown = 4;
+  const countEl = document.getElementById('successCountdown');
+  if(countEl) countEl.textContent = countdown;
+  const timer = setInterval(()=>{
+    countdown--;
+    if(countEl) countEl.textContent = countdown;
+    if(countdown <= 0){
+      clearInterval(timer);
+      state.photos = {};
+      state.skuData = {};
+      goTo('scType');
+      initGPS();
+    }
+  }, 1000);
+  
+  // Try to sync offline queue
+  if(!offline && state.scriptUrl) syncOffline();
+}
+
+async function syncOffline(){
+  const queue = JSON.parse(localStorage.getItem('dgm_offline')||'[]');
+  if(!queue.length) return;
+  const remaining = [];
+  for(const item of queue){
+    try{
+      const compressed = await compressPhotos(item);
+      const resp = await fetch(state.scriptUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(compressed)});
+      const r = await resp.json();
+      if(!r.status && !r.success) remaining.push(item);
+    } catch(e){ remaining.push(item); }
+  }
+  localStorage.setItem('dgm_offline', JSON.stringify(remaining));
+  if(remaining.length < queue.length) toast(`✅ Đã sync ${queue.length-remaining.length} báo cáo offline`);
+}
+
+// ============ UTILS ============
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escId(s){ return s.replace(/[^a-zA-Z0-9]/g,'_'); }
+function today(){ return new Date().toLocaleDateString('vi-VN'); }
+function genID(type){ return type.substr(0,2).toUpperCase()+'-'+new Date().toISOString().slice(0,10).replace(/-/g,'')+'-'+String(Math.floor(Math.random()*999)+1).padStart(3,'0'); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
+function showLoading(msg){ document.getElementById('loadingMsg').textContent=msg||'Đang xử lý...'; document.getElementById('loading').classList.add('show'); }
+function hideLoading(){ document.getElementById('loading').classList.remove('show'); }
+</script>
+</body>
+</html>
