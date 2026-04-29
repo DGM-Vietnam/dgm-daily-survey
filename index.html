@@ -887,18 +887,22 @@ async function sendData(payload, label) {
   }
   showLoading('Đang gửi dữ liệu...');
   try {
+    // Compress & convert photos to small base64, keep in payload
     const compressed = await compressPhotos(payload);
-    const jsonStr = JSON.stringify(compressed);
     
-    // FIX: Use POST with no-cors to avoid URL length limits.
-    // Apps Script receives the body via e.postData.contents in doPost().
-    // no-cors = opaque response, but data IS delivered.
-    await fetch(state.scriptUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain' },  // text/plain avoids CORS preflight
-      body: jsonStr
-    });
+    // Encode entire payload as base64 → send via GET
+    // GET requests from browser to Apps Script do NOT hit CORS preflight
+    // Apps Script doGet() reads e.parameter.data
+    const jsonStr = JSON.stringify(compressed);
+    const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+    
+    // Use an image tag trick to fire-and-forget without CORS errors
+    // Then poll a known endpoint to verify (or just trust the fire)
+    const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
+    
+    // Use no-cors GET — this DOES work for Apps Script doGet
+    await fetch(url, { method: 'GET', mode: 'no-cors' });
+    
     hideLoading();
     showSuccess(label, payload, false);
   } catch (err) {
@@ -906,6 +910,13 @@ async function sendData(payload, label) {
     saveOffline(payload);
     showSuccess(label, payload, true);
   }
+}
+
+async function syncOfflineSend(item) {
+  const jsonStr = JSON.stringify(item);
+  const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+  const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
+  await fetch(url, { method: 'GET', mode: 'no-cors' });
 }
 
 async function compressPhotos(payload) {
@@ -980,11 +991,7 @@ async function syncOffline() {
   const remaining = [];
   for (const item of queue) {
     try {
-      await fetch(state.scriptUrl, {
-        method: 'POST', mode: 'no-cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(item)
-      });
+      await syncOfflineSend(item);
     } catch (e) { remaining.push(item); }
   }
   localStorage.setItem('dgm_offline', JSON.stringify(remaining));
