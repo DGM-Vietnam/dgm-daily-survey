@@ -134,10 +134,20 @@ textarea{resize:vertical;min-height:80px}
 
 <!-- SCREEN: LOGIN -->
 <div class="screen active" id="scLogin">
-  <div style="background:var(--primary);padding:24px 20px 20px;text-align:center;color:#fff">
+  <div style="background:var(--primary);padding:24px 20px 20px;text-align:center;color:#fff;position:relative">
     <div style="font-size:36px;margin-bottom:8px">🏷️</div>
     <h2 style="font-size:20px;font-weight:700">DGM Sales Survey</h2>
     <p style="font-size:13px;opacity:.85;margin-top:4px">Ayam Brand · Denis G.M.</p>
+    <button onclick="showUrlConfig()" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.2);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer">⚙️ Script URL</button>
+  </div>
+  <div id="urlConfigBox" style="display:none;background:#fff3cd;border-bottom:2px solid #ffc107;padding:12px 16px">
+    <p style="font-size:12px;font-weight:600;color:#856404;margin-bottom:6px">⚙️ Apps Script Web App URL</p>
+    <input type="text" id="urlConfigInput" style="width:100%;padding:8px;border:1.5px solid #ffc107;border-radius:6px;font-size:12px;margin-bottom:8px" placeholder="https://script.google.com/macros/s/.../exec">
+    <div style="display:flex;gap:8px">
+      <button onclick="saveUrlConfig()" style="flex:1;padding:8px;background:#28a745;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">💾 Lưu</button>
+      <button onclick="document.getElementById('urlConfigBox').style.display='none'" style="flex:1;padding:8px;background:#6c757d;color:#fff;border:none;border-radius:6px;font-size:13px;cursor:pointer">Đóng</button>
+    </div>
+    <p id="urlStatusMsg" style="font-size:11px;color:#666;margin-top:6px;text-align:center"></p>
   </div>
   <div class="content">
     <div class="card">
@@ -237,14 +247,17 @@ const GT_SKUS_DAILY = [
 ];
 
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGP_zSQ2__lvUp1AhBDZ_Q8c9SWtsz9P0vA_y99UaAm7SpPlZlFEF9-3yCMGixtp40/exec';
+// ⚙️ Script URL — cập nhật khi deploy lại Apps Script
+// Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAO1mtkNKeP-8Q3GnhGiMch0WBDGgQDTBwty3pV7LB_4DmghJ-9dZLcCwKpLinfydB/exec';
 
 let state = {
   user: null,
   gps: null,
   photos: {},
   skuData: {},
-  scriptUrl: HARDCODED_SCRIPT_URL
+  // localStorage takes priority (set via ⚙️ button), fallback to hardcoded
+  scriptUrl: localStorage.getItem('dgm_script_url') || HARDCODED_SCRIPT_URL
 };
 
 // ============ INIT ============
@@ -1010,6 +1023,35 @@ function genID(type) { return (type||'XX').substr(0,2).toUpperCase()+'-'+new Dat
 function toast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 function showLoading(msg) { document.getElementById('loadingMsg').textContent=msg||'Đang xử lý...'; document.getElementById('loading').classList.add('show'); }
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
+
+function showUrlConfig() {
+  const box = document.getElementById('urlConfigBox');
+  const input = document.getElementById('urlConfigInput');
+  input.value = state.scriptUrl || '';
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  const msg = document.getElementById('urlStatusMsg');
+  if (state.scriptUrl) {
+    msg.textContent = '✅ URL hiện tại: ' + state.scriptUrl.slice(0, 60) + '...';
+    msg.style.color = '#28a745';
+  } else {
+    msg.textContent = '⚠️ Chưa có URL — cần nhập để gửi dữ liệu';
+    msg.style.color = '#dc3545';
+  }
+}
+
+function saveUrlConfig() {
+  const val = document.getElementById('urlConfigInput').value.trim();
+  if (!val || !val.includes('script.google.com')) {
+    document.getElementById('urlStatusMsg').textContent = '❌ URL không hợp lệ';
+    document.getElementById('urlStatusMsg').style.color = '#dc3545';
+    return;
+  }
+  state.scriptUrl = val;
+  localStorage.setItem('dgm_script_url', val);
+  document.getElementById('urlStatusMsg').textContent = '✅ Đã lưu thành công!';
+  document.getElementById('urlStatusMsg').style.color = '#28a745';
+  setTimeout(() => { document.getElementById('urlConfigBox').style.display = 'none'; }, 1200);
+}
 </script>
 </body>
 </html>
