@@ -196,7 +196,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="success-title">Đã gửi thành công!</div>
       <div class="success-sub" id="successSub">Dữ liệu đã được lưu vào hệ thống</div>
       <div class="success-detail" id="successDetail"></div>
-      <p style="font-size:13px;color:var(--text2);margin-top:16px">Tự động chuyển sau <span id="successCountdown">4</span>s...</p>
+      <p style="font-size:13px;color:var(--text2);margin-top:16px">Tự động về màn hình chính sau <span id="successCountdown">2</span>s...</p>
       <button class="btn btn-primary" style="margin-top:16px;max-width:300px" onclick="goTo('scType')">Khảo sát tiếp</button>
       <button class="btn btn-secondary" style="margin-top:10px;max-width:300px" onclick="goTo('scLogin')">Đổi người dùng</button>
     </div>
@@ -236,18 +236,21 @@ const GT_SKUS_DAILY = [
   "Tương Ớt Sriracha 235ml","Bắp Hạt 425g"
 ];
 
+// ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGP_zSQ2__lvUp1AhBDZ_Q8c9SWtsz9P0vA_y99UaAm7SpPlZlFEF9-3yCMGixtp40/exec';
+
 let state = {
   user: null,
   gps: null,
   photos: {},
   skuData: {},
-  scriptUrl: localStorage.getItem('dgm_script_url') || ''
+  scriptUrl: HARDCODED_SCRIPT_URL
 };
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   renderStaffList();
-  if (!state.scriptUrl) promptScriptUrl();
+  // Script URL hardcoded — no prompt needed
 });
 
 function promptScriptUrl() {
@@ -509,25 +512,25 @@ function renderMTForm(mode) {
     </div>
     <div class="card">
       <h3>✅ Đánh giá điểm bán</h3>
-      <div class="field"><label>Trưng bày</label>
+      <div class="field required"><label>Trưng bày</label>
         <div class="chips" id="mt_display">
           ${['Tốt, ngang tầm mắt','Vị trí cao','Vị trí thấp','Góc khó tìm','Thiếu mã'].map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
         </div>
       </div>
       <div class="divider"></div>
-      <div class="field"><label>Bảng giá</label>
+      <div class="field required"><label>Bảng giá</label>
         <div class="chips" id="mt_price">
           ${['Đúng giá','Thiếu bảng giá','Sai giá','Chưa tăng giá','Đã tăng giá','Đang KM'].map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
         </div>
       </div>
       <div class="divider"></div>
-      <div class="field"><label>Tình trạng hàng</label>
+      <div class="field required"><label>Tình trạng hàng</label>
         <div class="chips" id="mt_goods">
           ${['Đủ mã listing','Một số mã khóa','Một số mã OOS'].map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
         </div>
       </div>
       <div class="divider"></div>
-      <div class="field"><label>Hạn sử dụng</label>
+      <div class="field required"><label>Hạn sử dụng</label>
         <div class="chips" id="mt_expiry">
           ${['Tất cả >50% HSD','Có mã <50% HSD','Có mã <6 tháng','Cần hỗ trợ KM cận date'].map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
         </div>
@@ -661,7 +664,7 @@ function renderGTDailyForm(region) {
     </div>
     <div class="card">
       <h3>🛒 Đặt hàng & Ghi chú</h3>
-      <div class="field"><label>Thông tin đặt hàng</label>
+      <div class="field required"><label>Thông tin đặt hàng</label>
         <div class="chips" id="gt_order">
           ${['Đã đặt hàng thêm','Không đặt hàng','Sẽ đặt sau'].map(v=>`<span class="chip" onclick="selectChip(this,'gt_order')">${v}</span>`).join('')}
         </div>
@@ -734,7 +737,7 @@ function renderGTNewForm() {
     </div>
     <div class="card">
       <h3>🛒 Sản phẩm chào hàng</h3>
-      <div class="chips" id="gtnew_products">
+      <div class="field required" style="margin-bottom:0"><label>Sản phẩm chào hàng</label></div><div class="chips" id="gtnew_products">
         ${products.map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
       </div>
     </div>
@@ -787,6 +790,10 @@ async function submitMT() {
   const store = document.getElementById('mt_store')?.value;
   if (!chain) { toast('⚠️ Vui lòng chọn chain'); return; }
   if (!store) { toast('⚠️ Vui lòng chọn điểm bán'); return; }
+  if (!getChips('mt_display'))  { toast('⚠️ Vui lòng chọn Tình trạng trưng bày'); return; }
+  if (!getChips('mt_price'))    { toast('⚠️ Vui lòng chọn Thông tin bảng giá'); return; }
+  if (!getChips('mt_goods'))    { toast('⚠️ Vui lòng chọn Tình trạng hàng hóa'); return; }
+  if (!getChips('mt_expiry'))   { toast('⚠️ Vui lòng chọn Tình trạng HSD'); return; }
 
   const skus = collectSKUs('mt', MT_SKUS_ALL);
   const payload = {
@@ -826,6 +833,8 @@ async function submitGT() {
     if (!market) { toast('⚠️ Vui lòng chọn chợ'); return; }
     if (!store) { toast('⚠️ Vui lòng chọn hoặc nhập điểm bán'); return; }
   }
+
+  if (!getChips('gt_order')) { toast('⚠️ Vui lòng chọn Thông tin đặt hàng'); return; }
 
   const skus = collectSKUs('gt', GT_SKUS_DAILY);
   const payload = {
@@ -947,7 +956,7 @@ function showSuccess(label, payload, offline) {
   `;
   goTo('scSuccess');
 
-  let countdown = 4;
+  let countdown = 2;
   const countEl = document.getElementById('successCountdown');
   if (countEl) countEl.textContent = countdown;
   const timer = setInterval(() => {
@@ -957,7 +966,8 @@ function showSuccess(label, payload, offline) {
       clearInterval(timer);
       state.photos = {};
       state.skuData = {};
-      goTo('scType');
+      state.user = null;
+      goTo('scLogin');
     }
   }, 1000);
   
