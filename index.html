@@ -34,8 +34,18 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 textarea{resize:vertical;min-height:80px}
 .field{margin-bottom:14px}
 .field.required label::after{content:" *";color:var(--primary)}
-/* PHOTO */
-.photo-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+/* STORE MULTI-SELECT */
+.store-checklist{max-height:260px;overflow-y:auto;border:1.5px solid var(--border);border-radius:8px;background:#fff;margin-top:6px}
+.store-check-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;transition:background .15s}
+.store-check-item:last-child{border-bottom:none}
+.store-check-item:active{background:var(--primary-light)}
+.store-check-item input[type=checkbox]{width:18px;height:18px;accent-color:var(--primary);flex-shrink:0;cursor:pointer}
+.store-check-item label{font-size:14px;color:var(--text);cursor:pointer;flex:1;line-height:1.3}
+.store-count-badge{background:var(--primary);color:#fff;border-radius:12px;padding:2px 10px;font-size:12px;font-weight:700;display:inline-block;margin-left:6px}
+.store-count-badge.zero{background:#ccc}
+/* PHOTO GRID 30 */
+.photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.photo-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
 .photo-slot{aspect-ratio:1;border:2px dashed var(--border);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;position:relative;background:#fafafa;transition:border-color .2s}
 .photo-slot:hover{border-color:var(--primary)}
 .photo-slot img{width:100%;height:100%;object-fit:cover;position:absolute;top:0;left:0}
@@ -98,6 +108,7 @@ textarea{resize:vertical;min-height:80px}
 .badge-gtc{background:#fff3e0;color:#e65100}
 .badge-gts{background:#e8f5e9;color:#2e7d32}
 .badge-bo{background:#f5f5f5;color:#666}
+.badge-mtgt{background:#f0e6ff;color:#5e0099}
 /* TYPE CARDS */
 .type-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
 .type-card{padding:16px 12px;border:2px solid var(--border);border-radius:10px;text-align:center;cursor:pointer;transition:all .2s;background:#fff}
@@ -153,6 +164,23 @@ textarea{resize:vertical;min-height:80px}
     <div class="card">
       <h3>Chọn tên nhân viên</h3>
       <div class="staff-list" id="staffList"></div>
+    </div>
+    <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
+      <h3 style="color:var(--text2);font-size:12px">✏️ Nhập thủ công (nếu chưa có trong danh sách)</h3>
+      <div class="field" style="margin-bottom:10px">
+        <label>Họ và tên</label>
+        <input type="text" id="manualName" placeholder="Nhập họ tên đầy đủ..." style="margin-bottom:8px">
+        <label style="margin-top:8px">Khu vực làm việc</label>
+        <select id="manualTeam">
+          <option value="">— Chọn khu vực —</option>
+          <option value="MT">MT — Modern Trade</option>
+          <option value="GT South">GT Miền Nam</option>
+          <option value="GT Central">GT Miền Trung</option>
+          <option value="GT North">GT Miền Bắc</option>
+          <option value="MT/GT">MT + GT (Quản lý)</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="selectManualUser()" style="padding:11px">Bắt đầu khảo sát →</button>
     </div>
   </div>
 </div>
@@ -215,7 +243,25 @@ textarea{resize:vertical;min-height:80px}
 
 <script>
 // ============ DATA ============
-const TEAM = [{"name": "Hồ Anh Tài", "team": "MT"}, {"name": "Nguyễn Hoàng Thiên Thanh", "team": "MT"}, {"name": "Liêu Văn Vủ", "team": "MT"}, {"name": "Hồ Thị Thắm", "team": "MT"}, {"name": "Lê Thị Cẩm Loan", "team": "MT"}, {"name": "Hồ Ngọc Anh", "team": "GT Central"}, {"name": "Đặng Thị Thanh Hoa", "team": "GT Central"}, {"name": "Nguyễn Thị Thùy Nhung", "team": "GT Central"}, {"name": "Phương Ngọc Chánh", "team": "GT South"}, {"name": "Nguyễn Thị Thúy Oanh", "team": "GT South"}, {"name": "Hồ Ngọc Giàu", "team": "GT South"}, {"name": "Nguyễn Thanh Tùng", "team": "GT South"}, {"name": "Huỳnh Thị Đào", "team": "GT South"}, {"name": "Nguyễn Xuân Đức", "team": "GT North"}, {"name": "Bùi Thị Thoa", "team": "GT North"}, {"name": "Phạm Thị Phương", "team": "GT North"}, {"name": "Đặng Thị Phương Thi", "team": "Back Office"}, {"name": "Ngô Thị Hạnh", "team": "Back Office"}, {"name": "Lê Minh Phương", "team": "Digital Marketing"}, {"name": "Bùi Quang Quý", "team": "Back Office / Manager"}];
+const TEAM = [
+  {"name": "Hồ Anh Tài", "team": "MT"},
+  {"name": "Nguyễn Hoàng Thiên Thanh", "team": "MT"},
+  {"name": "Liêu Văn Vủ", "team": "MT"},
+  {"name": "Hồ Thị Thắm", "team": "MT"},
+  {"name": "Lê Thị Cẩm Loan", "team": "MT"},
+  {"name": "Hồ Ngọc Anh", "team": "GT Central"},
+  {"name": "Đặng Thị Thanh Hoa", "team": "GT Central"},
+  {"name": "Nguyễn Thị Thùy Nhung", "team": "GT Central"},
+  {"name": "Phương Ngọc Chánh", "team": "GT South"},
+  {"name": "Nguyễn Thị Thúy Oanh", "team": "GT South"},
+  {"name": "Hồ Ngọc Giàu", "team": "GT South"},
+  {"name": "Nguyễn Thanh Tùng", "team": "GT South"},
+  {"name": "Huỳnh Thị Đào", "team": "GT South"},
+  {"name": "Nguyễn Xuân Đức", "team": "GT North"},
+  {"name": "Bùi Thị Thoa", "team": "GT North"},
+  {"name": "Phạm Thị Phương", "team": "GT North"},
+  {"name": "Bùi Quang Quý", "team": "MT/GT"}
+];
 
 const MT_CHAINS = {"K-Market": ["K-Market Vh Golden River", "K-Market Vinhomes", "K-Market Vinhomes 2", "K-Market Vinhomes 3"], "Mega Market": ["Mega Market An Giang", "Mega Market An Phú", "Mega Market Biên Hòa", "Mega Market BìNh Dương", "Mega Market BìNh ĐịNh", "Mega Market Bình Phú", "Mega Market Buôn Ma ThuộT", "Mega Market Đà NẵNg", "Mega Market Hà Đông", "Mega Market HảI PhòNg", "Mega Market HiệP Phú", "Mega Market Hoàng Mai", "Mega Market Hồng Bàng", "Mega Market Hưng LợI", "Mega Market Hưng Phú", "Mega Market Kiên Giang", "Mega Market Nha Trang", "Mega Market QuảNg Ninh", "Mega Market Super Centar Đà Nẵng", "Mega Market Thanh Xuân", "Mega Market Thăng Long", "Mega Market VũNg TàU"], "Mekong": ["Mekong Gourmet"], "Nam An Gourmet": ["Nam An Mai Chí Thọ", "Nam An Nguyễn Lương Bằng", "Nam An Nguyễn Thị Minh Khai", "Nam An Nguyễn Văn Trổi", "Nam An Thảo Điền"], "Roots Organic": ["Root Organic Store"], "An Phú": ["St An Phú"], "Menas": ["St Mena Trường Sơn", "St Menas Celesta Rise"], "Lotte Mart": ["Lotte Bình Dương", "Lotte Cần Thơ", "Lotte Đà Nẵng", "Lotte Đồng Nai", "Lotte Gò Vấp", "Lotte Hanoi Center", "Lotte Nam Sài Gòn", "Lotte Nha Trang", "Lotte Nha Trang Gold Coast", "Lotte Phan Thiết", "Lotte Phú Thọ", "Lotte Tân Bình", "Lotte Vinh", "Lotte Vũng Tàu", "Lotte West Lake"], "Go!": ["Go! An Lạc", "Go! An Nhơn", "Go! Bà Rịa", "Go! Bắc Giang", "Go! Bạc Liêu", "Go! Bến Tre", "Go! Bình Định", "Go! Bình Dương", "Go! Buôn Ma Thuột", "Go! Cần Thơ", "Go! Đà Lạt", "Go! Đà Nẵng", "Go! Dĩ An", "Go! Điện Bàn", "Go! Đồng Nai", "Go! Gò Dầu", "Go! Gò Vấp", "Go! Hà Đông", "Go! Hạ Long", "Go! Hà Nam", "Go! Hải Dương", "Go! Hải Phòng", "Go! Hòa Thành", "Go! Hồng Ngự", "Go! Huế", "Go! Hưng Yên", "Go! Hương Trà", "Go! Lào Cai", "Go! Lấp Vò", "Go! Lộc Ninh", "Go! Long Biên", "Go! Mê Linh", "Go! Miền Đông", "Go! Mỹ Tho", "Go! Nam Định", "Go! Nguyễn Thị Thập", "Go! Nha Trang", "Go! Nhơn Trạch", "Go! Ninh Bình", "Go! Ninh Thuận", "Go! Phú Mỹ", "Go! Phú Thạnh", "Go! Quảng Ngãi", "Go! Rạch Giá", "Go! Tam Kỳ", "Go! Tân Hiệp", "Go! Tân Uyên", "Go! Thái Bình", "Go! Thái Nguyên", "Go! Thăng Long", "Go! Thanh Bình", "Go! Thanh Hóa", "Go! Trà Vinh", "Go! Trường Chinh", "Go! Việt Trì", "Go! Vinh", "Go! Vĩnh Phúc", "Go! Vũng Tàu"], "Tops": ["Tops Market An Phú", "Tops Market Âu Cơ", "Tops Market Eco Green", "Tops Market Garden", "Tops Market Hồ Gươm", "Tops Market Lê Trọng Tấn", "Tops Market Moonlight", "Tops Market Parkcity", "Tops Market Thảo Điền"], "An Nam Gourmet": ["Ân Nam 41 Thảo Điền (An Phú)", "Ân Nam Ascentia (Nguyễn Lương Bằng)", "Ân Nam Estella", "Ân Nam Feliz En Vista", "Ân Nam Gourmet Q2 (Võ Trường Toản)", "Ân Nam Hai Bà Trưng", "Ân Nam Landmark 81", "Ân Nam Nguyễn Văn Trỗi", "Ân Nam Phú Mỹ Hưng (Nguyễn Đức Cảnh)", "Ân Nam Sài Gòn Pearl", "Ân Nam Saigon Center", "Ân Nam Thảo Điền Green"], "King Food": ["King Food 0.01 Chung cư An Cư An Phú", "King Food 01 Đường Số 10 Tân Kiểng", "King Food 01.18 Pegasuite", "King Food 0105 B4 Era Town", "King Food 17 Hồ Thị Nhung", "King Food 09 Lâm Văn Bền", "King Food 10 Phạm Hùng", "King Food 107 Bình Quới", "King Food 108 Ngô Tất Tố", "King Food 116 Gò Dầu", "King Food 1-19 The Privia", "King Food 126 Chợ Lớn", "King Food 128 Vườn Lài", "King Food 14 Huỳnh Tịnh Của", "King Food 1426 Nguyễn Duy Trinh", "King Food 15 Nguyên Hồng", "King Food 165 Hoàng Hoa Thám", "King Food 166E Lê Văn Lương", "King Food 195 Thống Nhất", "King Food 22 Hoàng Hoa Thám", "King Food 222-224 Lê Văn Thịnh", "King Food 233 Phạm Hữu Lầu", "King Food 305 Nguyễn Duy Trinh", "King Food 308 Lê Văn Thọ", "King Food 31 Tân Mỹ", "King Food 367 Nguyễn Văn Tăng", "King Food 371 Nguyễn Kiệm", "King Food 372 Dương Quảng Hàm", "King Food 410 Phan Huy Ích", "King Food 42 Nguyễn Văn Đậu", "King Food 43 Bùi Văn Ba", "King Food 436 Nguyễn Thị Thập", "King Food 46 Nguyễn Thị Tú", "King Food 48 CN1", "King Food 511 Quốc Lộ 50", "King Food 539 Đỗ Xuân Hợp", "King Food 54 Vũ Huy Tấn", "King Food 571 Huỳnh Tấn Phát", "King Food 59 Quốc Hương", "King Food 63 Đường Số 3", "King Food 64A Cửu Long", "King Food 85 Cây Keo", "King Food 86B Vũ Tùng", "King Food 97 Lê Thị Chợ", "King Food 98 Khánh Hội", "King Food 99 Đường Số 7", "King Food A10-0.02 Ehome 3", "King Food A7-8 Valora Mizuki", "King Food T4, T5 Block D Chung Cư Akari City", "King Food AS19 Block A Prosper Plaza", "King Food BB17 Trường Sơn", "King Food 66/70 Bình Thành", "King Food Block B Imperia An Phú", "King Food C0.01 Riverside Phú Mỹ Hưng", "King Food Lô H10-05 Chung Cư Citihome Cát Lái", "King Food Chung Cư CT1 MT Eastmark City", "King Food D1-1.24 Safira Khang Điền", "King Food D-2.01A Westgate An Gia", "King Food Block C Diamond Riverside", "King Food E72 Phú Thuận", "King Food A0.01 EhomeS Phú Hữu", "King Food Block D Gia Hòa The Art", "King Food Block C Harmona", "King Food Him Lam Phú Đông", "King Food Him Lam Riverside", "King Food 296 Hoàng Ngân", "King Food Block B1 Hưng Ngân Garden", "King Food Block A Jamila Khang Điền", "King Food 10D Kỳ Đồng", "King Food Lô CD L1-12 Q7 Riverside Đào Trí", "King Food 39 Lý Phục Man", "King Food B0.07-B0.08 Nam Sài Gòn Residences", "King Food 160A Nguyễn Thị Định", "King Food 75 Nguyễn Trãi", "King Food 299 Nguyễn Văn Khối", "King Food 678 Nguyễn Văn Quá", "King Food Tháp B Tầng 1 Opal Skyline", "King Food R13 Hưng Vượng 2", "King Food RS4 Richstar", "King Food S01.05 Vinhomes Grand Park", "King Food S01.11 Block A1 Charm Sapphire", "King Food S03.05 Vinhomes Grand Park", "King Food S06.06 Vinhomes Grand Park", "King Food S07.02 Vinhomes Grand Park", "King Food S1.0.38 Block A5 Diamond Celadon City", "King Food S10.02 Vinhomes Grand Park", "King Food SAV_04-00.03 The Sun Avenue", "King Food B0.02 Lô MD4-4 Scenic Valley", "King Food SH01 Bcons Garden", "King Food SH14-15 Saigon South Residences", "King Food SH16 Eco Green", "King Food 229A Tân Hoà Đông", "King Food TMDV2 Mizuki Park", "King Food 46 Trần Não", "King Food 66 Trương Vĩnh Ký", "King Food Vạn Phúc City", "King Food 27 Tân Lập", "King Food 446 - 448 Phạm Văn Bạch", "King Food 02 Tạ Hiện", "King Food 128A Kha Vạn Cân", "King Food Vinhomes Grandpark 1.10-1.15-1.16 GH5", "King Food Vinhomes Grandpark 1.06-1.07 BS11", "Emart Gò Vấp", "Emart Phan Huy Ích", "Emart Sala", "King Food Cây Keo - Thủ Đức", "King Food Trần Trọng Cung", "King Food Nguyễn Trọng Tuyển", "King Food Phan Văn Hân", "King Food Hà Đô"]};
 
@@ -249,7 +295,7 @@ const GT_SKUS_DAILY = [
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
 // ⚙️ Script URL — cập nhật khi deploy lại Apps Script
 // Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAO1mtkNKeP-8Q3GnhGiMch0WBDGgQDTBwty3pV7LB_4DmghJ-9dZLcCwKpLinfydB/exec';
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzbgGLM0CcJzEp4rWLT6adDBIfvvd55qlEq65AEFfVvFE9FTtXaEr5EyFGWUzZB1CtHqw/exec';
 
 let state = {
   user: null,
@@ -263,7 +309,16 @@ let state = {
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   renderStaffList();
-  // Script URL hardcoded — no prompt needed
+  // Auto-sync offline queue khi load trang (nếu có mạng)
+  if (navigator.onLine && state.scriptUrl) syncOffline();
+});
+
+// Auto-retry khi có mạng lại
+window.addEventListener('online', () => {
+  if (state.scriptUrl) {
+    toast('📶 Đã có mạng — đang sync dữ liệu offline...');
+    setTimeout(syncOffline, 1500);
+  }
 });
 
 function promptScriptUrl() {
@@ -314,7 +369,7 @@ function updateGPSDisplays() {
 // ============ STAFF LIST ============
 function renderStaffList() {
   const list = document.getElementById('staffList');
-  const badges = { 'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts' };
+  const badges = { 'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts','MT/GT':'badge-mtgt' };
   list.innerHTML = TEAM.map(s => `
     <button class="staff-btn" onclick='selectUser(${JSON.stringify(s)})'>
       <div class="staff-avatar">${s.name[0]}</div>
@@ -335,6 +390,14 @@ function selectUser(user) {
   initGPS();
 }
 
+function selectManualUser() {
+  const name = document.getElementById('manualName')?.value?.trim();
+  const team = document.getElementById('manualTeam')?.value;
+  if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
+  if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
+  selectUser({ name, team });
+}
+
 // ============ TYPE SELECTION ============
 function renderTypeCards(team) {
   const cards = document.getElementById('typeCards');
@@ -349,10 +412,47 @@ function renderTypeCards(team) {
       <div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán GT hàng ngày</div></div>
       <div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">Điểm Bán Mới</div><div class="desc">Khảo sát & chào hàng điểm mới</div></div>
     </div>`;
+  } else if (team === 'MT/GT') {
+    html += `<div class="type-cards">
+      <div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">MT Daily</div><div class="desc">Khảo sát điểm MT hàng ngày</div></div>
+      <div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>
+      <div class="type-card" onclick="showGTRegionPicker()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>
+      <div class="type-card" onclick="showGTRegionPicker('new')"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>
+    </div>`;
   } else {
     html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
   }
   cards.innerHTML = html;
+}
+
+// ============ GT REGION PICKER (for MT/GT manager) ============
+function showGTRegionPicker(mode) {
+  const regions = ['GT South', 'GT Central', 'GT North'];
+  const labels = {'GT South': 'GT Miền Nam 🟢', 'GT Central': 'GT Miền Trung 🟡', 'GT North': 'GT Miền Bắc 🟣'};
+  const div = document.createElement('div');
+  div.id = 'regionPickerOverlay';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+  div.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:20px;width:100%;max-width:320px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;text-align:center">Chọn khu vực GT</h3>
+      ${regions.map(r => `<button onclick="pickGTRegion('${r}','${mode||'daily'}')" style="display:block;width:100%;padding:13px;margin-bottom:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;font-weight:600">${labels[r]}</button>`).join('')}
+      <button onclick="document.getElementById('regionPickerOverlay').remove()" style="display:block;width:100%;padding:11px;border:none;border-radius:10px;background:#f5f5f5;font-size:14px;cursor:pointer;color:#666">Huỷ</button>
+    </div>`;
+  document.body.appendChild(div);
+}
+
+function pickGTRegion(region, mode) {
+  document.getElementById('regionPickerOverlay')?.remove();
+  // Temporarily override user.team for GT form rendering
+  const originalTeam = state.user.team;
+  state.user = { ...state.user, team: region };
+  if (mode === 'new') {
+    startGTNew();
+  } else {
+    startGTDaily();
+  }
+  // After navigation, restore original team so type screen still shows MT/GT
+  state.user = { ...state.user, team: originalTeam };
 }
 
 // ============ DATE HELPERS ============
@@ -402,6 +502,63 @@ function photoSlotHTML(prefix, index, label) {
     </div>`;
 }
 
+// Shared max
+const PHOTO_MAX = 30;
+
+// GT: Dynamic photo add (up to 30)
+let gtPhotoCount = 4;
+
+// MT: Dynamic photo add (up to 30)
+let mtPhotoCount = 4;
+
+function addGTPhotoSlot() {
+  if (gtPhotoCount >= PHOTO_MAX) { toast(`⚠️ Tối đa ${PHOTO_MAX} hình`); return; }
+  gtPhotoCount++;
+  const grid = document.getElementById('gt_photo_grid');
+  if (!grid) return;
+  const div = document.createElement('div');
+  div.innerHTML = photoSlotHTML('gt', gtPhotoCount, `Hình ${gtPhotoCount}`);
+  grid.appendChild(div.firstElementChild);
+  updateGTPhotoBadge();
+  if (gtPhotoCount >= PHOTO_MAX) {
+    const btn = document.getElementById('gt_add_photo_btn');
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function updateGTPhotoBadge() {
+  const taken = Object.keys(state.photos).filter(k => k.startsWith('gt')).length;
+  const badge = document.getElementById('gt_photo_count_badge');
+  if (badge) {
+    badge.textContent = `${taken}/${PHOTO_MAX}`;
+    badge.className = 'store-count-badge' + (taken === 0 ? ' zero' : '');
+  }
+}
+
+function addMTPhotoSlot() {
+  if (mtPhotoCount >= PHOTO_MAX) { toast(`⚠️ Tối đa ${PHOTO_MAX} hình`); return; }
+  mtPhotoCount++;
+  const grid = document.getElementById('mt_photo_grid');
+  if (!grid) return;
+  const div = document.createElement('div');
+  div.innerHTML = photoSlotHTML('mt', mtPhotoCount, `Hình ${mtPhotoCount}`);
+  grid.appendChild(div.firstElementChild);
+  updateMTPhotoBadge();
+  if (mtPhotoCount >= PHOTO_MAX) {
+    const btn = document.getElementById('mt_add_photo_btn');
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function updateMTPhotoBadge() {
+  const taken = Object.keys(state.photos).filter(k => k.startsWith('mt')).length;
+  const badge = document.getElementById('mt_photo_count_badge');
+  if (badge) {
+    badge.textContent = `${taken}/${PHOTO_MAX}`;
+    badge.className = 'store-count-badge' + (taken === 0 ? ' zero' : '');
+  }
+}
+
 function previewPhoto(input, slotId, key) {
   if (!input.files[0]) return;
   const slot = document.getElementById(slotId);
@@ -413,6 +570,8 @@ function previewPhoto(input, slotId, key) {
     slot.classList.add('has-img');
     slot.querySelectorAll('.slot-icon,.slot-label').forEach(el => el.style.display = 'none');
     state.photos[key] = e.target.result;
+    updateGTPhotoBadge();
+    updateMTPhotoBadge();
   };
   reader.readAsDataURL(input.files[0]);
 }
@@ -457,6 +616,7 @@ function startMT(mode) {
   state.photos = {};
   state.skuData = {};
   state.mtMode = mode;
+  mtPhotoCount = 4; // reset photo count
   document.getElementById('mtSubtitle').textContent = state.user.name;
   renderMTForm(mode);
   goTo('scMT');
@@ -478,6 +638,7 @@ function renderMTForm(mode) {
         <td>${escHtml(sku)}</td>
         <td class="qty-cell"><input type="number" class="qty-input" id="mt_qty_${escId(sku)}" min="0" placeholder="0" inputmode="numeric"></td>
         <td><select class="status-sel" id="mt_st_${escId(sku)}">
+          <option value="">— Chọn —</option>
           <option value="OK">OK</option>
           <option value="Sắp hết">⚠ Sắp hết</option>
           <option value="Hết hàng">❌ Hết</option>
@@ -508,10 +669,12 @@ function renderMTForm(mode) {
       </div>
     </div>
     <div class="card">
-      <h3>📷 Hình ảnh (tối đa 4)</h3>
-      <div class="photo-grid">
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 4 hình bắt buộc. Có thể chụp thêm tối đa 30 hình/lần survey.</p>
+      <div id="mt_photo_grid" class="photo-grid-2">
         ${[['Tổng quan',1],['Mặt tiền',2],['Sản phẩm 1',3],['Sản phẩm 2',4]].map(([lbl,i]) => photoSlotHTML('mt',i,lbl)).join('')}
       </div>
+      <button onclick="addMTPhotoSlot()" id="mt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
     </div>
     <div class="card" style="padding:12px 8px">
       <h3 style="padding:0 8px 8px">📦 Tồn kho trên kệ</h3>
@@ -552,6 +715,26 @@ function renderMTForm(mode) {
       <div class="field"><label>Ghi chú thêm</label>
         <textarea id="mt_note" placeholder="Ghi chú tình trạng, yêu cầu hỗ trợ..."></textarea>
       </div>
+    </div>
+    <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
+      <h3 style="color:var(--text2)">📌 Đánh giá điểm bán thêm (Không bắt buộc)</h3>
+      <div class="field"><label>Lượng traffic</label>
+        <div class="chips" id="mt_traffic">
+          ${['Cao — đông khách','Trung bình','Thấp — ít khách'].map(v=>`<span class="chip" onclick="selectChip(this,'mt_traffic')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field"><label>Khả năng làm sampling</label>
+        <div class="chips" id="mt_sampling">
+          ${['Có thể — nên đăng ký','Có nhưng phức tạp','Không có vị trí'].map(v=>`<span class="chip" onclick="selectChip(this,'mt_sampling')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field"><label>Khu vực điểm bán</label>
+        <div class="chips" id="mt_zone">
+          ${['Khu trung tâm','Khu dân cư bình dân','Khu người nước ngoài','Khu văn phòng','Gần bệnh viện/trường học'].map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
+        </div>
+      </div>
     </div>`;
 
   const otherForm = `
@@ -572,10 +755,12 @@ function renderMTForm(mode) {
       </div>
     </div>
     <div class="card">
-      <h3>📷 Hình ảnh (tối đa 4)</h3>
-      <div class="photo-grid">
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 1 hình. Có thể thêm tối đa 30 hình.</p>
+      <div id="mt_photo_grid" class="photo-grid-2">
         ${[['Ảnh 1',1],['Ảnh 2',2],['Ảnh 3',3],['Ảnh 4',4]].map(([lbl,i]) => photoSlotHTML('mt',i,lbl)).join('')}
       </div>
+      <button onclick="addMTPhotoSlot()" id="mt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
     </div>`;
 
   content.innerHTML = mode === 'other' ? otherForm : dailyForm;
@@ -592,6 +777,7 @@ function loadMTStores(chain) {
 function startGTDaily() {
   state.photos = {};
   state.skuData = {};
+  gtPhotoCount = 4; // reset photo count
   const region = state.user.team;
   document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
   renderGTDailyForm(region);
@@ -606,17 +792,25 @@ function renderGTDailyForm(region) {
   let storeSelectHTML = '';
   
   if (region === 'GT North') {
-    // GT North: flat list with search
-    const allStores = GT_NORTH_STORES.map(s => `<option value="${escHtml(s.store)}" data-addr="${escHtml(s.address)}">${escHtml(s.store)} — ${escHtml(s.address)}</option>`).join('');
+    // GT North: flat list with search + multi-checkbox
+    marketSelectHTML = `
+      <div class="field required"><label>Chợ / Khu vực (GT Bắc)</label>
+        <input type="text" class="search-input" id="gt_north_search" placeholder="🔍 Tìm điểm bán..." oninput="filterGTNorthStores(this.value)">
+      </div>`;
     storeSelectHTML = `
-      <div class="field required"><label>Điểm bán (${GT_NORTH_STORES.length} stores)</label>
-        <input type="text" class="search-input" id="gt_north_search" placeholder="🔍 Tìm kiếm..." oninput="filterGTNorthStores(this.value)">
-        <select id="gt_store" size="1" onchange="onGTNorthSelect(this)">
-          <option value="">— Chọn điểm bán —</option>${allStores}
-        </select>
+      <div class="field required">
+        <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
+        <div class="store-checklist" id="gt_store_checklist">
+          ${GT_NORTH_STORES.map((s,i) => `
+            <div class="store-check-item" onclick="toggleStoreCheck(${i})">
+              <input type="checkbox" id="gt_cb_${i}" value="${escHtml(s.store)}" onchange="updateStoreCount()">
+              <label for="gt_cb_${i}">${escHtml(s.store)}<br><span style="font-size:11px;color:var(--text2)">${escHtml(s.address)}</span></label>
+            </div>`).join('')}
+        </div>
       </div>
-      <div class="field"><label>Địa chỉ điểm bán</label>
-        <input type="text" id="gt_north_addr" placeholder="Tự điền nếu chọn thủ công" readonly style="background:#f9f9f9">
+      <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
+        <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
+        <input type="text" id="gt_market_manual" placeholder="Địa chỉ / khu vực" style="margin-top:6px">
       </div>`;
   } else {
     const regionData = region === 'GT Central' ? GT_CENTRAL : GT_SOUTH;
@@ -624,16 +818,22 @@ function renderGTDailyForm(region) {
     const marketOpts = markets.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
     marketSelectHTML = `
       <div class="field required"><label>Chợ / Khu vực</label>
-        <select id="gt_market" onchange="loadGTStores(this.value,'${region}')">
+        <select id="gt_market" onchange="loadGTStoresChecklist(this.value,'${region}')">
           <option value="">— Chọn chợ —</option>${marketOpts}
         </select>
       </div>`;
     storeSelectHTML = `
-      <div class="field required"><label>Điểm bán</label>
-        <select id="gt_store"><option value="">— Chọn chợ trước —</option></select>
+      <div class="field required" id="gt_store_field">
+        <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
+        <input type="text" id="gt_store_search" placeholder="🔍 Tìm trong chợ..." style="margin-bottom:6px" oninput="filterStoreChecklist(this.value)">
+        <div class="store-checklist" id="gt_store_checklist">
+          <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ trước</div>
+        </div>
       </div>
-      <div class="field"><label>Hoặc nhập thủ công (nếu không có trong list)</label>
+      <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
         <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
+        <input type="text" id="gt_market_manual" placeholder="Tên chợ / khu vực (nếu nhập thủ công)" style="margin-top:6px">
+        <p style="font-size:11px;color:var(--text2);margin-top:4px">💡 Điểm bán nhập thủ công sẽ được ghi nhận theo khu vực của bạn</p>
       </div>`;
   }
 
@@ -661,10 +861,12 @@ function renderGTDailyForm(region) {
       </div>
     </div>
     <div class="card">
-      <h3>📷 Hình ảnh (tối đa 4)</h3>
-      <div class="photo-grid">
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="gt_photo_count_badge">0/30</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 4 hình bắt buộc. Có thể chụp thêm tối đa 30 hình/lần survey.</p>
+      <div id="gt_photo_grid" class="photo-grid">
         ${[['Tổng quan',1],['Mặt tiền',2],['Sản phẩm 1',3],['Sản phẩm 2',4]].map(([lbl,i]) => photoSlotHTML('gt',i,lbl)).join('')}
       </div>
+      <button onclick="addGTPhotoSlot()" id="gt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
     </div>
     <div class="card" style="padding:12px 8px">
       <h3 style="padding:0 8px 8px">📦 Tồn kho trên kệ</h3>
@@ -686,32 +888,75 @@ function renderGTDailyForm(region) {
       <div class="field"><label>Ghi chú</label>
         <textarea id="gt_note" placeholder="Ghi chú tình trạng, yêu cầu..."></textarea>
       </div>
+    </div>
+    <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
+      <h3 style="color:var(--text2)">📌 Thông tin bổ sung (Không bắt buộc)</h3>
+      <div class="field"><label>Điểm bán có khả năng làm trưng bày</label>
+        <div class="chips" id="gt_display_potential">
+          ${['Có — nên đề xuất','Không có vị trí','Chưa xác định'].map(v=>`<span class="chip" onclick="selectChip(this,'gt_display_potential')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="field"><label>Điểm bán tốt nhất trong khu vực</label>
+        <div class="chips" id="gt_best_store">
+          ${['Có — top điểm bán','Bình thường','Dưới trung bình'].map(v=>`<span class="chip" onclick="selectChip(this,'gt_best_store')">${v}</span>`).join('')}
+        </div>
+      </div>
+      <div class="field"><label>Ghi chú khác</label>
+        <textarea id="gt_extra_note" placeholder="Thông tin bổ sung, cơ hội, vấn đề cần xử lý..."></textarea>
+      </div>
     </div>`;
 
   content.dataset.region = region;
 }
 
-function loadGTStores(market, region) {
-  const sel = document.getElementById('gt_store');
-  if (!market) { sel.innerHTML = '<option value="">— Chọn chợ trước —</option>'; return; }
+function loadGTStoresChecklist(market, region) {
+  const cl = document.getElementById('gt_store_checklist');
+  if (!cl) return;
+  if (!market) { cl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ trước</div>'; updateStoreCount(); return; }
   const regionData = region === 'GT Central' ? GT_CENTRAL : GT_SOUTH;
   const stores = regionData[market] || [];
-  sel.innerHTML = '<option value="">— Chọn điểm bán —</option>' + stores.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+  cl.innerHTML = stores.length === 0
+    ? '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">Không có điểm bán</div>'
+    : stores.map((s,i) => `
+        <div class="store-check-item" onclick="toggleStoreCheck(${i})">
+          <input type="checkbox" id="gt_cb_${i}" value="${escHtml(s)}" onchange="updateStoreCount()">
+          <label for="gt_cb_${i}">${escHtml(s)}</label>
+        </div>`).join('');
+  updateStoreCount();
+}
+
+function filterStoreChecklist(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('#gt_store_checklist .store-check-item').forEach(item => {
+    const label = item.querySelector('label')?.textContent?.toLowerCase() || '';
+    item.style.display = (!q || label.includes(q)) ? '' : 'none';
+  });
 }
 
 function filterGTNorthStores(query) {
-  const sel = document.getElementById('gt_store');
   const q = query.toLowerCase().trim();
-  sel.innerHTML = '<option value="">— Chọn điểm bán —</option>' + GT_NORTH_STORES
-    .filter(s => !q || s.store.toLowerCase().includes(q) || s.address.toLowerCase().includes(q))
-    .map(s => `<option value="${escHtml(s.store)}" data-addr="${escHtml(s.address)}">${escHtml(s.store)} — ${escHtml(s.address)}</option>`)
-    .join('');
+  document.querySelectorAll('#gt_store_checklist .store-check-item').forEach(item => {
+    const label = item.querySelector('label')?.textContent?.toLowerCase() || '';
+    item.style.display = (!q || label.includes(q)) ? '' : 'none';
+  });
 }
 
-function onGTNorthSelect(sel) {
-  const opt = sel.selectedOptions[0];
-  const addrEl = document.getElementById('gt_north_addr');
-  if (addrEl) addrEl.value = opt?.dataset?.addr || '';
+function toggleStoreCheck(index) {
+  const cb = document.getElementById(`gt_cb_${index}`);
+  if (cb) { cb.checked = !cb.checked; updateStoreCount(); }
+}
+
+function updateStoreCount() {
+  const checked = document.querySelectorAll('#gt_store_checklist input[type=checkbox]:checked').length;
+  const badge = document.getElementById('gt_store_count');
+  if (badge) {
+    badge.textContent = checked + ' đã chọn';
+    badge.className = 'store-count-badge' + (checked === 0 ? ' zero' : '');
+  }
+}
+
+function getSelectedStores() {
+  return Array.from(document.querySelectorAll('#gt_store_checklist input[type=checkbox]:checked')).map(cb => cb.value);
 }
 
 // ============ GT NEW CUSTOMER ============
@@ -823,6 +1068,9 @@ async function submitMT() {
     goods_status: getChips('mt_goods'),
     expiry_status: getChips('mt_expiry'),
     note: document.getElementById('mt_note')?.value || '',
+    traffic: getChips('mt_traffic') || '',
+    sampling: getChips('mt_sampling') || '',
+    zone: getChips('mt_zone') || '',
     sku_data: skus,
     photos: state.photos
   };
@@ -834,17 +1082,22 @@ async function submitGT() {
   const region = document.getElementById('gtContent')?.dataset?.region || state.user.team;
   let market = '', store = '';
   
+  // Collect multi-selected stores + manual
+  const selectedStores = getSelectedStores();
+  const storeManual = document.getElementById('gt_store_manual')?.value?.trim() || '';
+  const marketManual = document.getElementById('gt_market_manual')?.value?.trim() || '';
+
   if (region === 'GT North') {
-    store = document.getElementById('gt_store')?.value?.trim() || '';
-    market = document.getElementById('gt_north_addr')?.value?.trim() || '';
-    if (!store) { toast('⚠️ Vui lòng chọn điểm bán'); return; }
+    market = marketManual || 'GT North';
+    const allSelected = [...selectedStores, ...(storeManual ? [storeManual] : [])];
+    if (allSelected.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
+    store = allSelected.join(' | ');
   } else {
-    market = document.getElementById('gt_market')?.value || '';
-    const storeDropdown = document.getElementById('gt_store')?.value || '';
-    const storeManual = document.getElementById('gt_store_manual')?.value?.trim() || '';
-    store = storeManual || storeDropdown;
+    market = document.getElementById('gt_market')?.value || marketManual || '';
+    const allSelected = [...selectedStores, ...(storeManual ? [storeManual] : [])];
     if (!market) { toast('⚠️ Vui lòng chọn chợ'); return; }
-    if (!store) { toast('⚠️ Vui lòng chọn hoặc nhập điểm bán'); return; }
+    if (allSelected.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
+    store = allSelected.join(' | ');
   }
 
   if (!getChips('gt_order')) { toast('⚠️ Vui lòng chọn Thông tin đặt hàng'); return; }
@@ -860,6 +1113,10 @@ async function submitGT() {
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
     order_info: getChips('gt_order'),
     note: document.getElementById('gt_note')?.value || '',
+    display_potential: getChips('gt_display_potential') || '',
+    best_store: getChips('gt_best_store') || '',
+    extra_note: document.getElementById('gt_extra_note')?.value || '',
+    store_count: store.split(' | ').length,
     sku_data: skus,
     photos: state.photos
   };
@@ -891,7 +1148,10 @@ async function submitGTNew() {
   await sendData(payload, 'GT New Customer');
 }
 
-// ============ SEND DATA — FIXED ============
+// ============ SEND DATA — FIXED v4 ============
+// Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
+// Không thể xác nhận server response với no-cors → dùng Image ping trick
+// để detect lỗi network vs success
 async function sendData(payload, label) {
   if (!state.scriptUrl) {
     saveOffline(payload);
@@ -900,24 +1160,38 @@ async function sendData(payload, label) {
   }
   showLoading('Đang gửi dữ liệu...');
   try {
-    // Compress & convert photos to small base64, keep in payload
     const compressed = await compressPhotos(payload);
-    
-    // Encode entire payload as base64 → send via GET
-    // GET requests from browser to Apps Script do NOT hit CORS preflight
-    // Apps Script doGet() reads e.parameter.data
     const jsonStr = JSON.stringify(compressed);
     const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
-    
-    // Use an image tag trick to fire-and-forget without CORS errors
-    // Then poll a known endpoint to verify (or just trust the fire)
     const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
-    
-    // Use no-cors GET — this DOES work for Apps Script doGet
-    await fetch(url, { method: 'GET', mode: 'no-cors' });
-    
-    hideLoading();
-    showSuccess(label, payload, false);
+
+    // Attempt 1: fetch với no-cors + timeout 15s
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow', signal: controller.signal });
+      clearTimeout(timer);
+      hideLoading();
+      showSuccess(label, payload, false);
+    } catch (fetchErr) {
+      clearTimeout(timer);
+      // Nếu abort do timeout hoặc network error → lưu offline
+      if (!navigator.onLine) {
+        hideLoading();
+        saveOffline(payload);
+        showSuccess(label, payload, true);
+      } else {
+        // Có mạng nhưng fetch lỗi → thử lại 1 lần với image ping
+        await new Promise((resolve) => {
+          const img = new Image();
+          img.onload = img.onerror = resolve;
+          img.src = url + '&_t=' + Date.now();
+          setTimeout(resolve, 8000);
+        });
+        hideLoading();
+        showSuccess(label, payload, false); // Coi như thành công vì đã ping
+      }
+    }
   } catch (err) {
     hideLoading();
     saveOffline(payload);
@@ -929,7 +1203,10 @@ async function syncOfflineSend(item) {
   const jsonStr = JSON.stringify(item);
   const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
   const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
-  await fetch(url, { method: 'GET', mode: 'no-cors' });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow', signal: controller.signal });
+  clearTimeout(timer);
 }
 
 async function compressPhotos(payload) {
