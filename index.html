@@ -140,6 +140,7 @@ textarea{resize:vertical;min-height:80px}
 </head>
 <body>
 
+<div id="dbgOv" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:50vh;overflow-y:auto;background:rgba(0,0,0,.9);color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:9999"><button onclick="document.getElementById('dbgOv').style.display='none'" style="float:right;background:#f00;color:#fff;border:none;padding:2px 8px;border-radius:4px">✕</button><div id="dbgLog"></div></div>
 <div class="toast" id="toast"></div>
 <div class="loading" id="loading"><div class="spinner"></div><p id="loadingMsg">Đang gửi...</p></div>
 
@@ -1196,6 +1197,17 @@ async function submitGTNew() {
 }
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
+function dbg(msg, col) {
+  var ov = document.getElementById('dbgOv');
+  var lg = document.getElementById('dbgLog');
+  if (!ov||!lg) return;
+  ov.style.display='block';
+  var d=document.createElement('div');
+  d.style.cssText='color:'+(col||'#0f0')+';border-bottom:1px solid #222;padding:2px 0';
+  d.textContent=new Date().toLocaleTimeString()+' | '+String(msg);
+  lg.appendChild(d);
+  ov.scrollTop=ov.scrollHeight;
+}
 // ============ SEND DATA — FIXED v4 ============
 // Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
 // Không thể xác nhận server response với no-cors → dùng Image ping trick
@@ -1211,8 +1223,11 @@ async function sendData(payload, label) {
       const compressed = await compressPhotos(payload);
         const jsonStr = JSON.stringify(compressed);
       var b64;
-    var b64 = btoa(unescape(encodeURIComponent(jsonStr)));
+    var b64;
+    try { b64 = btoa(unescape(encodeURIComponent(jsonStr))); dbg('btoa OK:'+b64.length,'#0f0'); }
+    catch(be) { dbg('btoa ERR:'+be.message,'#f00'); throw be; }
     const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
+    dbg('fetch→'+url.slice(0,80),'#ff0');
 
     // Timeout thủ công — tương thích iOS 12+, Android 8+ (manual AbortController)
       const controller = new AbortController();
