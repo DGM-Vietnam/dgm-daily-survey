@@ -348,7 +348,7 @@ const GT_SKUS_DAILY = [
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
 // ⚙️ Script URL — cập nhật khi deploy lại Apps Script
 // Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzjAG_nkNeDXCJFZMCV71moesJCAGiO8OHKP1-jEQI1sAB-MKWwNo_pBYPn36XS7WBBKQ/exec';
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwssU9jOsn2AI_JynLlzIUAz-_9AGRReTDl3mV9_OPzzQQzeKyVWJ7fFAUP5R1gtNpjw/exec';
 
 let state = {
   user: null,
@@ -1226,14 +1226,16 @@ async function sendData(payload, label) {
     var b64;
     try { b64 = btoa(unescape(encodeURIComponent(jsonStr))); dbg('btoa OK:'+b64.length,'#0f0'); }
     catch(be) { dbg('btoa ERR:'+be.message,'#f00'); throw be; }
-    const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
-    dbg('fetch→'+url.slice(0,80),'#ff0');
+    // POST để không bị giới hạn URL length
+    const formData = new FormData();
+    formData.append('data', b64);
+    dbg('size:'+b64.length+' POST→'+state.scriptUrl.slice(0,50),'#ff0');
 
     // Timeout thủ công — tương thích iOS 12+, Android 8+ (manual AbortController)
-      const controller = new AbortController();
+    const controller = new AbortController();
     const timer = setTimeout(function(){controller.abort();},15000);
     try {
-      await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow', signal: controller.signal });
+      await fetch(state.scriptUrl, { method: 'POST', mode: 'no-cors', redirect: 'follow', body: formData, signal: controller.signal });
       clearTimeout(timer);
           hideLoading();
       showSuccess(label, payload, false);
@@ -1249,7 +1251,7 @@ async function sendData(payload, label) {
           const img = new Image();
           img.onload = resolve;
           img.onerror = resolve;
-          img.src = url + '&_t=' + Date.now();
+          img.src = state.scriptUrl + '?_t=' + Date.now();
           setTimeout(resolve, 8000);
         });
         hideLoading();
@@ -1276,7 +1278,7 @@ async function syncOfflineSend(item) {
 async function compressPhotos(payload) {
   const out = { ...payload, photos: {} };
   for (const [key, dataUrl] of Object.entries(payload.photos || {})) {
-    out.photos[key] = await resizeImage(dataUrl, 800);
+    out.photos[key] = await resizeImage(dataUrl, 500);
   }
   return out;
 }
