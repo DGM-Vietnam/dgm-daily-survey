@@ -1228,37 +1228,33 @@ async function sendData(payload, label) {
     dbg('size:'+b64.length,'#ff0');
     dbg('POST→'+state.scriptUrl.slice(0,50),'#ff0');
 
-    // text/plain POST — tương thích no-cors Safari iOS
-    const postBody = JSON.stringify({data: b64});
+    // Image ping GET — tương thích 100% Safari iOS/Android mọi đời
+    var getUrl = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
+    dbg('GET size:'+getUrl.length,'#ff0');
 
-    // Timeout thủ công — tương thích iOS 12+, Android 8+ (manual AbortController)
-    const controller = new AbortController();
-    const timer = setTimeout(function(){controller.abort();},15000);
-    try {
-      await fetch(state.scriptUrl, { method: 'POST', mode: 'no-cors', redirect: 'follow',
-        headers: {'Content-Type': 'text/plain'}, body: postBody, signal: controller.signal });
-      clearTimeout(timer);
-          hideLoading();
-      showSuccess(label, payload, false);
-    } catch (fetchErr) {
-      clearTimeout(timer);
-          if (!navigator.onLine) {
-        hideLoading();
-        saveOffline(payload);
-        showSuccess(label, payload, true);
-      } else {
-        // Có mạng nhưng fetch lỗi → fallback: image ping (tương thích mọi browser)
-        await new Promise(function(resolve) {
-          const img = new Image();
-          img.onload = resolve;
-          img.onerror = resolve;
-          img.src = state.scriptUrl + '?_t=' + Date.now();
-          setTimeout(resolve, 8000);
-        });
-        hideLoading();
-        showSuccess(label, payload, false);
-      }
-    }
+    await new Promise(function(resolve) {
+      var done = false;
+      var watchdog = setTimeout(function() {
+        dbg('timeout 12s','#f00');
+        done = true; resolve();
+      }, 12000);
+      var img = new Image();
+      img.onload = function() {
+        if (done) return; done = true;
+        clearTimeout(watchdog);
+        dbg('img onload OK','#0f0');
+        resolve();
+      };
+      img.onerror = function() {
+        if (done) return; done = true;
+        clearTimeout(watchdog);
+        dbg('img onerror (bình thường với GAS)','#ff0');
+        resolve();
+      };
+      img.src = getUrl;
+    });
+    hideLoading();
+    showSuccess(label, payload, false);
   } catch (err) {
       hideLoading();
     saveOffline(payload);
