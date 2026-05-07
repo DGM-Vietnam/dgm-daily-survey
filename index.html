@@ -399,7 +399,7 @@ function initGPS() {
 function refreshGPS(boxId) {
   const box = document.getElementById(boxId);
   if (box) box.innerHTML = gpsBoxHTML(boxId, true);
-  navigator.geolocation?.getCurrentPosition(
+  navigator.geolocation && navigator.geolocation.getCurrentPosition(
     pos => { state.gps = { lat: pos.coords.latitude.toFixed(6), lng: pos.coords.longitude.toFixed(6) }; if (box) box.innerHTML = gpsBoxHTML(boxId, false); },
     () => { state.gps = null; if (box) box.innerHTML = gpsBoxHTML(boxId, false); },
     { enableHighAccuracy: true, timeout: 8000 }
@@ -444,8 +444,8 @@ function selectUser(user) {
 }
 
 function selectManualUser() {
-  const name = document.getElementById('manualName')?.value?.trim();
-  const team = document.getElementById('manualTeam')?.value;
+  const name = (function(){var _e=document.getElementById('manualName');return _e&&_e.value?_e.value.trim():''})();
+  const team = (document.getElementById('manualTeam')?document.getElementById('manualTeam').value:'');
   if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
   if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
   selectUser({ name, team });
@@ -986,7 +986,7 @@ function loadGTStoresChecklist(market, region) {
 function filterStoreChecklist(query) {
   const q = query.toLowerCase().trim();
   document.querySelectorAll('#gt_store_checklist .store-check-item').forEach(item => {
-    const label = item.querySelector('label')?.textContent?.toLowerCase() || '';
+    const label = (function(){var _l=item.querySelector('label');return _l&&_l.textContent?_l.textContent.toLowerCase():''})();
     item.style.display = (!q || label.includes(q)) ? '' : 'none';
   });
 }
@@ -994,7 +994,7 @@ function filterStoreChecklist(query) {
 function filterGTNorthStores(query) {
   const q = query.toLowerCase().trim();
   document.querySelectorAll('#gt_store_checklist .store-check-item').forEach(item => {
-    const label = item.querySelector('label')?.textContent?.toLowerCase() || '';
+    const label = (function(){var _l=item.querySelector('label');return _l&&_l.textContent?_l.textContent.toLowerCase():''})();
     item.style.display = (!q || label.includes(q)) ? '' : 'none';
   });
 }
@@ -1081,9 +1081,9 @@ async function submitMT() {
   const mode = state.mtMode || 'daily';
   
   if (mode === 'other') {
-    const purpose = document.getElementById('mt_other_purpose')?.value?.trim();
-    const location = document.getElementById('mt_other_location')?.value?.trim();
-    const content_val = document.getElementById('mt_other_content')?.value?.trim();
+    const purpose = (function(){var _e=document.getElementById('mt_other_purpose');return _e&&_e.value?_e.value.trim():''})();
+    const location = (function(){var _e=document.getElementById('mt_other_location');return _e&&_e.value?_e.value.trim():''})();
+    const content_val = (function(){var _e=document.getElementById('mt_other_content');return _e&&_e.value?_e.value.trim():''})();
     if (!purpose) { toast('⚠️ Vui lòng nhập mục đích công việc'); return; }
     if (!location) { toast('⚠️ Vui lòng nhập địa điểm'); return; }
     if (!content_val) { toast('⚠️ Vui lòng nhập nội dung'); return; }
@@ -1102,8 +1102,8 @@ async function submitMT() {
     return;
   }
   
-  const chain = document.getElementById('mt_chain')?.value;
-  const store = document.getElementById('mt_store')?.value;
+  const chain = (document.getElementById('mt_chain')?document.getElementById('mt_chain').value:'');
+  const store = (document.getElementById('mt_store')?document.getElementById('mt_store').value:'');
   if (!chain) { toast('⚠️ Vui lòng chọn chain'); return; }
   if (!store) { toast('⚠️ Vui lòng chọn điểm bán'); return; }
   if (!getChips('mt_display'))  { toast('⚠️ Vui lòng chọn Tình trạng trưng bày'); return; }
@@ -1119,13 +1119,13 @@ async function submitMT() {
     channel: 'MT',
     chain: chain,
     store_name: store,
-    address_note: document.getElementById('mt_addr')?.value || '',
+    address_note: (document.getElementById('mt_addr')?document.getElementById('mt_addr').value:'') || '',
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
     display: getChips('mt_display'),
     price_info: getChips('mt_price'),
     goods_status: getChips('mt_goods'),
     expiry_status: getChips('mt_expiry'),
-    note: document.getElementById('mt_note')?.value || '',
+    note: (document.getElementById('mt_note')?document.getElementById('mt_note').value:'') || '',
     traffic: getChips('mt_traffic') || '',
     sampling: getChips('mt_sampling') || '',
     zone: getChips('mt_zone') || '',
@@ -1137,13 +1137,13 @@ async function submitMT() {
 
 // ============ SUBMIT GT DAILY ============
 async function submitGT() {
-  const region = document.getElementById('gtContent')?.dataset?.region || state.user.team;
+  const region = (function(){var _el=document.getElementById('gtContent');return (_el&&_el.dataset&&_el.dataset.region)?_el.dataset.region:state.user.team})();
   let market = '', store = '';
   
   // Collect multi-selected stores + manual
   const selectedStores = getSelectedStores();
-  const storeManual = document.getElementById('gt_store_manual')?.value?.trim() || '';
-  const marketManual = document.getElementById('gt_market_manual')?.value?.trim() || '';
+  const storeManual = (function(){var _e=document.getElementById('gt_store_manual');return _e&&_e.value?_e.value.trim():''})() || '';
+  const marketManual = (function(){var _e=document.getElementById('gt_market_manual');return _e&&_e.value?_e.value.trim():''})() || '';
 
   if (region === 'GT North') {
     market = marketManual || 'GT North';
@@ -1151,7 +1151,7 @@ async function submitGT() {
     if (allSelected.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
     store = allSelected.join(' | ');
   } else {
-    market = document.getElementById('gt_market')?.value || marketManual || '';
+    market = (document.getElementById('gt_market')?document.getElementById('gt_market').value:'') || marketManual || '';
     const allSelected = [...selectedStores, ...(storeManual ? [storeManual] : [])];
     if (!market) { toast('⚠️ Vui lòng chọn chợ'); return; }
     if (allSelected.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
@@ -1170,10 +1170,10 @@ async function submitGT() {
     store_name: store,
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
     order_info: getChips('gt_order'),
-    note: document.getElementById('gt_note')?.value || '',
+    note: (document.getElementById('gt_note')?document.getElementById('gt_note').value:'') || '',
     display_potential: getChips('gt_display_potential') || '',
     best_store: getChips('gt_best_store') || '',
-    extra_note: document.getElementById('gt_extra_note')?.value || '',
+    extra_note: (document.getElementById('gt_extra_note')?document.getElementById('gt_extra_note').value:'') || '',
     store_count: store.split(' | ').length,
     sku_data: skus,
     photos: state.photos
@@ -1183,7 +1183,7 @@ async function submitGT() {
 
 // ============ SUBMIT GT NEW ============
 async function submitGTNew() {
-  const store = document.getElementById('gtnew_store')?.value?.trim();
+  const store = (function(){var _e=document.getElementById('gtnew_store');return _e&&_e.value?_e.value.trim():''})();
   if (!store) { toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
   if (!getChips('gtnew_biztype')) { toast('⚠️ Vui lòng chọn Hình thức kinh doanh'); return; }
   if (!getChips('gtnew_products')) { toast('⚠️ Vui lòng chọn Sản phẩm chào hàng'); return; }
@@ -1195,11 +1195,11 @@ async function submitGTNew() {
     salesperson: state.user.name,
     region: state.user.team,
     store_name: store,
-    address: document.getElementById('gtnew_addr')?.value || '',
+    address: (document.getElementById('gtnew_addr')?document.getElementById('gtnew_addr').value:'') || '',
     biz_type: getChips('gtnew_biztype'),
     products_pitched: getChips('gtnew_products'),
     potential: getChips('gtnew_potential'),
-    note: document.getElementById('gtnew_note')?.value || '',
+    note: (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'') || '',
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
     photos: state.photos
   };
@@ -1223,9 +1223,9 @@ async function sendData(payload, label) {
     const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
     const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
 
-    // Attempt 1: fetch với no-cors + timeout 15s
+    // Timeout thủ công — tương thích iOS 12+, Android 8+ (manual AbortController)
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 15000);
+    const timer = setTimeout(function() { controller.abort(); }, 15000);
     try {
       await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow', signal: controller.signal });
       clearTimeout(timer);
@@ -1233,21 +1233,21 @@ async function sendData(payload, label) {
       showSuccess(label, payload, false);
     } catch (fetchErr) {
       clearTimeout(timer);
-      // Nếu abort do timeout hoặc network error → lưu offline
       if (!navigator.onLine) {
         hideLoading();
         saveOffline(payload);
         showSuccess(label, payload, true);
       } else {
-        // Có mạng nhưng fetch lỗi → thử lại 1 lần với image ping
-        await new Promise((resolve) => {
+        // Có mạng nhưng fetch lỗi → fallback: image ping (tương thích mọi browser)
+        await new Promise(function(resolve) {
           const img = new Image();
-          img.onload = img.onerror = resolve;
+          img.onload = resolve;
+          img.onerror = resolve;
           img.src = url + '&_t=' + Date.now();
           setTimeout(resolve, 8000);
         });
         hideLoading();
-        showSuccess(label, payload, false); // Coi như thành công vì đã ping
+        showSuccess(label, payload, false);
       }
     }
   } catch (err) {
@@ -1262,7 +1262,7 @@ async function syncOfflineSend(item) {
   const b64 = btoa(unescape(encodeURIComponent(jsonStr)));
   const url = state.scriptUrl + '?data=' + encodeURIComponent(b64);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
+  const timer = setTimeout(function() { controller.abort(); }, 12000);
   await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow', signal: controller.signal });
   clearTimeout(timer);
 }
