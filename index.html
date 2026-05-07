@@ -140,7 +140,6 @@ textarea{resize:vertical;min-height:80px}
 </head>
 <body>
 
-<div id="debugOverlay" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:45vh;overflow-y:auto;background:rgba(0,0,0,.88);color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:9999"><button onclick="document.getElementById('debugOverlay').style.display='none'" style="float:right;background:#f00;color:#fff;border:none;padding:2px 8px;border-radius:4px;font-size:12px">✕</button><div id="debugLog"></div></div>
 <div class="toast" id="toast"></div>
 <div class="loading" id="loading"><div class="spinner"></div><p id="loadingMsg">Đang gửi...</p></div>
 
@@ -349,7 +348,7 @@ const GT_SKUS_DAILY = [
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
 // ⚙️ Script URL — cập nhật khi deploy lại Apps Script
 // Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzRSVEiXXt-z8qCadjtNaJ1w3xXXLnXqsJb0BvXyP-ieBFdfa018mgtEnoxNnBBVc5W/exec';
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzVjD43MLBlrT3GcRB8fFr2SXYgVJrZ6mrbUXaEE5izwZvRV4OQcfP3ndIyhpDkdeHK/exec';
 
 let state = {
   user: null,
@@ -846,33 +845,30 @@ function renderGTDailyForm(region) {
   let storeSelectHTML = '';
   
   if (region === 'GT North') {
-    // GT North: flat list with search + multi-checkbox
+    // GT North: Chọn chợ trước → hiện điểm bán (giống Central/South)
+    const northMarkets = Object.keys(GT_NORTH).sort();
+    const northOpts = northMarkets.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
     marketSelectHTML = `
       <div class="field required"><label>Chợ / Khu vực (GT Bắc)</label>
-        <input type="text" class="search-input" id="gt_north_search" placeholder="🔍 Tìm điểm bán..." oninput="filterGTNorthStores(this.value)">
+        <select id="gt_market" onchange="loadGTStoresChecklist(this.value,'GT North')">
+          <option value="">— Chọn chợ / khu vực —</option>${northOpts}
+        </select>
       </div>`;
     storeSelectHTML = `
-      <div class="field required">
+      <div class="field required" id="gt_store_field">
         <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
+        <input type="text" id="gt_store_search" placeholder="🔍 Tìm trong danh sách..." style="margin-bottom:6px" oninput="filterStoreChecklist(this.value)">
         <div class="store-checklist" id="gt_store_checklist">
-          ${Object.entries(GT_NORTH).flatMap(([mkt, stores]) =>
-          stores.map((s, i) => {
-            const uid = (mkt + '_' + i).replace(/[^a-zA-Z0-9]/g,'_');
-            return `
-              <div class="store-check-item" onclick="document.getElementById('gt_cb_${uid}').click()">
-                <input type="checkbox" id="gt_cb_${uid}" value="${escHtml(s)}" data-market="${escHtml(mkt)}" onchange="updateStoreCount()">
-                <label for="gt_cb_${uid}">${escHtml(s)}<br><span style="font-size:11px;color:var(--text2)">${escHtml(mkt)}</span></label>
-              </div>`;
-          })
-        ).join('')}
+          <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ / khu vực trước</div>
         </div>
       </div>
       <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
         <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
-        <input type="text" id="gt_market_manual" placeholder="Địa chỉ / khu vực" style="margin-top:6px">
+        <input type="text" id="gt_market_manual" placeholder="Tên chợ / khu vực (nếu nhập thủ công)" style="margin-top:6px">
+        <p style="font-size:11px;color:var(--text2);margin-top:4px">💡 Điểm bán nhập thủ công sẽ được ghi nhận theo khu vực của bạn</p>
       </div>`;
   } else {
-    const regionData = region === 'GT Central' ? GT_CENTRAL : GT_SOUTH;
+    const regionData = region === 'GT Central' ? GT_CENTRAL : (region === 'GT North' ? GT_NORTH : GT_SOUTH);
     const markets = Object.keys(regionData).sort();
     const marketOpts = markets.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
     marketSelectHTML = `
@@ -972,7 +968,7 @@ function loadGTStoresChecklist(market, region) {
   const cl = document.getElementById('gt_store_checklist');
   if (!cl) return;
   if (!market) { cl.innerHTML = '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ trước</div>'; updateStoreCount(); return; }
-  const regionData = region === 'GT Central' ? GT_CENTRAL : GT_SOUTH;
+  const regionData = region === 'GT Central' ? GT_CENTRAL : (region === 'GT North' ? GT_NORTH : GT_SOUTH);
   const stores = regionData[market] || [];
   cl.innerHTML = stores.length === 0
     ? '<div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">Không có điểm bán</div>'
@@ -992,13 +988,6 @@ function filterStoreChecklist(query) {
   });
 }
 
-function filterGTNorthStores(query) {
-  const q = query.toLowerCase().trim();
-  document.querySelectorAll('#gt_store_checklist .store-check-item').forEach(item => {
-    const label = (function(){var _l=item.querySelector('label');return _l&&_l.textContent?_l.textContent.toLowerCase():''})();
-    item.style.display = (!q || label.includes(q)) ? '' : 'none';
-  });
-}
 
 function toggleStoreCheck(index) {
   const cb = document.getElementById(`gt_cb_${index}`);
@@ -1147,7 +1136,8 @@ async function submitGT() {
   const marketManual = (function(){var _e=document.getElementById('gt_market_manual');return _e&&_e.value?_e.value.trim():''})() || '';
 
   if (region === 'GT North') {
-    market = marketManual || 'GT North';
+    market = (function(){var _el=document.getElementById('gt_market');return _el&&_el.value?_el.value:''})() || marketManual || '';
+    if (!market) { toast('⚠️ Vui lòng chọn chợ / khu vực'); return; }
     const allSelected = [...selectedStores, ...(storeManual ? [storeManual] : [])];
     if (allSelected.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
     store = allSelected.join(' | ');
@@ -1208,17 +1198,6 @@ async function submitGTNew() {
 }
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
-function dbg(msg, col) {
-  var ov = document.getElementById('debugOverlay');
-  var lg = document.getElementById('debugLog');
-  if (!ov||!lg) return;
-  ov.style.display = 'block';
-  var d = document.createElement('div');
-  d.style.cssText = 'color:'+(col||'#0f0')+';border-bottom:1px solid #222;padding:2px 0';
-  d.textContent = new Date().toLocaleTimeString()+' | '+String(msg);
-  lg.appendChild(d);
-  ov.scrollTop = ov.scrollHeight;
-}
 // ============ SEND DATA — FIXED v4 ============
 // Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
 // Không thể xác nhận server response với no-cors → dùng Image ping trick
