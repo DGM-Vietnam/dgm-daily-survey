@@ -149,7 +149,6 @@ textarea{resize:vertical;min-height:80px}
     <div style="font-size:36px;margin-bottom:8px">🏷️</div>
     <h2 style="font-size:20px;font-weight:700">DGM Sales Survey</h2>
     <p style="font-size:13px;opacity:.85;margin-top:4px">Ayam Brand · Denis G.M.</p>
-    <button onclick="showUrlConfig()" style="position:absolute;top:12px;right:12px;background:rgba(255,255,255,0.2);border:none;color:#fff;padding:6px 10px;border-radius:6px;font-size:11px;cursor:pointer">⚙️ Script URL</button>
   </div>
   <div id="urlConfigBox" style="display:none;background:#fff3cd;border-bottom:2px solid #ffc107;padding:12px 16px">
     <p style="font-size:12px;font-weight:600;color:#856404;margin-bottom:6px">⚙️ Apps Script Web App URL</p>
@@ -355,8 +354,8 @@ let state = {
   gps: null,
   photos: {},
   skuData: {},
-  // localStorage takes priority (set via ⚙️ button), fallback to hardcoded
-  scriptUrl: localStorage.getItem('dgm_script_url') || HARDCODED_SCRIPT_URL
+  // URL hardcoded — không dùng localStorage để tránh conflict
+  scriptUrl: HARDCODED_SCRIPT_URL
 };
 
 // ============ INIT ============
@@ -379,8 +378,7 @@ function promptScriptUrl() {
     const url = prompt("🔧 SETUP — Nhập URL Apps Script Web App:\n(Nhấn Cancel để bỏ qua)");
     if (url && url.startsWith("https://")) {
       state.scriptUrl = url;
-      localStorage.setItem('dgm_script_url', url);
-      toast('✅ Đã lưu URL Apps Script');
+          toast('✅ Đã lưu URL Apps Script');
     }
   }, 800);
 }
@@ -1363,20 +1361,6 @@ function toast(msg) { const t=document.getElementById('toast'); t.textContent=ms
 function showLoading(msg) { document.getElementById('loadingMsg').textContent=msg||'Đang xử lý...'; document.getElementById('loading').classList.add('show'); }
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
 
-function showUrlConfig() {
-  const box = document.getElementById('urlConfigBox');
-  const input = document.getElementById('urlConfigInput');
-  input.value = state.scriptUrl || '';
-  box.style.display = box.style.display === 'none' ? 'block' : 'none';
-  const msg = document.getElementById('urlStatusMsg');
-  if (state.scriptUrl) {
-    msg.textContent = '✅ URL hiện tại: ' + state.scriptUrl.slice(0, 60) + '...';
-    msg.style.color = '#28a745';
-  } else {
-    msg.textContent = '⚠️ Chưa có URL — cần nhập để gửi dữ liệu';
-    msg.style.color = '#dc3545';
-  }
-}
 
 function saveUrlConfig() {
   const val = document.getElementById('urlConfigInput').value.trim();
@@ -1386,7 +1370,6 @@ function saveUrlConfig() {
     return;
   }
   state.scriptUrl = val;
-  localStorage.setItem('dgm_script_url', val);
   document.getElementById('urlStatusMsg').textContent = '✅ Đã lưu thành công!';
   document.getElementById('urlStatusMsg').style.color = '#28a745';
   setTimeout(() => { document.getElementById('urlConfigBox').style.display = 'none'; }, 1200);
