@@ -57,7 +57,6 @@ textarea{resize:vertical;min-height:80px}
 .photo-actions{display:flex;gap:6px;margin-top:4px}
 .photo-btn{flex:1;padding:8px 6px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;cursor:pointer;background:#fff;text-align:center;transition:all .2s}
 .photo-btn:hover{border-color:var(--primary);background:var(--primary-light)}
-.photo-btn.camera{border-color:var(--primary);color:var(--primary)}
 /* GPS */
 .gps-box{background:var(--green-light);border:1.5px solid #a5d6a7;border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;margin-top:6px}
 .gps-box .icon{font-size:20px}
@@ -140,7 +139,6 @@ textarea{resize:vertical;min-height:80px}
 </head>
 <body>
 
-<div id="dbgOv" style="display:none;position:fixed;bottom:0;left:0;right:0;max-height:50vh;overflow-y:auto;background:rgba(0,0,0,.9);color:#0f0;font-family:monospace;font-size:11px;padding:8px;z-index:9999"><button onclick="document.getElementById('dbgOv').style.display='none'" style="float:right;background:#f00;color:#fff;border:none;padding:2px 8px;border-radius:4px">✕</button><div id="dbgLog"></div></div>
 <div class="toast" id="toast"></div>
 <div class="loading" id="loading"><div class="spinner"></div><p id="loadingMsg">Đang gửi...</p></div>
 
@@ -535,21 +533,15 @@ function getDateValue(id) {
 // ============ PHOTO HELPERS ============
 function photoSlotHTML(prefix, index, label) {
   const slotId = `${prefix}PhotoSlot${index}`;
-  const camId = `${prefix}PhotoCam${index}`;
   const galId = `${prefix}PhotoGal${index}`;
   const key = `${prefix}P${index}`;
   return `
     <div>
-      <div class="photo-slot" id="${slotId}">
-        <span class="slot-icon">📷</span>
+      <div class="photo-slot" id="${slotId}" onclick="document.getElementById('${galId}').click()">
+        <span class="slot-icon">🖼️</span>
         <span class="slot-label">${label}</span>
-        <input type="file" id="${camId}" accept="image/*" capture="environment" onchange="previewPhoto(this,'${slotId}','${key}')">
         <input type="file" id="${galId}" accept="image/*" onchange="previewPhoto(this,'${slotId}','${key}')">
-        <button class="del-btn" onclick="delPhoto(event,'${slotId}','${camId}','${galId}','${key}')">✕</button>
-      </div>
-      <div class="photo-actions">
-        <button class="photo-btn camera" onclick="document.getElementById('${camId}').click()">📷 Chụp</button>
-        <button class="photo-btn" onclick="document.getElementById('${galId}').click()">🖼️ Thư viện</button>
+        <button class="del-btn" onclick="delPhoto(event,'${slotId}','${galId}','${galId}','${key}')">✕</button>
       </div>
     </div>`;
 }
@@ -657,7 +649,7 @@ function collectSKUs(prefix, skuList) {
     const id = escId(sku);
     result[sku] = {
       qty: document.getElementById(`${prefix}_qty_${id}`)?.value || '0',
-      status: document.getElementById(`${prefix}_st_${id}`)?.value || 'OK'
+      status: document.getElementById(`${prefix}_st_${id}`)?.value || 'Chưa bán'
     };
   });
   return result;
@@ -691,11 +683,11 @@ function renderMTForm(mode) {
         <td class="qty-cell"><input type="number" class="qty-input" id="mt_qty_${escId(sku)}" min="0" placeholder="0" inputmode="numeric"></td>
         <td><select class="status-sel" id="mt_st_${escId(sku)}">
           <option value="">— Chọn —</option>
+          <option value="Chưa bán">— Chưa bán</option>
           <option value="OK">OK</option>
           <option value="Sắp hết">⚠ Sắp hết</option>
           <option value="Hết hàng">❌ Hết</option>
           <option value="Ngưng mã">🚫 Ngưng</option>
-          <option value="Chưa bán">— Chưa bán</option>
         </select></td>
       </tr>`;
     });
@@ -1060,10 +1052,14 @@ function renderGTNewForm() {
       <div class="field"><label>Ghi chú & nhận xét</label>
         <textarea id="gtnew_note" placeholder="Mô tả tiềm năng, ghi chú đặc biệt..."></textarea>
       </div>
-      <div class="field"><label>Hình ảnh (tối đa 4)</label>
-        <div class="photo-grid">
-          ${[[1,'Ảnh 1'],[2,'Ảnh 2'],[3,'Ảnh 3'],[4,'Ảnh 4']].map(([i,lbl]) => photoSlotHTML('gtnew',i,lbl)).join('')}
-        </div>
+      <div class="field">
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">📷 Hình ảnh <span class="store-count-badge zero" id="gtnew_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
+        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện.</p>
+        <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
+          📁 Chọn hình từ thư viện
+          <input type="file" id="gtnew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gtnew')">
+        </label>
+        <div id="gtnew_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
       </div>
     </div>`;
 }
@@ -1202,21 +1198,12 @@ async function submitGTNew() {
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
     photos: state.photos
   };
+  var _gnp=Object.keys(state.photos).filter(function(k){return k.startsWith('gtnew_');});
+  if(_gnp.length===0){toast('⚠️ Vui lòng upload ít nhất 1 hình');return;}
   await sendData(payload, 'GT New Customer');
 }
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
-function dbg(msg, col) {
-  var ov = document.getElementById('dbgOv');
-  var lg = document.getElementById('dbgLog');
-  if (!ov||!lg) return;
-  ov.style.display='block';
-  var d=document.createElement('div');
-  d.style.cssText='color:'+(col||'#0f0')+';border-bottom:1px solid #222;padding:2px 0';
-  d.textContent=new Date().toLocaleTimeString()+' | '+String(msg);
-  lg.appendChild(d);
-  ov.scrollTop=ov.scrollHeight;
-}
 // ============ SEND DATA — FIXED v4 ============
 // Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
 // Không thể xác nhận server response với no-cors → dùng Image ping trick
@@ -1234,31 +1221,25 @@ async function sendData(payload, label) {
       var b64;
     try { b64 = btoa(unescape(encodeURIComponent(jsonStr))); dbg('btoa OK:'+b64.length,'#0f0'); }
     catch(be) { dbg('btoa ERR:'+be.message,'#f00'); throw be; }
-    dbg('size:'+b64.length,'#ff0');
-    dbg('POST→'+state.scriptUrl.slice(0,50),'#ff0');
-
+    
     // Image ping GET — tương thích 100% Safari iOS/Android mọi đời
     var getUrl = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
-    dbg('GET size:'+getUrl.length,'#ff0');
-
+  
     await new Promise(function(resolve) {
       var done = false;
       var watchdog = setTimeout(function() {
-        dbg('timeout 12s','#f00');
-        done = true; resolve();
+              done = true; resolve();
       }, 12000);
       var img = new Image();
       img.onload = function() {
         if (done) return; done = true;
         clearTimeout(watchdog);
-        dbg('img onload OK','#0f0');
-        resolve();
+              resolve();
       };
       img.onerror = function() {
         if (done) return; done = true;
         clearTimeout(watchdog);
-        dbg('img onerror (bình thường với GAS)','#ff0');
-        resolve();
+              resolve();
       };
       img.src = getUrl;
     });
