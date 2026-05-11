@@ -407,324 +407,7 @@ function refreshGPS(boxId) {
 
 function gpsBoxHTML(id, loading) {
   if (loading) return `<div class="gps-box"><span class="icon">🔄</span><div class="gps-info"><strong>Đang lấy GPS...</strong></div></div>`;
-  if (state.gps) return `<div class="gps-box"><span class="icon">📍</span><div class="gps-info"><strong>GPS đã xác định</strong>${state.gps.lat}, ${state.gps.lng}</div><button onclick="refreshGPS('${id}')" style="background:none;border:none;font-size:18px;cursor:pointer">🔄</button></div>`;
-  return `<div class="gps-box gps-fail"><span class="icon">⚠️</span><div class="gps-info"><strong>Không lấy được GPS</strong>Cho phép truy cập vị trí</div><button onclick="refreshGPS('${id}')" style="background:none;border:none;font-size:18px;cursor:pointer">🔄</button></div>`;
-}
-
-function updateGPSDisplays() {
-  ['gpsBoxMT','gpsBoxGT','gpsBoxGTNew'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = gpsBoxHTML(id, false);
-  });
-}
-
-// ============ STAFF LIST ============
-function renderStaffList() {
-  const list = document.getElementById('staffList');
-  const badges = { 'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts','MT/GT':'badge-mtgt' };
-  list.innerHTML = TEAM.map(s => `
-    <button class="staff-btn" onclick='selectUser(${JSON.stringify(s)})'>
-      <div class="staff-avatar">${s.name[0]}</div>
-      <div class="staff-info">
-        <div class="staff-name">${s.name}</div>
-        <div class="staff-team"><span class="team-badge ${badges[s.team]||'badge-bo'}">${s.team}</span></div>
-      </div>
-      <span style="color:#ccc;font-size:18px">›</span>
-    </button>`).join('');
-}
-
-function selectUser(user) {
-  state.user = user;
-  document.getElementById('typeTitle').textContent = `Xin chào, ${user.name.split(' ').pop()}!`;
-  document.getElementById('typeSubtitle').textContent = user.team;
-  renderTypeCards(user.team);
-  goTo('scType');
-  initGPS();
-}
-
-function selectManualUser() {
-  const name = (function(){var _e=document.getElementById('manualName');return _e&&_e.value?_e.value.trim():''})();
-  const team = (document.getElementById('manualTeam')?document.getElementById('manualTeam').value:'');
-  if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
-  if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
-  selectUser({ name, team });
-}
-
-// ============ TYPE SELECTION ============
-function renderTypeCards(team) {
-  const cards = document.getElementById('typeCards');
-  let html = '<h3>Chọn loại khảo sát</h3>';
-  if (team === 'MT') {
-    html += `<div class="type-cards">
-      <div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán hàng ngày</div></div>
-      <div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">Công việc khác</div><div class="desc">Ghi nhận hoạt động khác</div></div>
-    </div>`;
-  } else if (team.startsWith('GT')) {
-    html += `<div class="type-cards">
-      <div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán GT hàng ngày</div></div>
-      <div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">Điểm Bán Mới</div><div class="desc">Khảo sát & chào hàng điểm mới</div></div>
-    </div>`;
-  } else if (team === 'MT/GT') {
-    html += `<div class="type-cards">
-      <div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">MT Daily</div><div class="desc">Khảo sát điểm MT hàng ngày</div></div>
-      <div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>
-      <div class="type-card" onclick="showGTRegionPicker()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>
-      <div class="type-card" onclick="showGTRegionPicker('new')"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>
-    </div>`;
-  } else {
-    html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
-  }
-  cards.innerHTML = html;
-}
-
-// ============ GT REGION PICKER (for MT/GT manager) ============
-function showGTRegionPicker(mode) {
-  const regions = ['GT South', 'GT Central', 'GT North'];
-  const labels = {'GT South': 'GT Miền Nam 🟢', 'GT Central': 'GT Miền Trung 🟡', 'GT North': 'GT Miền Bắc 🟣'};
-  const div = document.createElement('div');
-  div.id = 'regionPickerOverlay';
-  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
-  div.innerHTML = `
-    <div style="background:#fff;border-radius:14px;padding:20px;width:100%;max-width:320px">
-      <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;text-align:center">Chọn khu vực GT</h3>
-      ${regions.map(r => `<button onclick="pickGTRegion('${r}','${mode||'daily'}')" style="display:block;width:100%;padding:13px;margin-bottom:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;font-weight:600">${labels[r]}</button>`).join('')}
-      <button onclick="document.getElementById('regionPickerOverlay').remove()" style="display:block;width:100%;padding:11px;border:none;border-radius:10px;background:#f5f5f5;font-size:14px;cursor:pointer;color:#666">Huỷ</button>
-    </div>`;
-  document.body.appendChild(div);
-}
-
-function pickGTRegion(region, mode) {
-  document.getElementById('regionPickerOverlay')?.remove();
-  // Temporarily override user.team for GT form rendering
-  const originalTeam = state.user.team;
-  state.user = { ...state.user, team: region };
-  if (mode === 'new') {
-    startGTNew();
-  } else {
-    startGTDaily();
-  }
-  // After navigation, restore original team so type screen still shows MT/GT
-  state.user = { ...state.user, team: originalTeam };
-}
-
-// ============ DATE HELPERS ============
-function todayStr() {
-  const d = new Date();
-  return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-}
-function todayISO() {
-  return new Date().toISOString().slice(0,10);
-}
-function dateFieldHTML(id) {
-  return `<div class="date-display" id="${id}_display">${todayStr()}</div>
-    <input type="date" id="${id}" value="${todayISO()}" onchange="updateDateDisplay('${id}')" style="margin-top:6px">`;
-}
-function updateDateDisplay(id) {
-  const val = document.getElementById(id)?.value;
-  if (!val) return;
-  const [y,m,d] = val.split('-');
-  document.getElementById(id+'_display').textContent = `${d}/${m}/${y}`;
-}
-function getDateValue(id) {
-  const val = document.getElementById(id)?.value;
-  if (!val) return todayStr();
-  const [y,m,d] = val.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-// ============ PHOTO HELPERS ============
-function photoSlotHTML(prefix, index, label) {
-  const slotId = `${prefix}PhotoSlot${index}`;
-  const camId = `${prefix}PhotoCam${index}`;
-  const galId = `${prefix}PhotoGal${index}`;
-  const key = `${prefix}P${index}`;
-  return `
-    <div>
-      <div class="photo-slot" id="${slotId}">
-        <span class="slot-icon">📷</span>
-        <span class="slot-label">${label}</span>
-        <input type="file" id="${camId}" accept="image/*" capture="environment" onchange="previewPhoto(this,'${slotId}','${key}')">
-        <input type="file" id="${galId}" accept="image/*" onchange="previewPhoto(this,'${slotId}','${key}')">
-        <button class="del-btn" onclick="delPhoto(event,'${slotId}','${camId}','${galId}','${key}')">✕</button>
-      </div>
-      <div class="photo-actions">
-        <button class="photo-btn camera" onclick="document.getElementById('${camId}').click()">📷 Chụp</button>
-        <button class="photo-btn" onclick="document.getElementById('${galId}').click()">🖼️ Thư viện</button>
-      </div>
-    </div>`;
-}
-
-// Shared max
-const PHOTO_MAX = 30;
-
-// GT: Dynamic photo add (up to 30)
-let gtPhotoCount = 4;
-
-// MT: Dynamic photo add (up to 30)
-let mtPhotoCount = 4;
-
-function addGTPhotoSlot() {
-  if (gtPhotoCount >= PHOTO_MAX) { toast(`⚠️ Tối đa ${PHOTO_MAX} hình`); return; }
-  gtPhotoCount++;
-  const grid = document.getElementById('gt_photo_grid');
-  if (!grid) return;
-  const div = document.createElement('div');
-  div.innerHTML = photoSlotHTML('gt', gtPhotoCount, `Hình ${gtPhotoCount}`);
-  grid.appendChild(div.firstElementChild);
-  updateGTPhotoBadge();
-  if (gtPhotoCount >= PHOTO_MAX) {
-    const btn = document.getElementById('gt_add_photo_btn');
-    if (btn) btn.style.display = 'none';
-  }
-}
-
-function updateGTPhotoBadge() {
-  const taken = Object.keys(state.photos).filter(k => k.startsWith('gt')).length;
-  const badge = document.getElementById('gt_photo_count_badge');
-  if (badge) {
-    badge.textContent = `${taken}/${PHOTO_MAX}`;
-    badge.className = 'store-count-badge' + (taken === 0 ? ' zero' : '');
-  }
-}
-
-function addMTPhotoSlot() {
-  if (mtPhotoCount >= PHOTO_MAX) { toast(`⚠️ Tối đa ${PHOTO_MAX} hình`); return; }
-  mtPhotoCount++;
-  const grid = document.getElementById('mt_photo_grid');
-  if (!grid) return;
-  const div = document.createElement('div');
-  div.innerHTML = photoSlotHTML('mt', mtPhotoCount, `Hình ${mtPhotoCount}`);
-  grid.appendChild(div.firstElementChild);
-  updateMTPhotoBadge();
-  if (mtPhotoCount >= PHOTO_MAX) {
-    const btn = document.getElementById('mt_add_photo_btn');
-    if (btn) btn.style.display = 'none';
-  }
-}
-
-function updateMTPhotoBadge() {
-  const taken = Object.keys(state.photos).filter(k => k.startsWith('mt')).length;
-  const badge = document.getElementById('mt_photo_count_badge');
-  if (badge) {
-    badge.textContent = `${taken}/${PHOTO_MAX}`;
-    badge.className = 'store-count-badge' + (taken === 0 ? ' zero' : '');
-  }
-}
-
-function previewPhoto(input, slotId, key) {
-  if (!input.files[0]) return;
-  const slot = document.getElementById(slotId);
-  const reader = new FileReader();
-  reader.onload = e => {
-    let img = slot.querySelector('img');
-    if (!img) { img = document.createElement('img'); slot.appendChild(img); }
-    img.src = e.target.result;
-    slot.classList.add('has-img');
-    slot.querySelectorAll('.slot-icon,.slot-label').forEach(el => el.style.display = 'none');
-    state.photos[key] = e.target.result;
-    updateGTPhotoBadge();
-    updateMTPhotoBadge();
-  };
-  reader.readAsDataURL(input.files[0]);
-}
-
-function delPhoto(e, slotId, camId, galId, key) {
-  e.stopPropagation();
-  const slot = document.getElementById(slotId);
-  const img = slot.querySelector('img');
-  if (img) img.remove();
-  slot.classList.remove('has-img');
-  slot.querySelectorAll('.slot-icon,.slot-label').forEach(el => el.style.display = '');
-  if (document.getElementById(camId)) document.getElementById(camId).value = '';
-  if (document.getElementById(galId)) document.getElementById(galId).value = '';
-  delete state.photos[key];
-}
-
-// ============ CHIPS ============
-function toggleChip(el) { el.classList.toggle('active'); }
-function selectChip(el, groupId) {
-  document.querySelectorAll(`#${groupId} .chip`).forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
-}
-function getChips(groupId) {
-  return Array.from(document.querySelectorAll(`#${groupId} .chip.active`)).map(c => c.textContent).join(', ');
-}
-
-// ============ SKU COLLECT ============
-function collectSKUs(prefix, skuList) {
-  const result = {};
-  skuList.forEach(sku => {
-    const id = escId(sku);
-    result[sku] = {
-      qty: document.getElementById(`${prefix}_qty_${id}`)?.value || '0',
-      status: document.getElementById(`${prefix}_st_${id}`)?.value || 'OK'
-    };
-  });
-  return result;
-}
-
-// ============ MT FORM ============
-function startMT(mode) {
-  state.photos = {};
-  state.skuData = {};
-  state.mtMode = mode;
-  mtPhotoCount = 4; // reset photo count
-  document.getElementById('mtSubtitle').textContent = state.user.name;
-  renderMTForm(mode);
-  goTo('scMT');
-  initGPS();
-}
-
-function renderMTForm(mode) {
-  const content = document.getElementById('mtContent');
-
-  // Chain select → store select
-  const chainOpts = Object.keys(MT_CHAINS).sort().map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
-  
-  // SKU table
-  let skuRows = '';
-  Object.entries(MT_SKUS_CATS).forEach(([cat, skus]) => {
-    skuRows += `<tr class="cat-header"><td colspan="3">📦 ${cat}</td></tr>`;
-    skus.forEach(sku => {
-      skuRows += `<tr>
-        <td>${escHtml(sku)}</td>
-        <td class="qty-cell"><input type="number" class="qty-input" id="mt_qty_${escId(sku)}" min="0" placeholder="0" inputmode="numeric"></td>
-        <td><select class="status-sel" id="mt_st_${escId(sku)}">
-          <option value="">— Chọn —</option>
-          <option value="OK">OK</option>
-          <option value="Sắp hết">⚠ Sắp hết</option>
-          <option value="Hết hàng">❌ Hết</option>
-          <option value="Ngưng mã">🚫 Ngưng</option>
-          <option value="Chưa bán">— Chưa bán</option>
-        </select></td>
-      </tr>`;
-    });
-  });
-
-  const dailyForm = `
-    <div class="card">
-      <h3>📋 Thông tin khảo sát</h3>
-      <div class="field required"><label>Ngày khảo sát</label>${dateFieldHTML('mt_date')}</div>
-      <div class="field required"><label>Chain / Hệ thống</label>
-        <select id="mt_chain" onchange="loadMTStores(this.value)">
-          <option value="">— Chọn chain —</option>${chainOpts}
-        </select>
-      </div>
-      <div class="field required"><label>Điểm bán</label>
-        <select id="mt_store"><option value="">— Chọn chain trước —</option></select>
-      </div>
-      <div class="field"><label>Ghi chú địa chỉ</label>
-        <input type="text" id="mt_addr" placeholder="Tầng, khu vực...">
-      </div>
-      <div class="field"><label>GPS vị trí</label>
-        <div id="gpsBoxMT">${gpsBoxHTML('gpsBoxMT',false)}</div>
-      </div>
-    </div>
-    <div class="card">
-      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 4 hình bắt buộc. Có thể chụp thêm tối đa 30 hình/lần survey.</p>
-      <div id="mt_photo_grid" class="photo-grid-2">
-        ${[['Tổng quan',1],['Mặt tiền',2],['Sản phẩm 1',3],['Sản phẩm 2',4]].map(([lbl,i]) => photoSlotHTML('mt',i,lbl)).join('')}
+  if (state.gps) return `<div class="gps-box"><span class="icon">📍</span><div class="gps-info"><strong>GPS đã xác định</strong>
       </div>
       <button onclick="addMTPhotoSlot()" id="mt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
     </div>
@@ -807,12 +490,13 @@ function renderMTForm(mode) {
       </div>
     </div>
     <div class="card">
-      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 1 hình. Có thể thêm tối đa 30 hình.</p>
-      <div id="mt_photo_grid" class="photo-grid-2">
-        ${[['Ảnh 1',1],['Ảnh 2',2],['Ảnh 3',3],['Ảnh 4',4]].map(([lbl,i]) => photoSlotHTML('mt',i,lbl)).join('')}
-      </div>
-      <button onclick="addMTPhotoSlot()" id="mt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện (dùng app timestamp để chụp trước).</p>
+      <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
+        📁 Chọn hình từ thư viện
+        <input type="file" id="mt_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'mt')">
+      </label>
+      <div id="mt_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>`;
 
   content.innerHTML = mode === 'other' ? otherForm : dailyForm;
@@ -915,12 +599,13 @@ function renderGTDailyForm(region) {
       </div>
     </div>
     <div class="card">
-      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="gt_photo_count_badge">0/30</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 4 hình bắt buộc. Có thể chụp thêm tối đa 30 hình/lần survey.</p>
-      <div id="gt_photo_grid" class="photo-grid">
-        ${[['Tổng quan',1],['Mặt tiền',2],['Sản phẩm 1',3],['Sản phẩm 2',4]].map(([lbl,i]) => photoSlotHTML('gt',i,lbl)).join('')}
-      </div>
-      <button onclick="addGTPhotoSlot()" id="gt_add_photo_btn" style="margin-top:10px;width:100%;padding:10px;border:1.5px dashed var(--primary);border-radius:8px;background:var(--primary-light);color:var(--primary);font-size:13px;font-weight:600;cursor:pointer">+ Thêm hình</button>
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="gt_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện (dùng app timestamp để chụp trước).</p>
+      <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
+        📁 Chọn hình từ thư viện
+        <input type="file" id="gt_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gt')">
+      </label>
+      <div id="gt_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>
     <div class="card" style="padding:12px 8px">
       <h3 style="padding:0 8px 8px">📦 Tồn kho trên kệ</h3>
@@ -1059,7 +744,7 @@ function renderGTNewForm() {
       </div>
       <div class="field"><label>Hình ảnh (tối đa 4)</label>
         <div class="photo-grid">
-          ${[[1,'Ảnh 1'],[2,'Ảnh 2'],[3,'Ảnh 3'],[4,'Ảnh 4']].map(([i,lbl]) => photoSlotHTML('gtnew',i,lbl)).join('')}
+
         </div>
       </div>
     </div>`;
@@ -1087,6 +772,8 @@ async function submitMT() {
       gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
       photos: state.photos
     };
+    var mtP = Object.keys(state.photos).filter(function(k){return k.startsWith('mt_');});
+    if (mtP.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
     await sendData(payload, 'MT Công việc khác');
     return;
   }
@@ -1121,6 +808,8 @@ async function submitMT() {
     sku_data: skus,
     photos: state.photos
   };
+  var mtP = Object.keys(state.photos).filter(function(k){return k.startsWith('mt_');});
+  if (mtP.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
   await sendData(payload, 'MT Daily');
 }
 
@@ -1168,6 +857,8 @@ async function submitGT() {
     sku_data: skus,
     photos: state.photos
   };
+  var gtP = Object.keys(state.photos).filter(function(k){return k.startsWith('gt_');});
+  if (gtP.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
   await sendData(payload, 'GT Daily');
 }
 
@@ -1194,6 +885,63 @@ async function submitGTNew() {
     photos: state.photos
   };
   await sendData(payload, 'GT New Customer');
+}
+
+// ── PHOTO UPLOAD HANDLER ──────────────────────────────────
+function handlePhotoUpload(input, prefix) {
+  var files = Array.from(input.files);
+  var previewEl = document.getElementById(prefix + '_photo_preview');
+  var badgeEl   = document.getElementById(prefix + '_photo_count_badge');
+
+  // Count existing photos for this prefix
+  var existing = Object.keys(state.photos).filter(function(k){ return k.startsWith(prefix + '_'); }).length;
+  var remaining = PHOTO_MAX - existing;
+
+  if (files.length > remaining) {
+    toast('⚠️ Chỉ còn có thể thêm ' + remaining + ' hình (tối đa ' + PHOTO_MAX + ')');
+    files = files.slice(0, remaining);
+  }
+
+  files.forEach(function(file, i) {
+    var key = prefix + '_' + (existing + i + 1);
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      // Store in state
+      state.photos[key] = e.target.result;
+
+      // Thumbnail preview
+      var thumb = document.createElement('div');
+      thumb.style.cssText = 'position:relative;width:72px;height:72px';
+      var img = document.createElement('img');
+      img.src = e.target.result;
+      img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border)';
+      var del = document.createElement('button');
+      del.textContent = '✕';
+      del.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;padding:0;line-height:20px;text-align:center';
+      del.onclick = function() {
+        delete state.photos[key];
+        thumb.remove();
+        updatePhotoBadge(prefix);
+      };
+      thumb.appendChild(img);
+      thumb.appendChild(del);
+      if (previewEl) previewEl.appendChild(thumb);
+      updatePhotoBadge(prefix);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset input so same files can be re-selected
+  input.value = '';
+}
+
+function updatePhotoBadge(prefix) {
+  var count = Object.keys(state.photos).filter(function(k){ return k.startsWith(prefix + '_'); }).length;
+  var badge = document.getElementById(prefix + '_photo_count_badge');
+  if (badge) {
+    badge.textContent = count + '/' + PHOTO_MAX;
+    badge.className = 'store-count-badge' + (count === 0 ? ' zero' : '');
+  }
 }
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
