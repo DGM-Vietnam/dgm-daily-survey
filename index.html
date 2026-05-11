@@ -394,14 +394,26 @@ function renderStaffList() {
   function col(n){return colors[n.charCodeAt(0)%colors.length];}
   var list=document.getElementById('staffList');
   if(!list)return;
-  list.innerHTML=TEAM.map(function(u){
-    var b=badges[u.team]||'badge-bo';
-    return '<div class="staff-item" onclick="selectUser('+JSON.stringify(u).replace(/'/g,"\'")+')">'+
+  window._teamData = TEAM;
+  list.innerHTML = TEAM.map(function(u,i){
+    var b = badges[u.team]||'badge-bo';
+    var div = document.createElement('div');
+    div.className = 'staff-item';
+    div.onclick = (function(idx){return function(){selectUser(window._teamData[idx]);};})(i);
+    div.innerHTML =
       '<div class="staff-avatar" style="background:'+col(u.name)+'">'+ini(u.name)+'</div>'+
       '<div class="staff-info"><div class="staff-name">'+u.name+'</div>'+
       '<span class="badge '+b+'">'+u.team+'</span></div>'+
-      '<div class="staff-arrow">›</div></div>';
+      '<div class="staff-arrow">›</div>';
+    return div.outerHTML;
   }).join('');
+  // Re-attach onclick via event delegation (outerHTML loses handlers)
+  list.onclick = function(e){
+    var item = e.target.closest('.staff-item');
+    if(!item) return;
+    var idx = Array.from(list.children).indexOf(item);
+    if(idx >= 0) selectUser(window._teamData[idx]);
+  };
 }
 
 function selectUser(user) {
