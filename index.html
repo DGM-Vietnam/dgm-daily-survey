@@ -96,6 +96,18 @@ textarea{resize:vertical;min-height:80px}
 .bottom-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;padding:12px 16px;box-shadow:0 -2px 8px rgba(0,0,0,.1);z-index:99}
 /* STAFF */
 .staff-list{display:flex;flex-direction:column;gap:8px}
+.staff-item{display:flex;align-items:center;gap:12px;padding:14px 16px;background:#fff;border-radius:12px;border:1.5px solid var(--border);cursor:pointer;transition:all .15s}
+.staff-item:active{background:var(--primary-light);border-color:var(--primary)}
+.staff-avatar{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:18px;flex-shrink:0}
+.staff-info{flex:1}
+.staff-name{font-weight:600;font-size:15px;color:var(--text)}
+.staff-arrow{color:#ccc;font-size:20px}
+.type-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.type-card{background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:16px;text-align:center;cursor:pointer;transition:all .15s}
+.type-card:active{background:var(--primary-light);border-color:var(--primary)}
+.type-card .icon{font-size:28px;margin-bottom:6px}
+.type-card .title{font-weight:700;font-size:14px;color:var(--text)}
+.type-card .desc{font-size:11px;color:var(--text2);margin-top:3px}
 .staff-btn{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;background:#fff;cursor:pointer;transition:all .2s;text-align:left;width:100%}
 .staff-btn:hover{border-color:var(--primary);background:var(--primary-light)}
 .staff-avatar{width:38px;height:38px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
@@ -373,6 +385,105 @@ window.addEventListener('online', () => {
     setTimeout(syncOffline, 1500);
   }
 });
+
+// ── STAFF LIST ────────────────────────────────────────────
+function renderStaffList() {
+  var badges = {'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts','MT/GT':'badge-mtgt'};
+  var colors = ['#C8102E','#2E75B6','#1E7145','#7030A0','#E36C09'];
+  function ini(n){return n.split(' ').pop()[0].toUpperCase();}
+  function col(n){return colors[n.charCodeAt(0)%colors.length];}
+  var list=document.getElementById('staffList');
+  if(!list)return;
+  list.innerHTML=TEAM.map(function(u){
+    var b=badges[u.team]||'badge-bo';
+    return '<div class="staff-item" onclick="selectUser('+JSON.stringify(u).replace(/'/g,"\'")+')">'+
+      '<div class="staff-avatar" style="background:'+col(u.name)+'">'+ini(u.name)+'</div>'+
+      '<div class="staff-info"><div class="staff-name">'+u.name+'</div>'+
+      '<span class="badge '+b+'">'+u.team+'</span></div>'+
+      '<div class="staff-arrow">›</div></div>';
+  }).join('');
+}
+
+function selectUser(user) {
+  if (typeof user === 'string') user = JSON.parse(user);
+  state.user = user;
+  document.getElementById('typeTitle').textContent = 'Xin chào, ' + user.name.split(' ').pop() + '!';
+  document.getElementById('typeSubtitle').textContent = user.team;
+  renderTypeCards(user.team);
+  goTo('scType');
+  initGPS();
+}
+
+function selectManualUser() {
+  var name = document.getElementById('manualName') ? document.getElementById('manualName').value.trim() : '';
+  var team = document.getElementById('manualTeam') ? document.getElementById('manualTeam').value : '';
+  if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
+  if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
+  selectUser({name: name, team: team});
+}
+
+// ── TYPE CARDS ────────────────────────────────────────────
+function renderTypeCards(team) {
+  var html = '';
+  if (team === 'MT') {
+    html = '<div class="type-cards">'+
+      '<div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">MT Daily</div><div class="desc">Khảo sát điểm MT hàng ngày</div></div>'+
+      '<div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>'+
+      '</div>';
+  } else if (team === 'GT South' || team === 'GT Central' || team === 'GT North') {
+    html = '<div class="type-cards">'+
+      '<div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>'+
+      '<div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>'+
+      '</div>';
+  } else if (team === 'MT/GT') {
+    html = '<div class="type-cards">'+
+      '<div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">MT Daily</div><div class="desc">Khảo sát điểm MT hàng ngày</div></div>'+
+      '<div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>'+
+      '<div class="type-card" onclick="showGTRegionPicker()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>'+
+      '<div class="type-card" onclick="showGTRegionPicker('new')"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>'+
+      '</div>';
+  } else {
+    html = '<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.</p></div>';
+  }
+  document.getElementById('typeCards').innerHTML = html;
+}
+
+// ── GT REGION PICKER (for MT/GT manager) ─────────────────
+function showGTRegionPicker(mode) {
+  var regions = ['GT South','GT Central','GT North'];
+  var labels = {'GT South':'GT Miền Nam 🟢','GT Central':'GT Miền Trung 🟡','GT North':'GT Miền Bắc 🟣'};
+  var div = document.createElement('div');
+  div.id = 'regionPickerOverlay';
+  div.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:24px';
+  div.innerHTML = '<div style="background:#fff;border-radius:14px;padding:20px;width:100%;max-width:320px">'+
+    '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px;text-align:center">Chọn khu vực GT</h3>'+
+    regions.map(function(r){
+      return '<button onclick="pickGTRegion(''+r+'',''+(mode||'daily')+'')" style="display:block;width:100%;padding:13px;margin-bottom:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;font-weight:600">'+labels[r]+'</button>';
+    }).join('')+
+    '<button onclick="document.getElementById('regionPickerOverlay').remove()" style="display:block;width:100%;padding:11px;border:none;border-radius:10px;background:#f5f5f5;font-size:14px;cursor:pointer;color:#666">Huỷ</button>'+
+    '</div>';
+  document.body.appendChild(div);
+}
+
+function pickGTRegion(region, mode) {
+  document.getElementById('regionPickerOverlay') && document.getElementById('regionPickerOverlay').remove();
+  var orig = state.user.team;
+  state.user = Object.assign({}, state.user, {team: region});
+  if (mode === 'new') { startGTNew(); } else { startGTDaily(); }
+  state.user = Object.assign({}, state.user, {team: orig});
+}
+
+// ── START MT ──────────────────────────────────────────────
+function startMT(mode) {
+  state.photos = {};
+  state.skuData = {};
+  mtPhotoCount = 4;
+  state.mtMode = mode;
+  document.getElementById('mtSubtitle').textContent = state.user.name;
+  renderMTForm(mode);
+  goTo('scMT');
+  initGPS();
+}
 
 function promptScriptUrl() {
   setTimeout(() => {
