@@ -346,7 +346,7 @@ const GT_SKUS_DAILY = [
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
 // ⚙️ Script URL — cập nhật khi deploy lại Apps Script
 // Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOUERbdlDa69wnEcdaGLVyy0hnmyGT7ToJoWMVtc2o_pJfyrD9pkp0cG1ibJ9f1cqSTQ/exec';
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8ujBmm918E18EuS3vN30kLwo-_s9IdyHS7CEt3-hRrProc1w4uCEan2_BWQcsTCCZIg/exec';
 
 let state = {
   user: null,
@@ -1240,46 +1240,78 @@ async function submitGTNew() {
 // để detect lỗi network vs success
 async function sendData(payload, label) {
   if (!state.scriptUrl) {
-      saveOffline(payload);
+    saveOffline(payload);
     showSuccess(label, payload, true);
     return;
   }
   showLoading('Đang gửi dữ liệu...');
   try {
-      const compressed = await compressPhotos(payload);
-        const jsonStr = JSON.stringify(compressed);
-      var b64;
-    b64 = btoa(unescape(encodeURIComponent(jsonStr)));
-    
-    // Image ping GET — tương thích 100% Safari iOS/Android mọi đời
-    var getUrl = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
-  
+    // Resize ảnh
+    const compressed = await compressPhotos(payload);
+    const photos = compressed.photos || {};
+    const photoKeys = Object.keys(photos);
+
+    // Gửi survey data (không có ảnh) — image ping GET
+    const surveyPayload = Object.assign({}, compressed, {photos: {}, photo_count: photoKeys.length});
+    const surveyB64 = btoa(unescape(encodeURIComponent(JSON.stringify(surveyPayload))));
+    const surveyUrl = state.scriptUrl + '?data=' + encodeURIComponent(surveyB64) + '&_t=' + Date.now();
+
     await new Promise(function(resolve) {
       var done = false;
-      var watchdog = setTimeout(function() {
-              done = true; resolve();
-      }, 12000);
+      var wd = setTimeout(function(){ if(!done){done=true;resolve();} }, 12000);
       var img = new Image();
-      img.onload = function() {
-        if (done) return; done = true;
-        clearTimeout(watchdog);
-              resolve();
-      };
-      img.onerror = function() {
-        if (done) return; done = true;
-        clearTimeout(watchdog);
-              resolve();
-      };
-      img.src = getUrl;
+      img.onload = img.onerror = function(){ if(!done){done=true;clearTimeout(wd);resolve();} };
+      img.src = surveyUrl;
     });
+
     hideLoading();
     showSuccess(label, payload, false);
+
+    // Upload ảnh từng cái lên Drive (background, không block UI)
+    if (photoKeys.length > 0) {
+      uploadPhotosToScript(
+        surveyPayload.id || '',
+        surveyPayload.salesperson || '',
+        surveyPayload.date || '',
+        photos
+      );
+    }
   } catch (err) {
-      hideLoading();
+    hideLoading();
     saveOffline(payload);
     showSuccess(label, payload, true);
   }
 }
+
+async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
+  var keys = Object.keys(photos);
+  for (var i = 0; i < keys.length; i++) {
+    try {
+      var base64Data = photos[keys[i]];
+      // Strip data:image/...;base64, prefix
+      if (base64Data.indexOf(',') > -1) base64Data = base64Data.split(',')[1];
+      var photoPayload = {
+        type: 'PHOTO_UPLOAD',
+        survey_id: surveyId,
+        salesperson: salesperson,
+        date: date,
+        photo_key: keys[i],
+        photo_index: i + 1,
+        photo_total: keys.length,
+        photo_b64: base64Data
+      };
+      var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(photoPayload))));
+      var url = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
+      await new Promise(function(resolve) {
+        var img = new Image();
+        img.onload = img.onerror = resolve;
+        img.src = url;
+        setTimeout(resolve, 10000);
+      });
+    } catch(e) { /* tiếp tục với ảnh tiếp theo */ }
+  }
+}
+
 
 async function syncOfflineSend(item) {
   const jsonStr = JSON.stringify(item);
@@ -1336,10 +1368,13 @@ function updatePhotoBadge(prefix) {
 }
 
 async function compressPhotos(payload) {
-  // Không gửi ảnh qua server — chỉ ghi số lượng
-  // Giảm payload từ 130KB+ xuống ~2KB
+  var out = Object.assign({}, payload, {photos: {}});
   var photoCount = Object.keys(payload.photos || {}).length;
-  var out = Object.assign({}, payload, {photos: {}, photo_count: photoCount});
+  out.photo_count = photoCount;
+  for (var key in (payload.photos || {})) {
+    try { out.photos[key] = await resizeImage(payload.photos[key], 500); }
+    catch(e) { out.photos[key] = payload.photos[key]; }
+  }
   return out;
 }
 
