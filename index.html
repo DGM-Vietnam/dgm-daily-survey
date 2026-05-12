@@ -346,7 +346,7 @@ const GT_SKUS_DAILY = [
 // ⚙️ SCRIPT URL — Update this when you redeploy Apps Script
 // ⚙️ Script URL — cập nhật khi deploy lại Apps Script
 // Có thể thay đổi trực tiếp trên app bằng nút ⚙️ Script URL
-const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw8ujBmm918E18EuS3vN30kLwo-_s9IdyHS7CEt3-hRrProc1w4uCEan2_BWQcsTCCZIg/exec';
+const HARDCODED_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYpHeVVTpLGXwzp0T6CRkjakkucSD3i27hkXMD5Af3mv7V5dsmG1Hyrng8aSx5NoH5vw/exec';
 
 let state = {
   user: null,
@@ -1269,8 +1269,10 @@ async function sendData(payload, label) {
 
     // Upload ảnh từng cái lên Drive (background, không block UI)
     if (photoKeys.length > 0) {
+      // Generate local survey ID for folder naming (server ID not available client-side)
+      var localId = surveyPayload.type + '-' + (surveyPayload.date || '').replace(/\//g,'-') + '-' + Date.now().toString().slice(-4);
       uploadPhotosToScript(
-        surveyPayload.id || '',
+        localId,
         surveyPayload.salesperson || '',
         surveyPayload.date || '',
         photos
@@ -1288,7 +1290,6 @@ async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
   for (var i = 0; i < keys.length; i++) {
     try {
       var base64Data = photos[keys[i]];
-      // Strip data:image/...;base64, prefix
       if (base64Data.indexOf(',') > -1) base64Data = base64Data.split(',')[1];
       var photoPayload = {
         type: 'PHOTO_UPLOAD',
@@ -1300,14 +1301,20 @@ async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
         photo_total: keys.length,
         photo_b64: base64Data
       };
-      var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(photoPayload))));
-      var url = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
-      await new Promise(function(resolve) {
-        var img = new Image();
-        img.onload = img.onerror = resolve;
-        img.src = url;
-        setTimeout(resolve, 10000);
-      });
+      // Dùng fetch POST vì ảnh ~15KB không fit trong GET URL
+      var postBody = JSON.stringify({data: btoa(unescape(encodeURIComponent(JSON.stringify(photoPayload))))});
+      var controller = new AbortController();
+      var timer = setTimeout(function(){ controller.abort(); }, 20000);
+      try {
+        await fetch(state.scriptUrl, {
+          method: 'POST', mode: 'no-cors', redirect: 'follow',
+          headers: {'Content-Type': 'text/plain'},
+          body: postBody, signal: controller.signal
+        });
+      } catch(fe) { /* silent — continue */ }
+      clearTimeout(timer);
+      // Small delay giữa các ảnh để tránh rate limit
+      await new Promise(function(r){ setTimeout(r, 500); });
     } catch(e) { /* tiếp tục với ảnh tiếp theo */ }
   }
 }
