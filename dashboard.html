@@ -579,105 +579,88 @@ function pct(num,den){ return den===0?'—':(num/den*100).toFixed(0)+'%'; }
 function destroyChart(id){ if(CHART_INSTANCES[id]){ CHART_INSTANCES[id].destroy(); delete CHART_INSTANCES[id]; } }
 
 // ══════════════════════════════════════════════════════════
-// ★ CHART with DATA LABELS ★
+// CHART — with stable data labels via afterDraw
 // ══════════════════════════════════════════════════════════
+// Standalone afterDraw label painter — no external plugin needed
+function drawLabels(chart){
+  const type=chart.config.type;
+  const c=chart.ctx;
+  c.save();
+  c.font="600 10px 'IBM Plex Mono',monospace";
+  c.textBaseline='middle';
+  c.textAlign='center';
+
+  if(type==='bar'){
+    const isHoriz=chart.options.indexAxis==='y';
+    chart.data.datasets.forEach((ds,di)=>{
+      const meta=chart.getDatasetMeta(di);
+      if(meta.hidden) return;
+      meta.data.forEach((el,ii)=>{
+        const v=ds.data[ii];
+        if(!v||v<=0) return;
+        c.fillStyle='rgba(255,255,255,0.9)';
+        if(isHoriz){
+          // horizontal bar — label to the right of bar end
+          c.textAlign='left';
+          c.fillText(v, el.x+4, el.y);
+        } else {
+          // vertical bar — label above bar
+          c.textAlign='center';
+          c.fillText(v, el.x, el.y-8);
+        }
+      });
+    });
+  } else if(type==='doughnut'||type==='pie'){
+    chart.data.datasets.forEach((ds,di)=>{
+      const meta=chart.getDatasetMeta(di);
+      if(meta.hidden) return;
+      const total=ds.data.reduce((a,b)=>a+(b||0),0);
+      meta.data.forEach((el,ii)=>{
+        const v=ds.data[ii];
+        if(!v||!total||v/total<0.05) return;
+        const angle=(el.startAngle+el.endAngle)/2;
+        const r=(el.outerRadius+el.innerRadius)/2;
+        const x=el.x+Math.cos(angle)*r;
+        const y=el.y+Math.sin(angle)*r;
+        const pct=Math.round(v/total*100);
+        c.fillStyle='rgba(255,255,255,0.9)';
+        c.textAlign='center';
+        c.fillText(v, x, y-6);
+        c.font="500 9px 'IBM Plex Mono',monospace";
+        c.fillStyle='rgba(255,255,255,0.7)';
+        c.fillText(pct+'%', x, y+5);
+        c.font="600 10px 'IBM Plex Mono',monospace";
+      });
+    });
+  }
+  c.restore();
+}
+
+// Global afterDraw plugin — registered once, safe
+const DGM_LABEL_PLUGIN={
+  id:'dgmLabels',
+  afterDatasetsDraw(chart){ try{ drawLabels(chart); }catch(e){} }
+};
+if(!Chart.registry.plugins.get('dgmLabels')) Chart.register(DGM_LABEL_PLUGIN);
+
 function mkChart(id, type, labels, datasets, extraOpts={}){
   destroyChart(id);
   const ctx=document.getElementById(id); if(!ctx) return;
   const baseOpts={
     responsive:true, maintainAspectRatio:false,
-    plugins:{
-      legend:{ labels:{ color:'#9A9590', font:{size:10}, boxWidth:12 } },
-      // ★ Data labels plugin (built-in Chart.js datalabels via afterDraw)
-    },
+    plugins:{ legend:{ labels:{ color:'#9A9590', font:{size:10}, boxWidth:12 } } },
   };
   if(type==='bar'||type==='line'){
     baseOpts.scales={
       x:{ ticks:{color:'#9A9590',font:{size:10}}, grid:{color:'rgba(255,255,255,.04)'} },
       y:{ ticks:{color:'#9A9590',font:{size:10}}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true }
     };
-    // Add datalabels for bar charts
-    if(type==='bar'){
-      baseOpts.plugins.datalabels = {
-        display: ctx => { const v=ctx.dataset.data[ctx.dataIndex]; return v && v>0; },
-        color:'rgba(255,255,255,0.85)',
-        font:{family:"'IBM Plex Mono',monospace", size:10, weight:'600'},
-        anchor:'end', align:'end', offset:2,
-        formatter: v => v>0?v:''
-      };
-    }
-  }
-  if(type==='doughnut'){
-    baseOpts.plugins.datalabels = {
-      display: ctx => { const v=ctx.dataset.data[ctx.dataIndex]; const total=ctx.dataset.data.reduce((a,b)=>a+b,0); return total>0 && v/total>0.04; },
-      color:'#fff',
-      font:{family:"'IBM Plex Mono',monospace", size:10, weight:'600'},
-      formatter:(v,ctx)=>{
-        const total=ctx.dataset.data.reduce((a,b)=>a+b,0);
-        const pct=total?Math.round(v/total*100):0;
-        return v+'\n'+pct+'%';
-      }
-    };
   }
   const merged={...baseOpts,...extraOpts};
   if(extraOpts.plugins) merged.plugins={...baseOpts.plugins,...extraOpts.plugins};
   if(extraOpts.scales) merged.scales={...baseOpts.scales,...extraOpts.scales};
-  CHART_INSTANCES[id] = new Chart(ctx, { type, data:{labels,datasets}, options:merged });
+  CHART_INSTANCES[id]=new Chart(ctx,{type,data:{labels,datasets},options:merged});
 }
-
-// Register inline datalabels plugin (no external lib needed)
-Chart.register({
-  id:'dgmDatalabels',
-  afterDatasetsDraw(chart){
-    const opts=chart.options.plugins&&chart.options.plugins.datalabels;
-    if(!opts) return;
-    const ctx2=chart.ctx;
-    chart.data.datasets.forEach((ds,di)=>{
-      const meta=chart.getDatasetMeta(di);
-      if(meta.hidden) return;
-      meta.data.forEach((el,ii)=>{
-        const v=ds.data[ii];
-        // display check
-        let show=true;
-        if(typeof opts.display==='function') show=opts.display({dataset:ds,dataIndex:ii,chart});
-        else if(opts.display===false) show=false;
-        if(!show||v===null||v===undefined) return;
-        let text=opts.formatter?opts.formatter(v,{dataset:ds,dataIndex:ii,datasetIndex:di,chart}):String(v);
-        const lines=String(text).split('\n');
-        ctx2.save();
-        ctx2.fillStyle=opts.color||'#fff';
-        ctx2.font=`${(opts.font&&opts.font.weight)||'600'} ${(opts.font&&opts.font.size)||11}px ${(opts.font&&opts.font.family)||'sans-serif'}`;
-        ctx2.textAlign='center';
-        ctx2.textBaseline='middle';
-        let x=el.x, y=el.y;
-        const anchor=opts.anchor||'center';
-        const align=opts.align||'center';
-        const offset=opts.offset||0;
-        // Adjust position
-        if(chart.config.type==='bar'||chart.config.type==='horizontalBar'){
-          const isHoriz=chart.options.indexAxis==='y';
-          if(isHoriz){
-            x=el.x+(align==='end'?offset+14:align==='start'?-offset-14:0);
-            y=el.y;
-          } else {
-            x=el.x;
-            y=el.y-(align==='end'?offset+8:align==='start'?-offset-8:0);
-          }
-        } else if(chart.config.type==='doughnut'||chart.config.type==='pie'){
-          const angle=(el.startAngle+el.endAngle)/2;
-          const r=(el.outerRadius+el.innerRadius)/2;
-          x=el.x+Math.cos(angle)*r;
-          y=el.y+Math.sin(angle)*r;
-        }
-        const lineH=(opts.font&&opts.font.size||11)*1.3;
-        lines.forEach((line,li)=>{
-          ctx2.fillText(line, x, y+(li-(lines.length-1)/2)*lineH);
-        });
-        ctx2.restore();
-      });
-    });
-  }
-});
 
 function qualBar(containerId, items){
   const el = document.getElementById(containerId); if(!el) return;
