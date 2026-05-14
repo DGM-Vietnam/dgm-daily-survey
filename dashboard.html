@@ -127,26 +127,42 @@ tr:hover td{background:rgba(255,255,255,.025);}
 .alert-chip{padding:6px 14px;border-radius:3px;font-size:12px;font-family:var(--mono);background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.3);color:#ff8f8f;}
 .alert-chip.ok{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.3);color:var(--green);}
 
-/* ══ MAP (REDESIGNED) ══ */
-.map-unified-section{background:var(--card);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px;}
-.map-unified-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
-.map-unified-header h3{font-size:12px;font-family:var(--mono);color:var(--white);text-transform:uppercase;letter-spacing:.06em;}
-.map-unified-el{height:500px;}
-.map-controls-bar{padding:10px 18px;background:var(--card2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.map-controls-bar label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;}
-.map-select{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:4px 8px;font-size:11px;border-radius:2px;font-family:var(--mono);}
-.map-legend-bar{padding:8px 18px;display:flex;gap:14px;flex-wrap:wrap;background:var(--card2);border-top:1px solid var(--border);}
+/* ══ MAP v3 ══ */
+.map-controls-bar{padding:10px 18px;background:var(--card2);border:1px solid var(--border);border-radius:4px 4px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.map-controls-bar label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;}
+.map-select{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:4px 10px;font-size:11px;border-radius:2px;font-family:var(--mono);}
+.map-day-tags,.map-ch-tags{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.map-day-tag,.map-ch-tag{padding:3px 10px;border-radius:2px;font-size:10px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);color:var(--gray2);transition:all .12s;white-space:nowrap;user-select:none;}
+.map-day-tag.active{background:var(--red);border-color:var(--red);color:#fff;}
+.map-ch-tag.active{background:rgba(74,158,191,.15);border-color:var(--blue);color:var(--blue);}
+.map-day-tag:hover:not(.active),.map-ch-tag:hover:not(.active){border-color:var(--gray2);}
+.map-body{display:flex;border:1px solid var(--border);border-top:none;background:var(--card);overflow:hidden;}
+.map-unified-el{flex:1;min-width:0;height:500px;transition:height .25s ease;}
+.map-unified-el.map-h-member{height:650px;}
+.map-side-panel{width:255px;flex-shrink:0;background:var(--card2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.map-side-panel.hidden{display:none;}
+.msp-header{padding:12px 14px;border-bottom:1px solid var(--border);}
+.msp-name{font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.msp-sub{font-size:10px;font-family:var(--mono);color:var(--gray2);}
+.msp-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);}
+.msp-stat{background:var(--bg);border-radius:3px;padding:8px 10px;}
+.msp-stat-val{font-size:22px;font-weight:700;font-family:var(--mono);line-height:1;}
+.msp-stat-lbl{font-size:9px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
+.msp-timeline{flex:1;overflow-y:auto;padding:10px 12px;}
+.msp-tl-title{font-size:9px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.msp-tl-item{display:flex;gap:8px;margin-bottom:10px;position:relative;}
+.msp-tl-item:not(:last-child)::after{content:'';position:absolute;left:8px;top:20px;bottom:-8px;width:1px;background:var(--border);}
+.msp-tl-dot{width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:var(--mono);font-weight:700;color:#fff;}
+.msp-tl-body{flex:1;min-width:0;}
+.msp-tl-name{font-size:11px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.msp-tl-meta{font-size:10px;font-family:var(--mono);color:var(--gray2);margin-top:1px;}
+.map-footer{background:var(--card2);border:1px solid var(--border);border-top:none;border-radius:0 0 4px 4px;padding:9px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
+.map-legend-bar{display:flex;gap:12px;flex-wrap:wrap;flex:1;}
 .leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--gray2);}
 .leg-dot{width:9px;height:9px;border-radius:50%;}
-
-/* MAP DISTANCE SUMMARY */
-.map-distance-bar{padding:12px 18px;background:var(--card2);border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;}
-.map-dist-team{display:flex;flex-direction:column;gap:4px;}
-.map-dist-label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;}
-.map-dist-value{font-size:13px;font-family:var(--mono);color:var(--white);font-weight:600;}
-.map-dist-total{font-size:11px;font-family:var(--mono);color:var(--yellow);}
-.map-dist-members{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
-.map-dist-member{font-size:11px;font-family:var(--mono);color:var(--gray2);}
+.map-dist-summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-family:var(--mono);font-size:11px;}
+.map-dist-total-badge{background:rgba(255,225,64,.1);border:1px solid rgba(255,225,64,.2);color:var(--yellow);padding:2px 10px;border-radius:2px;font-size:10px;font-weight:600;}
+.map-note{font-size:10px;font-family:var(--mono);color:var(--gray2);opacity:.55;}
 
 /* ── NEW: SALES ACTIVITY TABLE ── */
 .sales-activity-table{width:100%;border-collapse:collapse;}
@@ -364,45 +380,56 @@ tr:hover td{background:rgba(255,255,255,.025);}
     </div>
   </div>
 
-  <!-- ── TAB MAP (REDESIGNED) ── -->
+  <!-- ── TAB MAP v3 ── -->
   <div class="tab-content" id="tab-map">
     <!-- Filter bar -->
     <div class="map-controls-bar">
       <label>Ngày xem:</label>
-      <select id="mapDaySelect" class="map-select" onchange="renderUnifiedMap()"></select>
-      <label>Kênh:</label>
-      <select id="mapChannelFilter" class="map-select" onchange="updateMapMemberFilter();renderUnifiedMap()">
-        <option value="all">Tất cả kênh</option>
-        <option value="MT">MT</option>
-        <option value="GTN">GT North</option>
-        <option value="GTC">GT Central</option>
-        <option value="GTS">GT South</option>
-      </select>
-      <label>Nhân viên:</label>
+      <div class="map-day-tags">
+        <span class="map-day-tag active" data-range="today" onclick="setMapDay('today',this)">Hôm nay</span>
+        <span class="map-day-tag" data-range="week" onclick="setMapDay('week',this)">Tuần này</span>
+        <select id="mapMonthSelect" class="map-select" style="padding:2px 6px;font-size:10px;" onchange="setMapDay('month',null,this.value)">
+          <option value="">Chọn tháng...</option>
+        </select>
+        <span class="map-day-tag" data-range="all" onclick="setMapDay('all',this)">Tất cả</span>
+      </div>
+      <label style="margin-left:8px;">Kênh:</label>
+      <div class="map-ch-tags">
+        <span class="map-ch-tag active" data-ch="all" onclick="setMapChannel('all',this)">Tất cả</span>
+        <span class="map-ch-tag" data-ch="MT" onclick="setMapChannel('MT',this)">MT</span>
+        <span class="map-ch-tag" data-ch="GTN" onclick="setMapChannel('GTN',this)">GT North</span>
+        <span class="map-ch-tag" data-ch="GTC" onclick="setMapChannel('GTC',this)">GT Central</span>
+        <span class="map-ch-tag" data-ch="GTS" onclick="setMapChannel('GTS',this)">GT South</span>
+      </div>
+      <label style="margin-left:8px;">Nhân viên:</label>
       <select id="mapMember" class="map-select" onchange="renderUnifiedMap()"><option value="all">Tất cả</option></select>
-      <span id="mapTotalCount" style="font-size:11px;font-family:var(--mono);color:var(--gray2);margin-left:8px;"></span>
+      <span id="mapTotalCount" style="font-size:10px;font-family:var(--mono);color:var(--gray2);margin-left:4px;"></span>
     </div>
 
-    <!-- Unified map -->
-    <div class="map-unified-section">
-      <div class="map-unified-header">
-        <h3>🗺️ Bản đồ hành trình — tất cả sales</h3>
-        <span id="mapUnifiedMeta" style="font-size:11px;color:var(--gray2);font-family:var(--mono);">— điểm có GPS</span>
-      </div>
+    <!-- Map body: map + side panel -->
+    <div class="map-body">
       <div id="mapUnified" class="map-unified-el"></div>
-      <!-- Legend row -->
+      <!-- Member side panel (shown when specific member selected) -->
+      <div class="map-side-panel hidden" id="mapSidePanel">
+        <div class="msp-header">
+          <div class="msp-name" id="mspName">—</div>
+          <div class="msp-sub" id="mspSub">—</div>
+        </div>
+        <div class="msp-stats" id="mspStats"></div>
+        <div class="msp-timeline">
+          <div class="msp-tl-title">Lịch trình hôm nay</div>
+          <div id="mspTimeline"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer: legend + distance summary -->
+    <div class="map-footer">
       <div class="map-legend-bar" id="legendUnified"></div>
-      <!-- Distance summary -->
-      <div class="map-distance-bar" id="mapDistanceBar">
-        <div class="map-dist-team">
-          <div class="map-dist-label">Tổng quãng đường cả team</div>
-          <div class="map-dist-total" id="mapDistTotal">— km</div>
-          <div class="map-dist-members" id="mapDistMembers"></div>
-        </div>
-        <div class="map-dist-team" style="margin-left:auto;text-align:right;">
-          <div class="map-dist-label">Lưu ý</div>
-          <div class="map-dist-value" style="font-size:11px;color:var(--gray2);">Ước tính theo đường thẳng × 1.35 (hệ số đường xe máy)</div>
-        </div>
+      <div class="map-dist-summary">
+        <span id="mapDistTotal" class="map-dist-total-badge">— km</span>
+        <span id="mapDistMembers" style="color:var(--gray2);font-size:11px;"></span>
+        <span class="map-note">· Đường thẳng × 1.35</span>
       </div>
     </div>
   </div>
@@ -966,53 +993,114 @@ function renderGT(){
 }
 
 // ══════════════════════════════════════════════════════════
-// TAB: MAP — UNIFIED with checkpoints & distance
+// TAB: MAP v3 — Card Overlay + GPS sanity + dynamic layout
 // ══════════════════════════════════════════════════════════
+
+// Vietnam bounding box for GPS sanity check
+const VN_LAT=[8,24], VN_LNG=[102,110];
+function validGPS(lat,lng){
+  return !isNaN(lat)&&!isNaN(lng)&&lat>=VN_LAT[0]&&lat<=VN_LAT[1]&&lng>=VN_LNG[0]&&lng<=VN_LNG[1];
+}
 function getGPS(r){
   const lat=parseFloat(r['Latitude']||(r['GPS']||'').split(',')[0]);
   const lng=parseFloat(r['Longitude']||(r['GPS']||'').split(',').slice(-1)[0]);
-  if(isNaN(lat)||isNaN(lng)||lat===0||lng===0) return null;
+  if(!validGPS(lat,lng)) return null;
   return [lat,lng];
 }
-
-// Haversine distance in km
 function haversine(a,b){
-  const R=6371, toR=x=>x*Math.PI/180;
-  const dLat=toR(b[0]-a[0]), dLng=toR(b[1]-a[1]);
-  const h=Math.sin(dLat/2)**2+Math.cos(toR(a[0]))*Math.cos(toR(b[0]))*Math.sin(dLng/2)**2;
+  const R=6371,tr=x=>x*Math.PI/180;
+  const dLat=tr(b[0]-a[0]),dLng=tr(b[1]-a[1]);
+  const h=Math.sin(dLat/2)**2+Math.cos(tr(a[0]))*Math.cos(tr(b[0]))*Math.sin(dLng/2)**2;
   return 2*R*Math.asin(Math.sqrt(h));
+}
+function hexAlpha(hex,a){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// Map state
+let MAP_FILTER_DAY='today';    // 'today'|'week'|'month:YYYY-MM'|'all'
+let MAP_FILTER_CH='all';       // 'all'|'MT'|'GTN'|'GTC'|'GTS'
+const CHANNEL_CENTERS={
+  all:[16.0,106.5],zoom:6,
+  MT:[10.76,106.66],zoom:11,
+  GTN:[21.02,105.83],zoom:11,
+  GTC:[16.05,108.2],zoom:11,
+  GTS:[10.76,106.66],zoom:11
+};
+
+function setMapDay(range,el,monthVal){
+  document.querySelectorAll('.map-day-tag').forEach(t=>t.classList.remove('active'));
+  if(range==='month'){
+    MAP_FILTER_DAY='month:'+(monthVal||'');
+  } else {
+    MAP_FILTER_DAY=range;
+    if(el) el.classList.add('active');
+    document.getElementById('mapMonthSelect').value='';
+  }
+  updateMapMemberFilter();
+  renderUnifiedMap();
+}
+
+function setMapChannel(ch,el){
+  document.querySelectorAll('.map-ch-tag').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  MAP_FILTER_CH=ch;
+  // Zoom map to channel region
+  if(MAP_UNIFIED){
+    const cfg=CHANNEL_CENTERS[ch]||CHANNEL_CENTERS.all;
+    MAP_UNIFIED.setView(cfg,cfg.zoom||6);
+  }
+  updateMapMemberFilter();
+  renderUnifiedMap();
+}
+
+function mapInRange(r){
+  const d=getDS(r); if(!d) return false;
+  if(MAP_FILTER_DAY==='today') return d===todayYMD();
+  if(MAP_FILTER_DAY==='week'){
+    const now=new Date(),day=now.getDay()||7;
+    const mon=new Date(now); mon.setDate(now.getDate()-day+1);
+    return d>=toYMD(mon)&&d<=todayYMD();
+  }
+  if(MAP_FILTER_DAY.startsWith('month:')){
+    const m=MAP_FILTER_DAY.slice(6);
+    return m?d.slice(0,7)===m:true;
+  }
+  return true; // all
 }
 
 function initUnifiedMap(){
   if(MAP_UNIFIED) return;
-  MAP_UNIFIED = L.map('mapUnified').setView([16.0,106.5], 6);
+  const cfg=CHANNEL_CENTERS[MAP_FILTER_CH]||CHANNEL_CENTERS.all;
+  MAP_UNIFIED=L.map('mapUnified').setView([cfg[0]||16,cfg[1]||106.5],cfg.zoom||6);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(MAP_UNIFIED);
 }
 
 function populateMapDayFilter(){
+  if(!RAW) return;
   const all=[...(RAW.mt_daily||[]),...(RAW.gt_daily||[])];
-  const days=[...new Set(all.map(getDS).filter(Boolean))].sort().reverse();
-  const sel=document.getElementById('mapDaySelect');
-  sel.innerHTML='<option value="all">Tất cả ngày</option>'+days.map(d=>`<option value="${d}" ${d===todayYMD()?'selected':''}>${d}</option>`).join('');
+  const months=[...new Set(all.map(r=>getDS(r).slice(0,7)).filter(Boolean))].sort().reverse();
+  const sel=document.getElementById('mapMonthSelect');
+  sel.innerHTML='<option value="">Chọn tháng...</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
 }
 
 function populateMapMemberFilter(){
-  const all=[...(RAW.mt_daily||[]),...(RAW.gt_daily||[])];
-  const names=[...new Set(all.map(nameKey))].sort();
-  const sel=document.getElementById('mapMember');
-  sel.innerHTML='<option value="all">Tất cả</option>'+names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(!RAW) return;
+  updateMapMemberFilter();
 }
 
 function updateMapMemberFilter(){
   if(!RAW) return;
-  const ch=document.getElementById('mapChannelFilter').value;
   const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
   let pool;
-  if(ch==='MT') pool=mt;
-  else if(ch==='GTN') pool=gt.filter(isNorth);
-  else if(ch==='GTC') pool=gt.filter(isCentral);
-  else if(ch==='GTS') pool=gt.filter(isSouth);
+  if(MAP_FILTER_CH==='MT') pool=mt;
+  else if(MAP_FILTER_CH==='GTN') pool=gt.filter(isNorth);
+  else if(MAP_FILTER_CH==='GTC') pool=gt.filter(isCentral);
+  else if(MAP_FILTER_CH==='GTS') pool=gt.filter(isSouth);
   else pool=[...mt,...gt];
+  // Apply day filter too
+  pool=pool.filter(mapInRange);
   const names=[...new Set(pool.map(nameKey))].sort();
   const sel=document.getElementById('mapMember');
   const cur=sel.value;
@@ -1029,9 +1117,6 @@ function renderUnifiedMap(){
   UMAP_START_MARKERS.forEach(m=>MAP_UNIFIED.removeLayer(m)); UMAP_START_MARKERS.length=0;
 
   const selMember=document.getElementById('mapMember').value;
-  const selDay=document.getElementById('mapDaySelect').value;
-  const selCh=document.getElementById('mapChannelFilter').value;
-
   const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
   let allData=[
     ...mt.map(r=>({...r,_ch:'MT'})),
@@ -1040,30 +1125,36 @@ function renderUnifiedMap(){
     ...gt.filter(isSouth).map(r=>({...r,_ch:'GTS'})),
   ];
 
-  if(selDay!=='all') allData=allData.filter(r=>getDS(r)===selDay);
-  if(selCh!=='all') allData=allData.filter(r=>r._ch===selCh);
+  // Apply day + channel filters
+  allData=allData.filter(mapInRange);
+  if(MAP_FILTER_CH!=='all') allData=allData.filter(r=>r._ch===MAP_FILTER_CH);
   if(selMember!=='all') allData=allData.filter(r=>nameKey(r)===selMember);
 
   document.getElementById('mapTotalCount').textContent=allData.length+' records';
 
+  // Dynamic map height + side panel
+  const mapEl=document.getElementById('mapUnified');
+  const sidePanel=document.getElementById('mapSidePanel');
+  if(selMember!=='all'){
+    mapEl.classList.add('map-h-member');
+    sidePanel.classList.remove('hidden');
+  } else {
+    mapEl.classList.remove('map-h-member');
+    sidePanel.classList.add('hidden');
+  }
+
   const memberNames=[...new Set(allData.map(nameKey))].sort();
   const colorMap={};
   memberNames.forEach((n,i)=>colorMap[n]=TEAM_COLORS[i%TEAM_COLORS.length]);
-
   const memberDistances={};
-
-  // ── Helper: hex color → rgba with opacity ──
-  function hexAlpha(hex,a){
-    const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-    return `rgba(${r},${g},${b},${a})`;
-  }
+  let allCheckpointsForPanel=[];
 
   memberNames.forEach(mem=>{
     const color=colorMap[mem];
     const rows=allData.filter(r=>nameKey(r)===mem)
       .sort((a,b)=>String(a.Timestamp||a['Ngày']||'').localeCompare(String(b.Timestamp||b['Ngày']||'')));
 
-    // ── Group into checkpoints ──
+    // Group into checkpoints
     const checkpoints=[];
     const cpMap={};
     rows.forEach(r=>{
@@ -1079,163 +1170,119 @@ function renderUnifiedMap(){
       checkpoints[cpMap[key]].storeCount++;
       if(store) checkpoints[cpMap[key]].stores.push(store);
     });
+    if(selMember!=='all') allCheckpointsForPanel=checkpoints;
 
     const routeCoords=checkpoints.filter(cp=>cp.coords).map(cp=>cp.coords);
 
-    // ── CARD OVERLAY: gradient route using segmented lines ──
-    // Segments go from full opacity (start) to faded (end) to simulate gradient
+    // Gradient route: segments fade from full→light
     if(routeCoords.length>1){
       const total=routeCoords.length-1;
       for(let i=0;i<total;i++){
-        const opacity=1-(i/total)*0.65; // 1.0 → 0.35
-        const weight=3.5-(i/total)*1.2; // 3.5 → 2.3
-        const seg=L.polyline([routeCoords[i],routeCoords[i+1]],{
-          color,weight,opacity,lineJoin:'round',lineCap:'round'
-        });
-        seg.addTo(MAP_UNIFIED);
-        UMAP_LINES.push(seg);
+        const opacity=1-(i/total)*0.65;
+        const weight=3.5-(i/total)*1.2;
+        const seg=L.polyline([routeCoords[i],routeCoords[i+1]],{color,weight,opacity,lineJoin:'round',lineCap:'round'});
+        seg.addTo(MAP_UNIFIED); UMAP_LINES.push(seg);
       }
-      // Glow layer (thick, very transparent) for visual depth
+      // Glow
       const glow=L.polyline(routeCoords,{color,weight:10,opacity:.07,lineJoin:'round'});
-      glow.addTo(MAP_UNIFIED);
-      UMAP_LINES.push(glow);
+      glow.addTo(MAP_UNIFIED); UMAP_LINES.push(glow);
     }
 
-    // ── Distance ──
+    // Distance (only valid GPS coords)
     let distKm=0;
     for(let i=1;i<routeCoords.length;i++) distKm+=haversine(routeCoords[i-1],routeCoords[i]);
     memberDistances[mem]=distKm*1.35;
 
-    // ── CARD OVERLAY markers ──
+    // Draw markers
     checkpoints.forEach((cp,idx)=>{
       if(!cp.coords) return;
       const isStart=idx===0;
-      const isEnd=idx===checkpoints.length-1 && checkpoints.length>1;
+      const isEnd=idx===checkpoints.length-1&&checkpoints.length>1;
       const num=idx+1;
       const shortName=mem.split(' ').slice(-1)[0];
       const storeNames=cp.stores.slice(0,3).join('<br>');
       const moreStores=cp.stores.length>3?`<span style="color:rgba(255,255,255,.4);font-size:9px">+${cp.stores.length-3} điểm khác</span>`:'';
 
-      // ── START marker: name badge + teardrop pin ──
       if(isStart){
-        const html=`
-          <div style="position:relative;display:inline-block;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));">
-            <div style="position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);
-              background:${color};color:#fff;font-size:9px;font-family:'IBM Plex Mono',monospace;font-weight:700;
-              padding:2px 7px;border-radius:3px;white-space:nowrap;letter-spacing:.04em;">
-              ${shortName}
-            </div>
-            <svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
-              <ellipse cx="13" cy="32" rx="5" ry="2" fill="rgba(0,0,0,0.35)"/>
-              <path d="M13 1 C6.4 1 1 6.4 1 13 C1 22 13 33 13 33 C13 33 25 22 25 13 C25 6.4 19.6 1 13 1Z"
-                fill="${color}" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
-              <circle cx="13" cy="13" r="5" fill="rgba(255,255,255,0.3)"/>
-              <circle cx="13" cy="13" r="3" fill="rgba(255,255,255,0.9)"/>
-            </svg>
-          </div>`;
+        const html=`<div style="position:relative;display:inline-block;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));">
+          <div style="position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);background:${color};color:#fff;font-size:9px;font-family:'IBM Plex Mono',monospace;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;">${shortName}</div>
+          <svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
+            <ellipse cx="13" cy="32" rx="5" ry="2" fill="rgba(0,0,0,0.35)"/>
+            <path d="M13 1 C6.4 1 1 6.4 1 13 C1 22 13 33 13 33 C13 33 25 22 25 13 C25 6.4 19.6 1 13 1Z" fill="${color}" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
+            <circle cx="13" cy="13" r="5" fill="rgba(255,255,255,0.3)"/>
+            <circle cx="13" cy="13" r="3" fill="rgba(255,255,255,0.9)"/>
+          </svg></div>`;
         const icon=L.divIcon({className:'',html,iconSize:[26,52],iconAnchor:[13,34]});
-        const popup=`
-          <div style="font-family:'IBM Plex Mono',monospace;">
-            <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🚩 ${mem} — Xuất phát</div>
-            <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
-            <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} &nbsp;·&nbsp; 📍 ${cp.storeCount} điểm bán</div>
-            ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
-          </div>`;
+        const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
+          <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🚩 ${mem} — Xuất phát</div>
+          <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
+          <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
+          ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
+        </div>`;
         const mk=L.marker(cp.coords,{icon,zIndexOffset:1000}).bindPopup(popup,{maxWidth:200});
         mk.addTo(MAP_UNIFIED); UMAP_START_MARKERS.push(mk);
         return;
       }
-
-      // ── END marker: checkered flag style ──
       if(isEnd){
-        const html=`
-          <div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,0.5));">
-            <svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="11" cy="11" r="10" fill="${color}" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
-              <text x="11" y="15" text-anchor="middle" fill="#fff" font-size="11" font-family="monospace">🏁</text>
-            </svg>
-          </div>`;
+        const html=`<div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,0.5));">
+          <svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="11" cy="11" r="10" fill="${color}" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
+            <text x="11" y="15" text-anchor="middle" fill="#fff" font-size="11" font-family="monospace">🏁</text>
+          </svg></div>`;
         const icon=L.divIcon({className:'',html,iconSize:[22,22],iconAnchor:[11,11]});
-        const popup=`
-          <div style="font-family:'IBM Plex Mono',monospace;">
-            <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🏁 ${mem} — Điểm cuối</div>
-            <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
-            <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} &nbsp;·&nbsp; 📍 ${cp.storeCount} điểm bán</div>
-            ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
-          </div>`;
+        const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
+          <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🏁 ${mem} — Điểm cuối</div>
+          <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
+          <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
+          ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
+        </div>`;
         const mk=L.marker(cp.coords,{icon}).bindPopup(popup,{maxWidth:200});
         mk.addTo(MAP_UNIFIED); UMAP_MARKERS.push(mk);
         return;
       }
-
-      // ── CHECKPOINT marker: mini card overlay ──
-      // Card floats above the dot, shows: number, chain name, store count, time
-      const cardHtml=`
-        <div style="position:relative;display:inline-block;">
-          <!-- Card -->
-          <div style="
-            position:absolute;
-            bottom:calc(100% + 6px);
-            left:50%;transform:translateX(-50%);
-            background:#162536;
-            border:1px solid ${hexAlpha(color,0.55)};
-            border-top:2px solid ${color};
-            border-radius:4px;
-            padding:5px 8px;
-            min-width:110px;
-            max-width:150px;
-            box-shadow:0 3px 10px rgba(0,0,0,0.55);
-            pointer-events:none;
-            white-space:nowrap;
-          ">
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:${color};margin-bottom:2px;letter-spacing:.04em;">
-              ${num}. ${cp.name.length>18?cp.name.slice(0,17)+'…':cp.name}
-            </div>
-            <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,.65);display:flex;gap:8px;">
-              <span>📍 ${cp.storeCount}</span>
-              <span>🕐 ${cp.time}</span>
-            </div>
-          </div>
-          <!-- Connector line card → dot -->
-          <div style="width:1px;height:6px;background:${hexAlpha(color,0.5)};margin:0 auto;"></div>
-          <!-- Dot -->
-          <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"
-            style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));display:block;">
-            <circle cx="9" cy="9" r="8" fill="#162536" stroke="${color}" stroke-width="2"/>
-            <circle cx="9" cy="9" r="4" fill="${color}" opacity=".9"/>
-            <text x="9" y="12.5" text-anchor="middle" fill="#fff" font-size="7" font-weight="700"
-              font-family="monospace" style="dominant-baseline:auto">${num}</text>
-          </svg>
-        </div>`;
-
+      // Mid checkpoint — card overlay
+      const cardHtml=`<div style="position:relative;display:inline-block;">
+        <div style="position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#162536;border:1px solid ${hexAlpha(color,0.55)};border-top:2px solid ${color};border-radius:4px;padding:5px 8px;min-width:110px;max-width:155px;box-shadow:0 3px 10px rgba(0,0,0,0.55);pointer-events:none;white-space:nowrap;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:${color};margin-bottom:2px;">${num}. ${cp.name.length>18?cp.name.slice(0,17)+'…':cp.name}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,.6);display:flex;gap:8px;"><span>📍 ${cp.storeCount}</span><span>🕐 ${cp.time}</span></div>
+        </div>
+        <div style="width:1px;height:5px;background:${hexAlpha(color,0.45)};margin:0 auto;"></div>
+        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));display:block;">
+          <circle cx="9" cy="9" r="8" fill="#162536" stroke="${color}" stroke-width="2"/>
+          <circle cx="9" cy="9" r="4" fill="${color}" opacity=".9"/>
+        </svg>
+      </div>`;
       const icon=L.divIcon({className:'',html:cardHtml,iconSize:[18,80],iconAnchor:[9,80]});
-
-      // Popup with full detail (click)
-      const popup=`
-        <div style="font-family:'IBM Plex Mono',monospace;">
-          <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">${mem} — Điểm ${num}</div>
-          <div style="color:rgba(255,255,255,.9);font-size:11px;margin-bottom:4px">${cp.name}</div>
-          <div style="color:rgba(255,255,255,.5);font-size:10px;">🕐 ${cp.time} &nbsp;·&nbsp; 📍 ${cp.storeCount} điểm bán</div>
-          ${storeNames?`<div style="color:rgba(255,255,255,.45);font-size:10px;margin-top:6px;line-height:1.6;border-top:1px solid rgba(255,255,255,.08);padding-top:5px">${storeNames}</div>`:''}
-          ${moreStores?`<div style="margin-top:2px">${moreStores}</div>`:''}
-        </div>`;
-
+      const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
+        <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">${mem} — Điểm ${num}</div>
+        <div style="color:rgba(255,255,255,.9);font-size:11px;margin-bottom:4px">${cp.name}</div>
+        <div style="color:rgba(255,255,255,.5);font-size:10px;">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
+        ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:5px;line-height:1.6">${storeNames}</div>`:''}
+        ${moreStores?`<div style="margin-top:2px">${moreStores}</div>`:''}
+      </div>`;
       const mk=L.marker(cp.coords,{icon}).bindPopup(popup,{maxWidth:210});
       mk.addTo(MAP_UNIFIED); UMAP_MARKERS.push(mk);
     });
   });
 
-  // Fit bounds
+  // Fit bounds (only if valid points exist)
   const allMks=[...UMAP_MARKERS,...UMAP_START_MARKERS];
   if(allMks.length>0){
-    const grp=L.featureGroup(allMks);
-    MAP_UNIFIED.fitBounds(grp.getBounds().pad(.15));
+    try{
+      const grp=L.featureGroup(allMks);
+      const bounds=grp.getBounds();
+      if(bounds.isValid()) MAP_UNIFIED.fitBounds(bounds.pad(.15));
+    }catch(e){}
+  } else if(MAP_FILTER_CH!=='all'){
+    // No data — zoom to channel region
+    const cfg=CHANNEL_CENTERS[MAP_FILTER_CH];
+    if(cfg) MAP_UNIFIED.setView([cfg[0],cfg[1]],cfg.zoom||10);
   }
   MAP_UNIFIED.invalidateSize();
 
-  // Meta
-  document.getElementById('mapUnifiedMeta').textContent=
-    (UMAP_MARKERS.length+UMAP_START_MARKERS.length)+' điểm có GPS · '+memberNames.length+' sales';
+  // Update meta (top-right)
+  const metaEl=document.getElementById('mapUnifiedMeta');
+  if(metaEl) metaEl.textContent=(allMks.length)+' điểm có GPS · '+memberNames.length+' sales';
 
   // Legend
   document.getElementById('legendUnified').innerHTML=memberNames.map(n=>{
@@ -1244,22 +1291,50 @@ function renderUnifiedMap(){
     const km=(memberDistances[n]||0).toFixed(1);
     return `<div class="leg-item">
       <div class="leg-dot" style="background:${colorMap[n]}"></div>
-      <span style="font-weight:600">${n}</span>
+      <span style="font-weight:600;color:var(--white)">${n}</span>
       ${chLabel?`<span style="font-size:9px;opacity:.5;margin-left:2px">(${chLabel})</span>`:''}
-      <span style="font-family:var(--mono);font-size:10px;margin-left:6px;color:${colorMap[n]};opacity:.8">${km} km</span>
+      <span style="font-family:var(--mono);font-size:10px;margin-left:5px;color:${colorMap[n]}">${km}km</span>
     </div>`;
   }).join('');
 
-  // Distance summary
+  // Distance summary footer
   const totalKm=Object.values(memberDistances).reduce((a,b)=>a+b,0);
-  document.getElementById('mapDistTotal').textContent=totalKm.toFixed(1)+' km (cả team)';
+  document.getElementById('mapDistTotal').textContent=totalKm.toFixed(1)+' km cả team';
   document.getElementById('mapDistMembers').innerHTML=memberNames.map(n=>{
     const km=(memberDistances[n]||0).toFixed(1);
-    return `<span class="map-dist-member" style="color:${colorMap[n]}">▸ ${n}: <strong style="color:${colorMap[n]}">${km} km</strong></span>`;
-  }).join('');
+    return `<span style="color:${colorMap[n]}">▸ ${n.split(' ').slice(-1)[0]}: <strong>${km}km</strong></span>`;
+  }).join('<span style="opacity:.3"> · </span>');
+
+  // Side panel (member selected)
+  if(selMember!=='all' && memberNames.length>0){
+    const mem=memberNames[0];
+    const color=colorMap[mem];
+    const ch=allData.find(r=>nameKey(r)===mem)?._ch||'';
+    const chLabel=ch==='MT'?'MT':ch==='GTN'?'GT North':ch==='GTC'?'GT Central':ch==='GTS'?'GT South':'';
+    const km=(memberDistances[mem]||0).toFixed(1);
+    const totalStores=allCheckpointsForPanel.reduce((s,cp)=>s+cp.storeCount,0);
+    const validCps=allCheckpointsForPanel.filter(cp=>cp.coords).length;
+
+    document.getElementById('mspName').textContent=mem;
+    document.getElementById('mspSub').textContent=chLabel+' · '+getDS(allData[0]||{});
+    document.getElementById('mspStats').innerHTML=`
+      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${km}</div><div class="msp-stat-lbl">km di chuyển</div></div>
+      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${totalStores}</div><div class="msp-stat-lbl">điểm bán</div></div>
+      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${validCps}</div><div class="msp-stat-lbl">checkpoint</div></div>
+      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${allCheckpointsForPanel.length>0?allCheckpointsForPanel[0].time:'—'}</div><div class="msp-stat-lbl">giờ bắt đầu</div></div>
+    `;
+    // Timeline
+    document.getElementById('mspTimeline').innerHTML=allCheckpointsForPanel.map((cp,i)=>`
+      <div class="msp-tl-item">
+        <div class="msp-tl-dot" style="background:${i===0?color:i===allCheckpointsForPanel.length-1?'rgba(255,255,255,.2)':hexAlpha(color,.6)}">${i===0?'S':i===allCheckpointsForPanel.length-1?'E':i+1}</div>
+        <div class="msp-tl-body">
+          <div class="msp-tl-name">${cp.name}</div>
+          <div class="msp-tl-meta">🕐 ${cp.time} &nbsp;·&nbsp; 📍 ${cp.storeCount} điểm${cp.coords?'':' <span style="color:rgba(255,107,107,.6)">no GPS</span>'}</div>
+        </div>
+      </div>`).join('')||'<div style="color:var(--gray2);font-size:11px">Không có dữ liệu</div>';
+  }
 }
 
-// ══════════════════════════════════════════════════════════
 // TAB: CALENDAR HEATMAP
 // ══════════════════════════════════════════════════════════
 function renderCalendar(){
