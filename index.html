@@ -1235,9 +1235,7 @@ async function submitGTNew() {
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
 // ============ SEND DATA — FIXED v4 ============
-// Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
-// Không thể xác nhận server response với no-cors → dùng Image ping trick
-// để detect lỗi network vs success
+// Gửi data bằng fetch GET no-cors — chuẩn nhất cho GitHub Pages → Apps Script
 async function sendData(payload, label) {
   if (!state.scriptUrl) {
     saveOffline(payload);
@@ -1246,31 +1244,30 @@ async function sendData(payload, label) {
   }
   showLoading('Đang gửi dữ liệu...');
   try {
-    // Resize ảnh
     const compressed = await compressPhotos(payload);
     const photos = compressed.photos || {};
     const photoKeys = Object.keys(photos);
 
-    // Gửi survey data (không có ảnh) — image ping GET
-    const surveyPayload = Object.assign({}, compressed, {photos: {}, photo_count: photoKeys.length});
-    const surveyB64 = btoa(unescape(encodeURIComponent(JSON.stringify(surveyPayload))));
-    const surveyUrl = state.scriptUrl + '?data=' + encodeURIComponent(surveyB64) + '&_t=' + Date.now();
-
-    await new Promise(function(resolve) {
-      var done = false;
-      var wd = setTimeout(function(){ if(!done){done=true;resolve();} }, 12000);
-      var img = new Image();
-      img.onload = img.onerror = function(){ if(!done){done=true;clearTimeout(wd);resolve();} };
-      img.src = surveyUrl;
+    // Payload không có ảnh (ảnh upload riêng)
+    const surveyPayload = Object.assign({}, compressed, {
+      photos: {},
+      photo_count: photoKeys.length
     });
+
+    // Encode base64 → URL param
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(surveyPayload))));
+    const url = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
+
+    // fetch GET no-cors — không cần CORS header, không đọc response (no-cors)
+    // Apps Script doGet nhận e.parameter.data và ghi vào Sheet
+    await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow' });
 
     hideLoading();
     showSuccess(label, payload, false);
 
-    // Upload ảnh từng cái lên Drive (background, không block UI)
+    // Upload ảnh background
     if (photoKeys.length > 0) {
-      // Generate local survey ID for folder naming (server ID not available client-side)
-      var localId = surveyPayload.type + '-' + (surveyPayload.date || '').replace(/\//g,'-') + '-' + Date.now().toString().slice(-4);
+      var localId = (surveyPayload.type||'XX') + '-' + Date.now().toString().slice(-6);
       uploadPhotosToScript(
         localId,
         surveyPayload.salesperson || '',
@@ -1279,6 +1276,7 @@ async function sendData(payload, label) {
       );
     }
   } catch (err) {
+    console.error('sendData error:', err);
     hideLoading();
     saveOffline(payload);
     showSuccess(label, payload, true);
