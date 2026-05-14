@@ -1109,11 +1109,17 @@ async function submitMT() {
       type: 'MT_Other',
       date: getDateValue('mt_other_date'),
       salesperson: state.user.name,
+      salesName: state.user.name,
+      salesId: state.user.name,
       channel: 'MT',
       purpose,
       location_note: location,
+      storeName: location,
+      store_name: location,
+      ghiChu: content_val,
       content: content_val,
       gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+      soHinh: Object.keys(state.photos).length,
       photos: state.photos
     };
     var _mp=Object.keys(state.photos).filter(function(k){return k.startsWith('mt_');});
@@ -1136,20 +1142,32 @@ async function submitMT() {
     type: 'MT_Daily',
     date: getDateValue('mt_date'),
     salesperson: state.user.name,
+    salesName: state.user.name,
+    salesId: state.user.name,
     channel: 'MT',
     chain: chain,
     store_name: store,
+    storeName: store,
     address_note: (document.getElementById('mt_addr')?document.getElementById('mt_addr').value:'') || '',
+    address: (document.getElementById('mt_addr')?document.getElementById('mt_addr').value:'') || '',
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    trungBay: getChips('mt_display'),
     display: getChips('mt_display'),
+    bangGia: getChips('mt_price'),
     price_info: getChips('mt_price'),
+    tinhTrangHang: getChips('mt_goods'),
     goods_status: getChips('mt_goods'),
+    hsd: getChips('mt_expiry'),
     expiry_status: getChips('mt_expiry'),
+    ghiChu: (document.getElementById('mt_note')?document.getElementById('mt_note').value:'') || '',
     note: (document.getElementById('mt_note')?document.getElementById('mt_note').value:'') || '',
     traffic: getChips('mt_traffic') || '',
     sampling: getChips('mt_sampling') || '',
+    khuVuc: getChips('mt_zone') || '',
     zone: getChips('mt_zone') || '',
+    skuData: skus,
     sku_data: skus,
+    soHinh: Object.keys(state.photos).length,
     photos: state.photos
   };
   var _mp=Object.keys(state.photos).filter(function(k){return k.startsWith('mt_');});
@@ -1188,17 +1206,28 @@ async function submitGT() {
     type: 'GT_Daily',
     date: getDateValue('gt_date'),
     salesperson: state.user.name,
+    salesName: state.user.name,
+    salesId: state.user.name,
+    channel: 'GT',
+    team: state.user.team,
     region: state.user.team,
+    cho: market,
     market,
     store_name: store,
+    diemBan: store,
+    storeName: store,
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    thongTinDatHang: getChips('gt_order'),
     order_info: getChips('gt_order'),
+    ghiChu: (document.getElementById('gt_note')?document.getElementById('gt_note').value:'') || '',
     note: (document.getElementById('gt_note')?document.getElementById('gt_note').value:'') || '',
     display_potential: getChips('gt_display_potential') || '',
     best_store: getChips('gt_best_store') || '',
     extra_note: (document.getElementById('gt_extra_note')?document.getElementById('gt_extra_note').value:'') || '',
     store_count: store.split(' | ').length,
+    skuData: skus,
     sku_data: skus,
+    soHinh: Object.keys(state.photos).length,
     photos: state.photos
   };
   var _gp=Object.keys(state.photos).filter(function(k){return k.startsWith('gt_');});
@@ -1218,14 +1247,26 @@ async function submitGTNew() {
     type: 'GT_NewCustomer',
     date: getDateValue('gtnew_date'),
     salesperson: state.user.name,
+    salesName: state.user.name,
+    salesId: state.user.name,
+    channel: 'GT',
+    team: state.user.team,
     region: state.user.team,
     store_name: store,
+    storeName: store,
+    tenDiemBan: store,
+    diemBan: store,
     address: (document.getElementById('gtnew_addr')?document.getElementById('gtnew_addr').value:'') || '',
+    hinhThucKD: getChips('gtnew_biztype'),
     biz_type: getChips('gtnew_biztype'),
+    sanPham: getChips('gtnew_products'),
     products_pitched: getChips('gtnew_products'),
+    tienNang: getChips('gtnew_potential'),
     potential: getChips('gtnew_potential'),
+    ghiChu: (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'') || '',
     note: (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'') || '',
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
+    soHinh: Object.keys(state.photos).length,
     photos: state.photos
   };
   var _gnp=Object.keys(state.photos).filter(function(k){return k.startsWith('gtnew_');});
@@ -1235,7 +1276,9 @@ async function submitGTNew() {
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
 // ============ SEND DATA — FIXED v4 ============
-// Gửi data bằng fetch GET no-cors — chuẩn nhất cho GitHub Pages → Apps Script
+// Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
+// Không thể xác nhận server response với no-cors → dùng Image ping trick
+// để detect lỗi network vs success
 async function sendData(payload, label) {
   if (!state.scriptUrl) {
     saveOffline(payload);
@@ -1244,30 +1287,31 @@ async function sendData(payload, label) {
   }
   showLoading('Đang gửi dữ liệu...');
   try {
+    // Resize ảnh
     const compressed = await compressPhotos(payload);
     const photos = compressed.photos || {};
     const photoKeys = Object.keys(photos);
 
-    // Payload không có ảnh (ảnh upload riêng)
-    const surveyPayload = Object.assign({}, compressed, {
-      photos: {},
-      photo_count: photoKeys.length
+    // Gửi survey data (không có ảnh) — image ping GET
+    const surveyPayload = Object.assign({}, compressed, {photos: {}, photo_count: photoKeys.length});
+    const surveyB64 = btoa(unescape(encodeURIComponent(JSON.stringify(surveyPayload))));
+    const surveyUrl = state.scriptUrl + '?data=' + encodeURIComponent(surveyB64) + '&_t=' + Date.now();
+
+    await new Promise(function(resolve) {
+      var done = false;
+      var wd = setTimeout(function(){ if(!done){done=true;resolve();} }, 12000);
+      var img = new Image();
+      img.onload = img.onerror = function(){ if(!done){done=true;clearTimeout(wd);resolve();} };
+      img.src = surveyUrl;
     });
-
-    // Encode base64 → URL param
-    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(surveyPayload))));
-    const url = state.scriptUrl + '?data=' + encodeURIComponent(b64) + '&_t=' + Date.now();
-
-    // fetch GET no-cors — không cần CORS header, không đọc response (no-cors)
-    // Apps Script doGet nhận e.parameter.data và ghi vào Sheet
-    await fetch(url, { method: 'GET', mode: 'no-cors', redirect: 'follow' });
 
     hideLoading();
     showSuccess(label, payload, false);
 
-    // Upload ảnh background
+    // Upload ảnh từng cái lên Drive (background, không block UI)
     if (photoKeys.length > 0) {
-      var localId = (surveyPayload.type||'XX') + '-' + Date.now().toString().slice(-6);
+      // Generate local survey ID for folder naming (server ID not available client-side)
+      var localId = surveyPayload.type + '-' + (surveyPayload.date || '').replace(/\//g,'-') + '-' + Date.now().toString().slice(-4);
       uploadPhotosToScript(
         localId,
         surveyPayload.salesperson || '',
@@ -1276,7 +1320,6 @@ async function sendData(payload, label) {
       );
     }
   } catch (err) {
-    console.error('sendData error:', err);
     hideLoading();
     saveOffline(payload);
     showSuccess(label, payload, true);
