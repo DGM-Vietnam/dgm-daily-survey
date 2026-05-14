@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DGM Survey Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --red:    #C8102E;
+  --yellow: #FFE140;
+  --navy:   #1B3A57;
+  --navy2:  #112840;
+  --white:  #F8F6F1;
+  --gray:   #D4CFC6;
+  --gray2:  #9A9590;
+  --bg:     #0F1E2E;
+  --card:   #162536;
+  --card2:  #1D3045;
+  --border: rgba(255,255,255,0.07);
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'IBM Plex Sans Thai', sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:var(--sans);background:var(--bg);color:var(--white);min-height:100vh;}
+
+/* ── LOGIN ── */
+#loginScreen{
+  position:fixed;inset:0;z-index:9999;
+  background:var(--bg);
+  display:flex;align-items:center;justify-content:center;
+}
+.login-box{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-top:3px solid var(--red);
+  padding:48px 40px 40px;
+  width:360px;
+  border-radius:4px;
+}
+.login-logo{
+  display:flex;align-items:center;gap:12px;margin-bottom:32px;
+}
+.login-logo .badge{
+  width:40px;height:40px;background:var(--red);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;
+}
+.login-logo .brand{font-size:13px;color:var(--gray2);line-height:1.4;}
+.login-logo .brand strong{display:block;color:var(--white);font-size:15px;}
+.login-title{font-size:22px;font-weight:700;margin-bottom:6px;}
+.login-sub{font-size:13px;color:var(--gray2);margin-bottom:28px;}
+.login-box label{display:block;font-size:11px;font-family:var(--mono);color:var(--gray2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+.login-box input{
+  width:100%;background:var(--bg);border:1px solid var(--border);
+  color:var(--white);padding:12px 14px;font-size:15px;font-family:var(--sans);
+  border-radius:3px;outline:none;letter-spacing:.12em;
+  transition:border-color .2s;
+}
+.login-box input:focus{border-color:var(--red);}
+.login-btn{
+  margin-top:20px;width:100%;padding:13px;
+  background:var(--red);color:#fff;border:none;
+  font-size:15px;font-family:var(--sans);font-weight:600;
+  cursor:pointer;border-radius:3px;letter-spacing:.03em;
+  transition:opacity .15s;
+}
+.login-btn:hover{opacity:.88;}
+.login-err{
+  margin-top:12px;font-size:13px;color:#ff6b6b;display:none;
+  text-align:center;
+}
+
+/* ── APP SHELL ── */
+#app{display:none;flex-direction:column;min-height:100vh;}
+
+/* TOP BAR */
+.topbar{
+  background:var(--navy2);
+  border-bottom:1px solid var(--border);
+  padding:0 24px;height:56px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.topbar-left{display:flex;align-items:center;gap:14px;}
+.topbar-badge{
+  width:32px;height:32px;background:var(--red);
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--mono);font-weight:600;font-size:11px;color:#fff;
+  flex-shrink:0;
+}
+.topbar-title{font-size:14px;font-weight:600;color:var(--white);}
+.topbar-sub{font-size:11px;color:var(--gray2);font-family:var(--mono);}
+.topbar-right{display:flex;align-items:center;gap:16px;}
+#lastUpdate{font-size:11px;font-family:var(--mono);color:var(--gray2);}
+.refresh-btn{
+  background:transparent;border:1px solid var(--border);color:var(--gray2);
+  padding:5px 12px;font-size:11px;font-family:var(--mono);cursor:pointer;
+  border-radius:2px;transition:all .15s;
+}
+.refresh-btn:hover{border-color:var(--red);color:var(--red);}
+
+/* DATE FILTER */
+.filter-bar{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:10px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+}
+.filter-bar label{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;}
+.filter-bar input[type=date]{
+  background:var(--bg);border:1px solid var(--border);color:var(--white);
+  padding:5px 10px;font-size:12px;font-family:var(--mono);border-radius:2px;
+  outline:none;
+}
+.filter-bar input[type=date]:focus{border-color:var(--yellow);}
+.filter-tag{
+  padding:4px 10px;border-radius:2px;font-size:11px;font-family:var(--mono);
+  cursor:pointer;border:1px solid var(--border);color:var(--gray2);
+  transition:all .15s;
+}
+.filter-tag.active{background:var(--red);border-color:var(--red);color:#fff;}
+.filter-tag:hover:not(.active){border-color:var(--gray2);}
+
+/* TABS */
+.tabs{
+  display:flex;border-bottom:1px solid var(--border);
+  background:var(--card);padding:0 24px;
+}
+.tab{
+  padding:14px 20px;font-size:13px;font-weight:500;
+  cursor:pointer;border-bottom:2px solid transparent;
+  color:var(--gray2);transition:all .15s;white-space:nowrap;
+}
+.tab:hover{color:var(--white);}
+.tab.active{color:var(--white);border-bottom-color:var(--red);}
+
+/* CONTENT */
+.tab-content{display:none;padding:24px;}
+.tab-content.active{display:block;}
+
+/* SCORECARDS */
+.scorecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:24px;}
+.sc{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:4px;padding:18px 20px;
+  border-left:3px solid var(--red);
+}
+.sc.yellow{border-left-color:var(--yellow);}
+.sc.navy{border-left-color:#4A9EBF;}
+.sc-label{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.sc-value{font-size:32px;font-weight:700;font-family:var(--mono);line-height:1;}
+.sc-sub{font-size:11px;color:var(--gray2);margin-top:6px;}
+
+/* GRID 2COL */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr;}}
+
+/* CHART CARD */
+.chart-card{
+  background:var(--card);border:1px solid var(--border);border-radius:4px;padding:20px;
+}
+.chart-card h3{font-size:12px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;}
+.chart-wrap{position:relative;height:240px;}
+.chart-wrap.tall{height:300px;}
+
+/* TABLE */
+.tbl-card{
+  background:var(--card);border:1px solid var(--border);border-radius:4px;
+  overflow:hidden;margin-bottom:16px;
+}
+.tbl-card h3{
+  font-size:12px;font-family:var(--mono);color:var(--gray2);
+  text-transform:uppercase;letter-spacing:.06em;
+  padding:16px 20px;border-bottom:1px solid var(--border);
+}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--card2);}
+th{
+  padding:10px 14px;text-align:left;font-size:11px;font-family:var(--mono);
+  color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;
+  border-bottom:1px solid var(--border);white-space:nowrap;
+}
+td{
+  padding:10px 14px;font-size:13px;border-bottom:1px solid var(--border);
+}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.03);}
+.pill{
+  display:inline-block;padding:2px 8px;border-radius:20px;
+  font-size:10px;font-family:var(--mono);font-weight:600;
+}
+.pill.mt{background:rgba(200,16,46,.2);color:#ff6b8a;}
+.pill.gt-n{background:rgba(74,158,191,.2);color:#7dd3f0;}
+.pill.gt-c{background:rgba(255,225,64,.2);color:#FFE140;}
+.pill.gt-s{background:rgba(100,210,140,.2);color:#78e8a8;}
+.num{font-family:var(--mono);text-align:right;}
+.rank{font-family:var(--mono);color:var(--gray2);font-size:11px;}
+
+/* MAP */
+#mapContainer{height:520px;border-radius:4px;overflow:hidden;border:1px solid var(--border);}
+.map-controls{
+  display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;
+}
+.map-legend{
+  display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;
+  background:var(--card);border:1px solid var(--border);border-radius:4px;
+  margin-top:12px;
+}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;}
+.legend-dot{width:10px;height:10px;border-radius:50%;}
+
+/* LOADING */
+.loading-overlay{
+  position:fixed;inset:0;background:rgba(15,30,46,.85);
+  display:flex;align-items:center;justify-content:center;
+  z-index:500;flex-direction:column;gap:14px;
+}
+.spinner{
+  width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:var(--red);border-radius:50%;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-overlay p{font-size:13px;font-family:var(--mono);color:var(--gray2);}
+
+/* SECTION DIVIDER */
+.section-title{
+  font-size:11px;font-family:var(--mono);color:var(--gray2);
+  text-transform:uppercase;letter-spacing:.1em;
+  margin-bottom:12px;margin-top:8px;
+  display:flex;align-items:center;gap:8px;
+}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* EMPTY STATE */
+.empty{padding:40px;text-align:center;color:var(--gray2);font-size:13px;}
+
+/* RESPONSIVE */
+@media(max-width:600px){
+  .filter-bar{padding:8px 12px;}
+  .tab-content{padding:12px;}
+  .scorecards{grid-template-columns:1fr 1fr;}
+  .tabs{padding:0 12px;overflow-x:auto;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ LOGIN ══════════════════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="badge">DGM</div>
+      <div class="brand">
+        <strong>Denis G.M. Company</strong>
+        Sales Survey Dashboard
+      </div>
+    </div>
+    <div class="login-title">Đăng nhập</div>
+    <div class="login-sub">Nhập mật khẩu để xem dashboard</div>
+    <label>Mật khẩu</label>
+    <input type="password" id="pwInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Xem Dashboard →</button>
+    <div class="login-err" id="loginErr">Mật khẩu không đúng. Thử lại.</div>
+  </div>
+</div>
+
+<!-- ══ APP ════════════════════════════════════════════════ -->
+<div id="app">
+  <!-- Loading -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <p>Đang tải dữ liệu từ Google Sheet...</p>
+  </div>
+
+  <!-- Topbar -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-badge">DGM</div>
+      <div>
+        <div class="topbar-title">Sales Survey Dashboard</div>
+        <div class="topbar-sub">Ayam Brand Vietnam · Denis G.M. Co., Ltd</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <span id="lastUpdate">--</span>
+      <button class="refresh-btn" onclick="loadData()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="filter-bar">
+    <label>Ngày:</label>
+    <span class="filter-tag active" onclick="setQuick('today',this)">Hôm nay</span>
+    <span class="filter-tag" onclick="setQuick('week',this)">7 ngày</span>
+    <span class="filter-tag" onclick="setQuick('month',this)">Tháng này</span>
+    <label style="margin-left:8px">Từ:</label>
+    <input type="date" id="dateFrom" onchange="renderAll()">
+    <label>Đến:</label>
+    <input type="date" id="dateTo" onchange="renderAll()">
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('overview',this)">📊 Tổng quan</div>
+    <div class="tab" onclick="switchTab('mt',this)">🏬 MT Team</div>
+    <div class="tab" onclick="switchTab('gt',this)">🏪 GT Team</div>
+    <div class="tab" onclick="switchTab('map',this)">🗺️ Bản đồ</div>
+  </div>
+
+  <!-- ── TAB: OVERVIEW ──────────────────────────────────── -->
+  <div class="tab-content active" id="tab-overview">
+
+    <div class="section-title">Tổng quan toàn team hôm nay</div>
+    <div class="scorecards" id="sc-overview"></div>
+
+    <div class="grid2">
+      <div class="chart-card">
+        <h3>Điểm survey theo ngày (tháng này)</h3>
+        <div class="chart-wrap"><canvas id="chartDaily"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Phân bổ MT vs GT</h3>
+        <div class="chart-wrap"><canvas id="chartMtGt"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tbl-card">
+      <h3>Top nhân viên — lũy kế tháng này</h3>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Nhân viên</th><th>Team</th>
+          <th class="num">Hôm nay</th><th class="num">Tháng này</th>
+        </tr></thead>
+        <tbody id="tbOverview"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB: MT ─────────────────────────────────────────── -->
+  <div class="tab-content" id="tab-mt">
+
+    <div class="section-title">MT Team — hôm nay</div>
+    <div class="scorecards" id="sc-mt"></div>
+
+    <div class="grid2">
+      <div class="chart-card">
+        <h3>Điểm survey theo nhân viên — hôm nay</h3>
+        <div class="chart-wrap tall"><canvas id="chartMtToday"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>Lũy kế tháng này theo nhân viên</h3>
+        <div class="chart-wrap tall"><canvas id="chartMtMonth"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tbl-card">
+      <h3>Chi tiết MT Team</h3>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Nhân viên</th>
+          <th class="num">Hôm nay</th>
+          <th class="num">Tháng này</th>
+          <th>Chain nhiều nhất</th>
+        </tr></thead>
+        <tbody id="tbMt"></tbody>
+      </table>
+    </div>
+
+    <div class="tbl-card">
+      <h3>Survey gần nhất — MT (20 records)</h3>
+      <table>
+        <thead><tr>
+          <th>Thời gian</th><th>Nhân viên</th><th>Chain</th>
+          <th>Điểm bán</th><th>Trưng bày</th><th>Bảng giá</th>
+        </tr></thead>
+        <tbody id="tbMtRecent"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB: GT ─────────────────────────────────────────── -->
+  <div class="tab-content" id="tab-gt">
+
+    <div class="section-title">GT Team — hôm nay</div>
+    <div class="scorecards" id="sc-gt"></div>
+
+    <div class="grid3">
+      <div class="chart-card">
+        <h3>GT North — hôm nay</h3>
+        <div class="chart-wrap"><canvas id="chartGtN"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>GT Central — hôm nay</h3>
+        <div class="chart-wrap"><canvas id="chartGtC"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3>GT South — hôm nay</h3>
+        <div class="chart-wrap"><canvas id="chartGtS"></canvas></div>
+      </div>
+    </div>
+
+    <div class="tbl-card">
+      <h3>Chi tiết GT Team theo vùng</h3>
+      <table>
+        <thead><tr>
+          <th>#</th><th>Nhân viên</th><th>Vùng</th>
+          <th class="num">Hôm nay</th><th class="num">Tháng này</th>
+        </tr></thead>
+        <tbody id="tbGt"></tbody>
+      </table>
+    </div>
+
+    <div class="tbl-card">
+      <h3>Survey gần nhất — GT (20 records)</h3>
+      <table>
+        <thead><tr>
+          <th>Thời gian</th><th>Nhân viên</th><th>Vùng</th>
+          <th>Điểm bán</th><th>Ghi chú</th>
+        </tr></thead>
+        <tbody id="tbGtRecent"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── TAB: MAP ────────────────────────────────────────── -->
+  <div class="tab-content" id="tab-map">
+    <div class="map-controls">
+      <label style="font-size:11px;font-family:var(--mono);color:var(--gray2)">NHÂN VIÊN:</label>
+      <select id="mapMember" onchange="renderMap()" style="background:var(--card);border:1px solid var(--border);color:var(--white);padding:5px 10px;font-size:12px;border-radius:2px;font-family:var(--mono);">
+        <option value="all">Tất cả</option>
+      </select>
+      <label style="font-size:11px;font-family:var(--mono);color:var(--gray2)">KÊNH:</label>
+      <select id="mapChannel" onchange="renderMap()" style="background:var(--card);border:1px solid var(--border);color:var(--white);padding:5px 10px;font-size:12px;border-radius:2px;font-family:var(--mono);">
+        <option value="all">Tất cả</option>
+        <option value="MT">MT</option>
+        <option value="GT">GT</option>
+      </select>
+      <span id="mapCount" style="font-size:11px;font-family:var(--mono);color:var(--gray2);margin-left:8px;"></span>
+    </div>
+    <div id="mapContainer"></div>
+    <div class="map-legend" id="mapLegend"></div>
+  </div>
+
+</div><!-- end #app -->
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════
+const PASS = '2026';
+// ⚠️ SAU KHI DEPLOY Apps Script → thay URL này:
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYpHeVVTpLGXwzp0T6CRkjakkucSD3i27hkXMD5Af3mv7V5dsmG1Hyrng8aSx5NoH5vw/exec';
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let RAW = null; // raw API response
+let map = null;
+let markers = [];
+let chartInstances = {};
+
+const TEAM_COLORS = [
+  '#C8102E','#FFE140','#4A9EBF','#78e8a8','#ff9f7f',
+  '#b39ddb','#80deea','#f48fb1','#a5d6a7','#fff176',
+  '#90caf9','#ffcc80','#bcaaa4','#c5e1a5','#80cbc4',
+  '#ffe082','#ef9a9a'
+];
+
+// ══════════════════════════════════════════════════════
+// LOGIN
+// ══════════════════════════════════════════════════════
+function doLogin() {
+  const v = document.getElementById('pwInput').value;
+  if (v === PASS) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('app').style.flexDirection = 'column';
+    initDateFilter();
+    loadData();
+  } else {
+    document.getElementById('loginErr').style.display = 'block';
+    document.getElementById('pwInput').value = '';
+    document.getElementById('pwInput').focus();
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// DATE FILTER
+// ══════════════════════════════════════════════════════
+function toYMD(d) {
+  return d.toISOString().slice(0,10);
+}
+function initDateFilter() {
+  const today = toYMD(new Date());
+  document.getElementById('dateFrom').value = today;
+  document.getElementById('dateTo').value   = today;
+}
+function setQuick(range, el) {
+  document.querySelectorAll('.filter-tag').forEach(e=>e.classList.remove('active'));
+  el.classList.add('active');
+  const today = new Date();
+  const to = toYMD(today);
+  let from = to;
+  if (range === 'week') {
+    const d = new Date(today); d.setDate(d.getDate()-6);
+    from = toYMD(d);
+  } else if (range === 'month') {
+    from = toYMD(new Date(today.getFullYear(), today.getMonth(), 1));
+  }
+  document.getElementById('dateFrom').value = from;
+  document.getElementById('dateTo').value   = to;
+  renderAll();
+}
+function getDateRange() {
+  return {
+    from: document.getElementById('dateFrom').value,
+    to:   document.getElementById('dateTo').value
+  };
+}
+function inRange(dateStr) {
+  if (!dateStr) return false;
+  const d = dateStr.slice(0,10);
+  const {from,to} = getDateRange();
+  return d >= from && d <= to;
+}
+function isToday(dateStr) {
+  if (!dateStr) return false;
+  return dateStr.slice(0,10) === toYMD(new Date());
+}
+function isThisMonth(dateStr) {
+  if (!dateStr) return false;
+  const now = new Date();
+  const m = now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'));
+  return dateStr.slice(0,7) === m;
+}
+
+// ══════════════════════════════════════════════════════
+// DATA LOADING
+// ══════════════════════════════════════════════════════
+async function loadData() {
+  if (SCRIPT_URL === 'PASTE_YOUR_APPS_SCRIPT_URL_HERE') {
+    document.getElementById('loadingOverlay').style.display = 'none';
+    useDemoData();
+    return;
+  }
+  document.getElementById('loadingOverlay').style.display = 'flex';
+  try {
+    const res = await fetch(SCRIPT_URL + '?action=dashboard');
+    RAW = await res.json();
+    document.getElementById('lastUpdate').textContent =
+      'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+    populateMapFilter();
+    renderAll();
+  } catch(e) {
+    alert('Lỗi kết nối API: ' + e.message);
+  } finally {
+    document.getElementById('loadingOverlay').style.display = 'none';
+  }
+}
+
+// Demo data khi chưa có script URL
+function useDemoData() {
+  const today = toYMD(new Date());
+  const ym    = today.slice(0,7);
+  const mkRow = (ts, name, team, channel, region, store, chain, diemBan, lat, lng) => ({
+    Timestamp: ts, 'Nhân Viên': name, Team: team, Channel: channel,
+    'Khu Vực': region, 'Điểm Bán': diemBan || store, Chain: chain || '',
+    'Trưng Bày': ['Đúng vị trí','Có nhưng thiếu','Chưa trưng bày'][Math.floor(Math.random()*3)],
+    'Bảng Giá': ['Đúng giá','Chưa có bảng giá'][Math.floor(Math.random()*2)],
+    'Ghi Chú': '', GPS: lat+', '+lng,
+    Latitude: lat, Longitude: lng,
+    Ngày: ts.slice(0,10)
+  });
+  const days = [today, ym+'-13', ym+'-12', ym+'-11', ym+'-10'];
+  const mt = [];
+  const gt = [];
+  const mtStaff = [
+    ['Hồ Anh Tài','MT','ALL'],['Nguyễn Hoàng Thiên Thanh','MT','ALL'],
+    ['Liêu Văn Vủ','MT','ALL'],['Hồ Thị Thắm','MT','ALL'],
+    ['Lê Thị Cẩm Loan','MT','ALL']
+  ];
+  const gtStaff = [
+    ['Hồ Ngọc Anh','GT Central','GT Central'],
+    ['Đặng Thị Thanh Hoa','GT Central','GT Central'],
+    ['Nguyễn Thị Thùy Nhung','GT Central','GT Central'],
+    ['Phương Ngọc Chánh','GT South','GT South'],
+    ['Nguyễn Thị Thúy Oanh','GT South','GT South'],
+    ['Hồ Ngọc Giàu','GT South','GT South'],
+    ['Nguyễn Xuân Đức','GT North','GT North'],
+    ['Bùi Thị Thoa','GT North','GT North']
+  ];
+  const chains = ['Go!','Lotte Mart','Emart','Co.opXtra','Mega Market','Tops','Mekong'];
+  const gtStores = ['Chợ Bến Thành','Chợ Tân Bình','Chợ Bình Thới','Tạp hóa Nguyễn','Sạp Hà Lan'];
+
+  days.forEach(day => {
+    mtStaff.forEach(([name, team]) => {
+      const n = Math.floor(Math.random()*5)+2;
+      for(let i=0;i<n;i++){
+        const lat = 10.76 + Math.random()*0.08;
+        const lng = 106.65 + Math.random()*0.12;
+        mt.push(mkRow(day+'T0'+(7+i)+':'+String(Math.floor(Math.random()*59)).padStart(2,'0')+':00',
+          name, team, 'MT', 'ALL',
+          chains[Math.floor(Math.random()*chains.length)]+' '+Math.floor(Math.random()*10+1),
+          chains[Math.floor(Math.random()*chains.length)], null, lat, lng));
+      }
+    });
+    gtStaff.forEach(([name, team, region]) => {
+      const n = Math.floor(Math.random()*6)+2;
+      const baseLat = region==='GT North' ? 21.02 : region==='GT Central' ? 16.05 : 10.76;
+      const baseLng = region==='GT North' ? 105.83 : region==='GT Central' ? 108.2 : 106.65;
+      for(let i=0;i<n;i++){
+        const lat = baseLat + (Math.random()-.5)*0.15;
+        const lng = baseLng + (Math.random()-.5)*0.2;
+        gt.push(mkRow(day+'T0'+(7+i)+':'+String(Math.floor(Math.random()*59)).padStart(2,'0')+':00',
+          name, team, 'GT', region,
+          gtStores[Math.floor(Math.random()*gtStores.length)],
+          null, null, lat, lng));
+      }
+    });
+  });
+
+  RAW = {
+    generated_at: new Date().toISOString(),
+    sales_team: [
+      ...mtStaff.map(([name,team]) => ({Tên_Nhân_Viên: name, 'Team / Kênh': team, Active:'TRUE'})),
+      ...gtStaff.map(([name,team]) => ({Tên_Nhân_Viên: name, 'Team / Kênh': team, Active:'TRUE'}))
+    ],
+    mt_daily: mt,
+    gt_daily: gt
+  };
+  document.getElementById('lastUpdate').textContent = 'DEMO DATA — ' + new Date().toLocaleTimeString('vi-VN');
+  populateMapFilter();
+  renderAll();
+}
+
+// ══════════════════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════════════════
+function filtered(arr) {
+  return arr.filter(r => inRange(r.Timestamp || r.Ngày || r['Ngày'] || ''));
+}
+function today(arr) {
+  return arr.filter(r => isToday(r.Timestamp || r.Ngày || ''));
+}
+function thisMonth(arr) {
+  return arr.filter(r => isThisMonth(r.Timestamp || r.Ngày || ''));
+}
+function groupBy(arr, key) {
+  return arr.reduce((acc,r) => {
+    const k = r[key] || 'N/A';
+    if(!acc[k]) acc[k] = [];
+    acc[k].push(r);
+    return acc;
+  }, {});
+}
+function nameKey(r) {
+  return r['Nhân Viên'] || r['NhanVien'] || r['Tên Nhân Viên'] || r['SalesID'] || '?';
+}
+function teamKey(r) {
+  return r['Team'] || r['Team / Kênh'] || r['Channel'] || '';
+}
+function fmt(n) { return n.toLocaleString('vi-VN'); }
+
+function destroyChart(id) {
+  if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+function mkChart(id, type, labels, datasets, opts={}) {
+  destroyChart(id);
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  chartInstances[id] = new Chart(ctx, {
+    type,
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#9A9590', font: { size: 11 } } }
+      },
+      scales: type === 'bar' || type === 'line' ? {
+        x: { ticks: { color: '#9A9590', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+        y: { ticks: { color: '#9A9590', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,.07)' }, beginAtZero: true }
+      } : {},
+      ...opts
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// RENDER ALL
+// ══════════════════════════════════════════════════════
+function renderAll() {
+  if (!RAW) return;
+  renderOverview();
+  renderMT();
+  renderGT();
+  renderMap();
+}
+
+// ──────────────────────────────────────────────────────
+// OVERVIEW TAB
+// ──────────────────────────────────────────────────────
+function renderOverview() {
+  const mt = RAW.mt_daily || [];
+  const gt = RAW.gt_daily || [];
+  const allToday = [...today(mt), ...today(gt)];
+  const allMonth = [...thisMonth(mt), ...thisMonth(gt)];
+  const filteredAll = [...filtered(mt), ...filtered(gt)];
+
+  // Scorecards
+  const scEl = document.getElementById('sc-overview');
+  const mtTd = today(mt).length;
+  const gtTd = today(gt).length;
+  scEl.innerHTML = `
+    <div class="sc"><div class="sc-label">Tổng hôm nay</div><div class="sc-value">${fmt(mtTd+gtTd)}</div><div class="sc-sub">MT ${mtTd} · GT ${gtTd}</div></div>
+    <div class="sc yellow"><div class="sc-label">MT hôm nay</div><div class="sc-value">${fmt(mtTd)}</div><div class="sc-sub">${[...new Set(today(mt).map(nameKey))].length} nhân viên</div></div>
+    <div class="sc navy"><div class="sc-label">GT hôm nay</div><div class="sc-value">${fmt(gtTd)}</div><div class="sc-sub">${[...new Set(today(gt).map(nameKey))].length} nhân viên</div></div>
+    <div class="sc"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${fmt(allMonth.length)}</div><div class="sc-sub">MT ${thisMonth(mt).length} · GT ${thisMonth(gt).length}</div></div>
+  `;
+
+  // Chart daily trend
+  const byDay = {};
+  filteredAll.forEach(r => {
+    const d = (r.Timestamp||r.Ngày||'').slice(0,10);
+    if(!byDay[d]) byDay[d] = {mt:0,gt:0};
+    if((r.Channel||r.Team||'').includes('MT')) byDay[d].mt++;
+    else byDay[d].gt++;
+  });
+  const sortedDays = Object.keys(byDay).sort();
+  mkChart('chartDaily','bar', sortedDays, [
+    {label:'MT', data: sortedDays.map(d=>byDay[d].mt), backgroundColor:'rgba(200,16,46,.7)', borderRadius:3},
+    {label:'GT', data: sortedDays.map(d=>byDay[d].gt), backgroundColor:'rgba(74,158,191,.6)', borderRadius:3}
+  ], {scales:{x:{stacked:true},y:{stacked:true}}});
+
+  // Chart donut MT vs GT
+  mkChart('chartMtGt','doughnut',
+    ['MT','GT'],
+    [{data:[thisMonth(mt).length, thisMonth(gt).length],
+      backgroundColor:['rgba(200,16,46,.8)','rgba(74,158,191,.7)'],
+      borderColor:['#C8102E','#4A9EBF'], borderWidth:2}],
+    {plugins:{legend:{position:'bottom'}}}
+  );
+
+  // Table tổng hợp nhân viên
+  const allStaff = {};
+  [...mt, ...gt].forEach(r => {
+    const name = nameKey(r);
+    if (!allStaff[name]) allStaff[name] = {team: teamKey(r), today:0, month:0};
+    if (isToday(r.Timestamp||r.Ngày||'')) allStaff[name].today++;
+    if (isThisMonth(r.Timestamp||r.Ngày||'')) allStaff[name].month++;
+  });
+  const sorted = Object.entries(allStaff).sort((a,b)=>b[1].month-a[1].month);
+  const teamPill = t => {
+    if(t.includes('MT')) return `<span class="pill mt">MT</span>`;
+    if(t.includes('North')) return `<span class="pill gt-n">GT-N</span>`;
+    if(t.includes('Central')) return `<span class="pill gt-c">GT-C</span>`;
+    if(t.includes('South')) return `<span class="pill gt-s">GT-S</span>`;
+    return `<span class="pill gt-n">${t}</span>`;
+  };
+  document.getElementById('tbOverview').innerHTML = sorted.map(([name,d],i)=>`
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td>${name}</td>
+      <td>${teamPill(d.team)}</td>
+      <td class="num">${d.today||'—'}</td>
+      <td class="num"><strong>${fmt(d.month)}</strong></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+}
+
+// ──────────────────────────────────────────────────────
+// MT TAB
+// ──────────────────────────────────────────────────────
+function renderMT() {
+  const mt = RAW.mt_daily || [];
+  const mtTd = today(mt);
+  const mtMo = thisMonth(mt);
+
+  // Scorecards
+  const byMember = groupBy(mtTd, 'Nhân Viên') ;
+  const activeToday = Object.keys(byMember).length;
+  document.getElementById('sc-mt').innerHTML = `
+    <div class="sc"><div class="sc-label">MT hôm nay</div><div class="sc-value">${fmt(mtTd.length)}</div><div class="sc-sub">${activeToday} nhân viên active</div></div>
+    <div class="sc yellow"><div class="sc-label">Tháng này</div><div class="sc-value">${fmt(mtMo.length)}</div><div class="sc-sub">tính đến hôm nay</div></div>
+    <div class="sc navy"><div class="sc-label">TB/người/ngày</div><div class="sc-value">${activeToday ? (mtTd.length/activeToday).toFixed(1) : '—'}</div><div class="sc-sub">hôm nay</div></div>
+  `;
+
+  // Chart today per member
+  const membersToday = Object.keys(byMember).sort();
+  const colors = membersToday.map((_,i)=>TEAM_COLORS[i%TEAM_COLORS.length]);
+  mkChart('chartMtToday','bar', membersToday,
+    [{label:'Điểm hôm nay', data: membersToday.map(m=>byMember[m].length),
+      backgroundColor:colors, borderRadius:4}],
+    {plugins:{legend:{display:false}}, indexAxis:'y'}
+  );
+
+  // Chart month per member
+  const byMemberMo = groupBy(mtMo, 'Nhân Viên');
+  const membersMo = Object.keys(byMemberMo).sort((a,b)=>byMemberMo[b].length-byMemberMo[a].length);
+  mkChart('chartMtMonth','bar', membersMo,
+    [{label:'Tháng này', data: membersMo.map(m=>byMemberMo[m].length),
+      backgroundColor:'rgba(200,16,46,.7)', borderRadius:4}],
+    {plugins:{legend:{display:false}}, indexAxis:'y'}
+  );
+
+  // Table chi tiết
+  const allMtMembers = {};
+  mt.forEach(r => {
+    const name = nameKey(r);
+    if(!allMtMembers[name]) allMtMembers[name] = {today:0, month:0, chains:{}};
+    if(isToday(r.Timestamp||r.Ngày||'')) allMtMembers[name].today++;
+    if(isThisMonth(r.Timestamp||r.Ngày||'')) allMtMembers[name].month++;
+    const ch = r.Chain||'';
+    if(ch) allMtMembers[name].chains[ch] = (allMtMembers[name].chains[ch]||0)+1;
+  });
+  const sortedMt = Object.entries(allMtMembers).sort((a,b)=>b[1].month-a[1].month);
+  document.getElementById('tbMt').innerHTML = sortedMt.map(([name,d],i)=>{
+    const topChain = Object.entries(d.chains).sort((a,b)=>b[1]-a[1])[0];
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td>${name}</td>
+      <td class="num">${d.today||'—'}</td>
+      <td class="num"><strong>${fmt(d.month)}</strong></td>
+      <td style="font-size:12px;color:var(--gray2)">${topChain?topChain[0]:'—'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+
+  // Recent records
+  const recent = [...mt].sort((a,b)=>(b.Timestamp||'').localeCompare(a.Timestamp||'')).slice(0,20);
+  document.getElementById('tbMtRecent').innerHTML = recent.map(r=>`
+    <tr>
+      <td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${(r.Timestamp||'').slice(11,16)}</td>
+      <td style="font-size:12px">${nameKey(r)}</td>
+      <td style="font-size:12px">${r.Chain||'—'}</td>
+      <td style="font-size:12px">${r['Điểm Bán']||r['Store']||'—'}</td>
+      <td style="font-size:11px;color:var(--gray2)">${r['Trưng Bày']||'—'}</td>
+      <td style="font-size:11px;color:var(--gray2)">${r['Bảng Giá']||'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="6" class="empty">Không có dữ liệu</td></tr>';
+}
+
+// ──────────────────────────────────────────────────────
+// GT TAB
+// ──────────────────────────────────────────────────────
+function renderGT() {
+  const gt = RAW.gt_daily || [];
+  const gtTd = today(gt);
+  const gtMo = thisMonth(gt);
+
+  const north = gtTd.filter(r=>(r['Khu Vực']||r['Team']||'').toLowerCase().includes('north')||r['Team / Kênh']==='GT North');
+  const central = gtTd.filter(r=>(r['Khu Vực']||r['Team']||'').toLowerCase().includes('central')||r['Team / Kênh']==='GT Central');
+  const south = gtTd.filter(r=>(r['Khu Vực']||r['Team']||'').toLowerCase().includes('south')||r['Team / Kênh']==='GT South');
+
+  document.getElementById('sc-gt').innerHTML = `
+    <div class="sc"><div class="sc-label">GT hôm nay</div><div class="sc-value">${fmt(gtTd.length)}</div><div class="sc-sub">${[...new Set(gtTd.map(nameKey))].length} nhân viên</div></div>
+    <div class="sc navy"><div class="sc-label">GT North</div><div class="sc-value">${fmt(north.length)}</div><div class="sc-sub">${[...new Set(north.map(nameKey))].length} nhân viên</div></div>
+    <div class="sc yellow"><div class="sc-label">GT Central</div><div class="sc-value">${fmt(central.length)}</div><div class="sc-sub">${[...new Set(central.map(nameKey))].length} nhân viên</div></div>
+    <div class="sc"><div class="sc-label">GT South</div><div class="sc-value">${fmt(south.length)}</div><div class="sc-sub">${[...new Set(south.map(nameKey))].length} nhân viên</div></div>
+    <div class="sc yellow"><div class="sc-label">Tháng này</div><div class="sc-value">${fmt(gtMo.length)}</div><div class="sc-sub">tất cả GT</div></div>
+  `;
+
+  const mkGtChart = (id, data) => {
+    const byM = groupBy(data, 'Nhân Viên');
+    const ms = Object.keys(byM);
+    mkChart(id,'bar', ms,
+      [{label:'Điểm', data:ms.map(m=>byM[m].length),
+        backgroundColor:'rgba(74,158,191,.7)', borderRadius:3}],
+      {plugins:{legend:{display:false}}, indexAxis:'y'}
+    );
+  };
+  mkGtChart('chartGtN', north);
+  mkGtChart('chartGtC', central);
+  mkGtChart('chartGtS', south);
+
+  // Table
+  const allGt = {};
+  gt.forEach(r => {
+    const name = nameKey(r);
+    const region = r['Khu Vực']||r['Team']||r['Team / Kênh']||'?';
+    if(!allGt[name]) allGt[name] = {region, today:0, month:0};
+    if(isToday(r.Timestamp||r.Ngày||'')) allGt[name].today++;
+    if(isThisMonth(r.Timestamp||r.Ngày||'')) allGt[name].month++;
+  });
+  const regionOrder = ['GT North','GT Central','GT South'];
+  const sortedGt = Object.entries(allGt).sort((a,b)=>{
+    const ri = regionOrder.indexOf(a[1].region) - regionOrder.indexOf(b[1].region);
+    return ri !== 0 ? ri : b[1].month - a[1].month;
+  });
+  const regionPill = r => {
+    if(r.includes('North')) return `<span class="pill gt-n">GT-N</span>`;
+    if(r.includes('Central')) return `<span class="pill gt-c">GT-C</span>`;
+    if(r.includes('South')) return `<span class="pill gt-s">GT-S</span>`;
+    return `<span class="pill gt-n">GT</span>`;
+  };
+  document.getElementById('tbGt').innerHTML = sortedGt.map(([name,d],i)=>`
+    <tr>
+      <td class="rank">${i+1}</td>
+      <td>${name}</td>
+      <td>${regionPill(d.region)}</td>
+      <td class="num">${d.today||'—'}</td>
+      <td class="num"><strong>${fmt(d.month)}</strong></td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+
+  // Recent GT
+  const recent = [...gt].sort((a,b)=>(b.Timestamp||'').localeCompare(a.Timestamp||'')).slice(0,20);
+  document.getElementById('tbGtRecent').innerHTML = recent.map(r=>`
+    <tr>
+      <td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${(r.Timestamp||'').slice(11,16)}</td>
+      <td style="font-size:12px">${nameKey(r)}</td>
+      <td>${regionPill(r['Khu Vực']||r['Team']||'GT')}</td>
+      <td style="font-size:12px">${r['Điểm Bán']||'—'}</td>
+      <td style="font-size:11px;color:var(--gray2)">${r['Ghi Chú']||'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+}
+
+// ──────────────────────────────────────────────────────
+// MAP TAB
+// ──────────────────────────────────────────────────────
+function populateMapFilter() {
+  if (!RAW) return;
+  const all = [...(RAW.mt_daily||[]), ...(RAW.gt_daily||[])];
+  const names = [...new Set(all.map(nameKey))].sort();
+  const sel = document.getElementById('mapMember');
+  sel.innerHTML = '<option value="all">Tất cả</option>' +
+    names.map(n=>`<option value="${n}">${n}</option>`).join('');
+}
+
+function renderMap() {
+  if (!RAW) return;
+
+  // Init map
+  if (!map) {
+    map = L.map('mapContainer').setView([16.0, 108.0], 6);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution:'© OpenStreetMap © CARTO', maxZoom:19
+    }).addTo(map);
+  }
+
+  // Clear markers
+  markers.forEach(m=>map.removeLayer(m));
+  markers = [];
+
+  const selMember  = document.getElementById('mapMember').value;
+  const selChannel = document.getElementById('mapChannel').value;
+  const {from,to}  = getDateRange();
+
+  let all = [...(RAW.mt_daily||[]).map(r=>({...r,_ch:'MT'})),
+             ...(RAW.gt_daily||[]).map(r=>({...r,_ch:'GT'}))];
+
+  // Filter
+  all = all.filter(r => {
+    const d = (r.Timestamp||r.Ngày||'').slice(0,10);
+    return d >= from && d <= to;
+  });
+  if (selMember !== 'all') all = all.filter(r=>nameKey(r)===selMember);
+  if (selChannel !== 'all') all = all.filter(r=>r._ch===selChannel);
+
+  // Build color map per member
+  const memberNames = [...new Set(all.map(nameKey))].sort();
+  const colorMap = {};
+  memberNames.forEach((n,i) => colorMap[n] = TEAM_COLORS[i%TEAM_COLORS.length]);
+
+  // Add markers
+  let validCount = 0;
+  all.forEach(r => {
+    const lat = parseFloat(r.Latitude || (r.GPS||'').split(',')[0]);
+    const lng = parseFloat(r.Longitude || (r.GPS||'').split(',').slice(-1)[0]);
+    if (isNaN(lat)||isNaN(lng)||lat===0||lng===0) return;
+    validCount++;
+    const name = nameKey(r);
+    const color = colorMap[name] || '#fff';
+    const svgIcon = L.divIcon({
+      className:'',
+      html:`<svg width="14" height="14" viewBox="0 0 14 14" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="7" cy="7" r="6" fill="${color}" fill-opacity="0.85" stroke="rgba(255,255,255,0.5)" stroke-width="1.5"/>
+      </svg>`,
+      iconSize:[14,14], iconAnchor:[7,7]
+    });
+    const m = L.marker([lat,lng], {icon: svgIcon})
+      .bindPopup(`<b>${name}</b><br>${r['Điểm Bán']||r.Chain||''}<br><small>${(r.Timestamp||'').slice(0,16)}</small>`);
+    m.addTo(map);
+    markers.push(m);
+  });
+
+  document.getElementById('mapCount').textContent = `${validCount} điểm có GPS`;
+
+  // Legend
+  document.getElementById('mapLegend').innerHTML =
+    memberNames.map(n=>`
+      <div class="legend-item">
+        <div class="legend-dot" style="background:${colorMap[n]}"></div>
+        <span>${n}</span>
+      </div>`).join('');
+
+  // Fit bounds
+  if (markers.length > 0) {
+    const group = L.featureGroup(markers);
+    map.fitBounds(group.getBounds().pad(0.1));
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// TAB SWITCHING
+// ══════════════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  // Invalidate map size when switching to map tab
+  if (name === 'map' && map) setTimeout(()=>map.invalidateSize(),100);
+}
+</script>
+</body>
+</html>
