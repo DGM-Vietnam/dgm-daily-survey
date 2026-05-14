@@ -476,17 +476,27 @@ const TEAM_COLORS = [
 function doLogin() {
   const v = document.getElementById('pwInput').value;
   if (v === PASS) {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('app').style.display = 'flex';
-    document.getElementById('app').style.flexDirection = 'column';
-    initDateFilter();
-    loadData();
+    sessionStorage.setItem('dgm_auth', '1');
+    showApp();
   } else {
     document.getElementById('loginErr').style.display = 'block';
     document.getElementById('pwInput').value = '';
     document.getElementById('pwInput').focus();
   }
 }
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('app').style.flexDirection = 'column';
+  initDateFilter();
+  loadData();
+}
+// Kiểm tra session khi load trang
+(function checkSession() {
+  if (sessionStorage.getItem('dgm_auth') === '1') {
+    showApp();
+  }
+})();
 
 // ══════════════════════════════════════════════════════
 // DATE FILTER
@@ -521,21 +531,35 @@ function getDateRange() {
     to:   document.getElementById('dateTo').value
   };
 }
+function normalizeDate(dateStr) {
+  if (!dateStr) return '';
+  const s = String(dateStr).trim();
+  // dd/MM/yyyy HH:mm:ss → yyyy-MM-dd
+  const dmyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    const [,d,m,y] = dmyMatch;
+    return y+'-'+m.padStart(2,'0')+'-'+d.padStart(2,'0');
+  }
+  // yyyy-MM-dd (ISO) - đã đúng
+  return s.slice(0,10);
+}
 function inRange(dateStr) {
-  if (!dateStr) return false;
-  const d = dateStr.slice(0,10);
+  const d = normalizeDate(dateStr);
+  if (!d) return false;
   const {from,to} = getDateRange();
   return d >= from && d <= to;
 }
 function isToday(dateStr) {
-  if (!dateStr) return false;
-  return dateStr.slice(0,10) === toYMD(new Date());
+  const d = normalizeDate(dateStr);
+  if (!d) return false;
+  return d === toYMD(new Date());
 }
 function isThisMonth(dateStr) {
-  if (!dateStr) return false;
+  const d = normalizeDate(dateStr);
+  if (!d) return false;
   const now = new Date();
   const m = now.getFullYear()+'-'+(String(now.getMonth()+1).padStart(2,'0'));
-  return dateStr.slice(0,7) === m;
+  return d.slice(0,7) === m;
 }
 
 // ══════════════════════════════════════════════════════
@@ -551,8 +575,19 @@ async function loadData() {
   try {
     const res = await fetch(SCRIPT_URL + '?action=dashboard');
     RAW = await res.json();
+    const mtCount = (RAW.mt_daily||[]).length;
+    const gtCount = (RAW.gt_daily||[]).length;
     document.getElementById('lastUpdate').textContent =
-      'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN');
+      'Cập nhật: ' + new Date().toLocaleTimeString('vi-VN') 
+      + ' | MT:' + mtCount + ' GT:' + gtCount + ' rows';
+    if (mtCount === 0 && gtCount === 0) {
+      console.warn('⚠️ API trả về 0 rows. Kiểm tra tên sheet trong Apps Script.');
+      console.log('API response keys:', Object.keys(RAW));
+      if (RAW.mt_daily) console.log('MT sample header:', Object.keys(RAW.mt_daily[0]||{}));
+    } else {
+      if (RAW.mt_daily && RAW.mt_daily[0]) console.log('MT cols:', Object.keys(RAW.mt_daily[0]));
+      if (RAW.gt_daily && RAW.gt_daily[0]) console.log('GT cols:', Object.keys(RAW.gt_daily[0]));
+    }
     populateMapFilter();
     renderAll();
   } catch(e) {
@@ -640,14 +675,18 @@ function useDemoData() {
 // ══════════════════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════════════════
+function getDateStamp(r) {
+  return r['Ngày'] || r['Timestamp'] || r['timestamp'] 
+      || r['NGÀY'] || r['Date'] || r['date'] || '';
+}
 function filtered(arr) {
-  return arr.filter(r => inRange(r.Timestamp || r.Ngày || r['Ngày'] || ''));
+  return arr.filter(r => inRange(getDateStamp(r)));
 }
 function today(arr) {
-  return arr.filter(r => isToday(r.Timestamp || r.Ngày || ''));
+  return arr.filter(r => isToday(getDateStamp(r)));
 }
 function thisMonth(arr) {
-  return arr.filter(r => isThisMonth(r.Timestamp || r.Ngày || ''));
+  return arr.filter(r => isThisMonth(getDateStamp(r)));
 }
 function groupBy(arr, key) {
   return arr.reduce((acc,r) => {
@@ -658,10 +697,18 @@ function groupBy(arr, key) {
   }, {});
 }
 function nameKey(r) {
-  return r['Nhân Viên'] || r['NhanVien'] || r['Tên Nhân Viên'] || r['SalesID'] || '?';
+  // Thử nhiều tên cột khác nhau từ sheet thực tế
+  return r['Nhân Viên'] || r['NhanVien'] || r['Tên Nhân Viên'] 
+      || r['NHÂN VIÊN'] || r['SalesName'] || r['salesName']
+      || r['SalesID'] || '?';
 }
 function teamKey(r) {
-  return r['Team'] || r['Team / Kênh'] || r['Channel'] || '';
+  return r['Team'] || r['Team / Kênh'] || r['Kênh'] || r['Channel'] 
+      || r['KÊNH'] || '';
+}
+function regionKey(r) {
+  return r['Khu Vực'] || r['KhuVuc'] || r['Team / Kênh'] 
+      || r['Team'] || r['Region'] || '';
 }
 function fmt(n) { return n.toLocaleString('vi-VN'); }
 
@@ -877,7 +924,7 @@ function renderGT() {
   const allGt = {};
   gt.forEach(r => {
     const name = nameKey(r);
-    const region = r['Khu Vực']||r['Team']||r['Team / Kênh']||'?';
+    const region = regionKey(r) || '?';
     if(!allGt[name]) allGt[name] = {region, today:0, month:0};
     if(isToday(r.Timestamp||r.Ngày||'')) allGt[name].today++;
     if(isThisMonth(r.Timestamp||r.Ngày||'')) allGt[name].month++;
