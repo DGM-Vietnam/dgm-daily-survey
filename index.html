@@ -360,36 +360,81 @@ let state = {
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   renderStaffList();
-  // Khôi phục session sau refresh
+
+  // Khôi phục session sau refresh hoặc khi quay lại từ app khác
   try {
     var saved = sessionStorage.getItem('dgm_session');
     if (saved) {
       var sess = JSON.parse(saved);
       if (sess.user && sess.screen) {
         state.user = sess.user;
-        // Chỉ khôi phục màn hình chọn loại survey (scType)
-        // Các màn hình form phức tạp reset về home để tránh state không đồng bộ
-        if (sess.screen === 'scType') {
+        // Khôi phục state bổ sung nếu có
+        if (sess.mtMode) state.mtMode = sess.mtMode;
+
+        var sc = sess.screen;
+
+        if (sc === 'scType') {
           document.getElementById('typeTitle').textContent = 'Xin chào, ' + sess.user.name.split(' ').pop() + '!';
           document.getElementById('typeSubtitle').textContent = sess.user.team;
           renderTypeCards(sess.user.team);
           goTo('scType');
+
+        } else if (sc === 'scMT') {
+          var mode = sess.mtMode || 'daily';
+          document.getElementById('mtSubtitle').textContent = sess.user.name;
+          renderMTForm(mode);
+          goTo('scMT');
+          initGPS();
+
+        } else if (sc === 'scGTDaily') {
+          var region = sess.gtRegion || sess.user.team;
+          // Nếu user là MT/GT, tạm thời gán region để render đúng form
+          var userForRender = Object.assign({}, sess.user, { team: region });
+          state.user = userForRender;
+          document.getElementById('gtSubtitle').textContent = sess.user.name + ' · ' + region;
+          renderGTDailyForm(region);
+          goTo('scGTDaily');
+          initGPS();
+          // Khôi phục lại team gốc
+          state.user = Object.assign({}, userForRender, { team: sess.user.team });
+
+        } else if (sc === 'scGTNew') {
+          var region2 = sess.gtRegion || sess.user.team;
+          var userForRender2 = Object.assign({}, sess.user, { team: region2 });
+          state.user = userForRender2;
+          document.getElementById('gtnewSubtitle').textContent = sess.user.name + ' · ' + region2;
+          renderGTNewForm(region2);
+          goTo('scGTNew');
+          initGPS();
+          state.user = Object.assign({}, userForRender2, { team: sess.user.team });
+
+        } else {
+          // Màn hình khác (scLogin, scSuccess): về home
+          goTo('scLogin');
         }
       }
     }
   } catch(e) {}
+
   // Auto-sync offline queue khi load trang (nếu có mạng)
   if (navigator.onLine && state.scriptUrl) syncOffline();
 });
 
-// Lưu session khi chuyển màn hình
+// Lưu session đầy đủ khi chuyển màn hình
 var _origGoTo = goTo;
 goTo = function(id) {
   _origGoTo(id);
   try {
+    // Không lưu session cho màn hình thành công/login để tránh restore sai
+    if (id === 'scSuccess' || id === 'scLogin') {
+      sessionStorage.removeItem('dgm_session');
+      return;
+    }
     sessionStorage.setItem('dgm_session', JSON.stringify({
       user: state.user,
-      screen: id
+      screen: id,
+      mtMode: state.mtMode || null,
+      gtRegion: (state.user && state.user._gtRegion) || null
     }));
   } catch(e) {}
 };
@@ -523,15 +568,15 @@ function showGTRegionPicker(mode) {
 
 function pickGTRegion(region, mode) {
   document.getElementById('regionPickerOverlay')?.remove();
-  // Temporarily override user.team for GT form rendering
+  // Temporarily override user.team for GT form rendering, also save _gtRegion for session restore
   const originalTeam = state.user.team;
-  state.user = { ...state.user, team: region };
+  state.user = { ...state.user, team: region, _gtRegion: region };
   if (mode === 'new') {
     startGTNew();
   } else {
     startGTDaily();
   }
-  // After navigation, restore original team so type screen still shows MT/GT
+  // After navigation, restore original team so type screen still shows MT/GT, keep _gtRegion
   state.user = { ...state.user, team: originalTeam };
 }
 
@@ -855,6 +900,7 @@ function startGTDaily() {
   state.skuData = {};
   gtPhotoCount = 4; // reset photo count
   const region = state.user.team;
+  state.user = Object.assign({}, state.user, { _gtRegion: region });
   document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
   renderGTDailyForm(region);
   goTo('scGTDaily');
@@ -1034,13 +1080,15 @@ function getSelectedStores() {
 // ============ GT NEW CUSTOMER ============
 function startGTNew() {
   state.photos = {};
-  document.getElementById('gtnewSubtitle').textContent = state.user.name;
-  renderGTNewForm();
+  const region = state.user._gtRegion || state.user.team;
+  state.user = Object.assign({}, state.user, { _gtRegion: region });
+  document.getElementById('gtnewSubtitle').textContent = state.user.name + (region ? ' · ' + region : '');
+  renderGTNewForm(region);
   goTo('scGTNew');
   initGPS();
 }
 
-function renderGTNewForm() {
+function renderGTNewForm(region) {
   const content = document.getElementById('gtnewContent');
   const products = ["Đậu sốt cà","Puree cà chua","Đậu trắng","Đậu gà","Cá ngừ","Cá trích","Cá thu","Bắp","Nước cốt dừa","Tương ớt Sriracha"];
   const bizTypes = ["Tiệm tạp hóa","Siêu thị mini / CVS","Nhà buôn (bán sỉ)","Sạp trong chợ","Nhà hàng / Khách sạn"];
