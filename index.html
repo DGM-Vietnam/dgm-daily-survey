@@ -135,6 +135,22 @@ textarea{resize:vertical;min-height:80px}
 .date-display{background:var(--blue-light);border-radius:8px;padding:10px 12px;font-size:14px;font-weight:600;color:var(--blue);text-align:center;margin-bottom:4px}
 /* Search input */
 .search-input{margin-bottom:8px}
+/* Searchable Select */
+.ss-wrap{position:relative}
+.ss-input{width:100%;padding:11px 32px 11px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;color:var(--text);background:#fff;outline:none;transition:border-color .2s;cursor:pointer}
+.ss-input:focus{border-color:var(--primary)}
+.ss-input::placeholder{color:#aaa}
+.ss-arrow{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none;color:#666;font-size:11px}
+.ss-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:#fff;border:1.5px solid var(--primary);border-top:none;border-radius:0 0 8px 8px;max-height:220px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.ss-dropdown.open{display:block}
+.ss-option{padding:10px 12px;font-size:14px;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background .1s}
+.ss-option:last-child{border-bottom:none}
+.ss-option:hover,.ss-option.focused{background:var(--primary-light)}
+.ss-option.selected{font-weight:600;color:var(--primary)}
+.ss-empty{padding:12px;text-align:center;color:var(--text2);font-size:13px}
+/* Photo compress indicator */
+.photo-compress-bar{height:3px;background:#e0e0e0;border-radius:2px;margin-top:4px;overflow:hidden;display:none}
+.photo-compress-fill{height:100%;background:var(--primary);width:0;transition:width .3s;border-radius:2px}
 </style>
 </head>
 <body>
@@ -745,9 +761,6 @@ function startMT(mode) {
 function renderMTForm(mode) {
   const content = document.getElementById('mtContent');
 
-  // Chain select → store select
-  const chainOpts = Object.keys(MT_CHAINS).sort().map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
-  
   // SKU table
   let skuRows = '';
   Object.entries(MT_SKUS_CATS).forEach(([cat, skus]) => {
@@ -773,12 +786,22 @@ function renderMTForm(mode) {
       <h3>📋 Thông tin khảo sát</h3>
       <div class="field required"><label>Ngày khảo sát</label>${dateFieldHTML('mt_date')}</div>
       <div class="field required"><label>Chain / Hệ thống</label>
-        <select id="mt_chain" onchange="loadMTStores(this.value)">
-          <option value="">— Chọn chain —</option>${chainOpts}
-        </select>
+        <div class="ss-wrap" id="mt_chain_wrap">
+          <input type="text" class="ss-input" id="mt_chain_input" placeholder="🔍 Gõ để tìm chain..." autocomplete="off"
+            oninput="ssFilter('mt_chain_wrap',this.value)" onfocus="ssOpen('mt_chain_wrap')" onblur="ssBlur('mt_chain_wrap')">
+          <span class="ss-arrow">▼</span>
+          <div class="ss-dropdown" id="mt_chain_dropdown"></div>
+          <input type="hidden" id="mt_chain" value="">
+        </div>
       </div>
-      <div class="field required"><label>Điểm bán</label>
-        <select id="mt_store"><option value="">— Chọn chain trước —</option></select>
+      <div class="field required" id="mt_store_field" style="display:none"><label>Điểm bán</label>
+        <div class="ss-wrap" id="mt_store_wrap">
+          <input type="text" class="ss-input" id="mt_store_input" placeholder="🔍 Gõ để tìm điểm bán..." autocomplete="off"
+            oninput="ssFilter('mt_store_wrap',this.value)" onfocus="ssOpen('mt_store_wrap')" onblur="ssBlur('mt_store_wrap')">
+          <span class="ss-arrow">▼</span>
+          <div class="ss-dropdown" id="mt_store_dropdown"></div>
+          <input type="hidden" id="mt_store" value="">
+        </div>
       </div>
       <div class="field"><label>Ghi chú địa chỉ</label>
         <input type="text" id="mt_addr" placeholder="Tầng, khu vực...">
@@ -789,11 +812,13 @@ function renderMTForm(mode) {
     </div>
     <div class="card">
       <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện (dùng app timestamp để chụp trước).</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc ít nhất 1 hình. Tối đa 30 hình — hình sẽ được <b>nén tự động</b> trước khi gửi.</p>
       <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
         📁 Chọn hình từ thư viện
         <input type="file" id="mt_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'mt')">
       </label>
+      <div class="photo-compress-bar" id="mt_compress_bar"><div class="photo-compress-fill" id="mt_compress_fill"></div></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:4px" id="mt_compress_msg"></p>
       <div id="mt_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>
     <div class="card" style="padding:12px 8px">
@@ -876,22 +901,38 @@ function renderMTForm(mode) {
     </div>
     <div class="card">
       <h3>📷 Hình ảnh <span class="store-count-badge zero" id="mt_photo_count_badge">0/30</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 1 hình. Có thể thêm tối đa 30 hình.</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:8px">Tối thiểu 1 hình. Tối đa 30 hình — hình sẽ được nén tự động.</p>
       <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
         📁 Chọn hình từ thư viện
         <input type="file" id="mt_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'mt')">
       </label>
+      <div class="photo-compress-bar" id="mt_compress_bar"><div class="photo-compress-fill" id="mt_compress_fill"></div></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:4px" id="mt_compress_msg"></p>
       <div id="mt_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>`;
 
   content.innerHTML = mode === 'other' ? otherForm : dailyForm;
-}
 
-function loadMTStores(chain) {
-  const sel = document.getElementById('mt_store');
-  if (!chain) { sel.innerHTML = '<option value="">— Chọn chain trước —</option>'; return; }
-  const stores = MT_CHAINS[chain] || [];
-  sel.innerHTML = '<option value="">— Chọn điểm bán —</option>' + stores.map(s => `<option value="${escHtml(s)}">${escHtml(s)}</option>`).join('');
+  // Init searchable selects for MT daily
+  if (mode !== 'other') {
+    ssInit('mt_chain_wrap', Object.keys(MT_CHAINS).sort(), function(val) {
+      document.getElementById('mt_chain').value = val;
+      // Reset store
+      document.getElementById('mt_store').value = '';
+      const inp = document.getElementById('mt_store_input');
+      if (inp) inp.value = '';
+      const storeField = document.getElementById('mt_store_field');
+      const stores = (MT_CHAINS[val] || []).slice().sort();
+      if (stores.length > 0) {
+        storeField.style.display = '';
+        ssInit('mt_store_wrap', stores, function(sv) {
+          document.getElementById('mt_store').value = sv;
+        });
+      } else {
+        storeField.style.display = 'none';
+      }
+    });
+  }
 }
 
 // ============ GT DAILY FORM ============
@@ -910,56 +951,34 @@ function startGTDaily() {
 function renderGTDailyForm(region) {
   const content = document.getElementById('gtContent');
   
-  let marketSelectHTML = '';
-  let storeSelectHTML = '';
-  
-  if (region === 'GT North') {
-    // GT North: Chọn chợ trước → hiện điểm bán (giống Central/South)
-    const northMarkets = Object.keys(GT_NORTH).sort();
-    const northOpts = northMarkets.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
-    marketSelectHTML = `
-      <div class="field required"><label>Chợ / Khu vực (GT Bắc)</label>
-        <select id="gt_market" onchange="loadGTStoresChecklist(this.value,'GT North')">
-          <option value="">— Chọn chợ / khu vực —</option>${northOpts}
-        </select>
-      </div>`;
-    storeSelectHTML = `
-      <div class="field required" id="gt_store_field">
-        <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
-        <input type="text" id="gt_store_search" placeholder="🔍 Tìm trong danh sách..." style="margin-bottom:6px" oninput="filterStoreChecklist(this.value)">
-        <div class="store-checklist" id="gt_store_checklist">
-          <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ / khu vực trước</div>
-        </div>
+  const regionData = region === 'GT Central' ? GT_CENTRAL : (region === 'GT North' ? GT_NORTH : GT_SOUTH);
+  const marketLabel = region === 'GT North' ? 'Chợ / Khu vực (GT Bắc)' : 'Chợ / Khu vực';
+  const marketPlaceholder = region === 'GT North' ? '🔍 Gõ để tìm chợ / khu vực...' : '🔍 Gõ để tìm chợ...';
+
+  const marketSelectHTML = `
+    <div class="field required"><label>${marketLabel}</label>
+      <div class="ss-wrap" id="gt_market_wrap">
+        <input type="text" class="ss-input" id="gt_market_input" placeholder="${marketPlaceholder}" autocomplete="off"
+          oninput="ssFilter('gt_market_wrap',this.value)" onfocus="ssOpen('gt_market_wrap')" onblur="ssBlur('gt_market_wrap')">
+        <span class="ss-arrow">▼</span>
+        <div class="ss-dropdown" id="gt_market_dropdown"></div>
+        <input type="hidden" id="gt_market" value="">
       </div>
-      <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
-        <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
-        <input type="text" id="gt_market_manual" placeholder="Tên chợ / khu vực (nếu nhập thủ công)" style="margin-top:6px">
-        <p style="font-size:11px;color:var(--text2);margin-top:4px">💡 Điểm bán nhập thủ công sẽ được ghi nhận theo khu vực của bạn</p>
-      </div>`;
-  } else {
-    const regionData = region === 'GT Central' ? GT_CENTRAL : (region === 'GT North' ? GT_NORTH : GT_SOUTH);
-    const markets = Object.keys(regionData).sort();
-    const marketOpts = markets.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('');
-    marketSelectHTML = `
-      <div class="field required"><label>Chợ / Khu vực</label>
-        <select id="gt_market" onchange="loadGTStoresChecklist(this.value,'${region}')">
-          <option value="">— Chọn chợ —</option>${marketOpts}
-        </select>
-      </div>`;
-    storeSelectHTML = `
-      <div class="field required" id="gt_store_field">
-        <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
-        <input type="text" id="gt_store_search" placeholder="🔍 Tìm trong chợ..." style="margin-bottom:6px" oninput="filterStoreChecklist(this.value)">
-        <div class="store-checklist" id="gt_store_checklist">
-          <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ trước</div>
-        </div>
+    </div>`;
+
+  const storeSelectHTML = `
+    <div class="field required" id="gt_store_field">
+      <label>Chọn điểm bán <span class="store-count-badge zero" id="gt_store_count">0 đã chọn</span></label>
+      <input type="text" id="gt_store_search" placeholder="🔍 Tìm trong danh sách..." style="margin-bottom:6px" oninput="filterStoreChecklist(this.value)">
+      <div class="store-checklist" id="gt_store_checklist">
+        <div style="padding:16px;text-align:center;color:var(--text2);font-size:13px">← Chọn chợ trước</div>
       </div>
-      <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
-        <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
-        <input type="text" id="gt_market_manual" placeholder="Tên chợ / khu vực (nếu nhập thủ công)" style="margin-top:6px">
-        <p style="font-size:11px;color:var(--text2);margin-top:4px">💡 Điểm bán nhập thủ công sẽ được ghi nhận theo khu vực của bạn</p>
-      </div>`;
-  }
+    </div>
+    <div class="field"><label>Nhập thủ công (điểm bán chưa có trong list)</label>
+      <input type="text" id="gt_store_manual" placeholder="Tên điểm bán mới...">
+      <input type="text" id="gt_market_manual" placeholder="Tên chợ / khu vực (nếu nhập thủ công)" style="margin-top:6px">
+      <p style="font-size:11px;color:var(--text2);margin-top:4px">💡 Điểm bán nhập thủ công sẽ được ghi nhận theo khu vực của bạn</p>
+    </div>`;
 
   const skuRows = GT_SKUS_DAILY.map(sku => `
     <tr>
@@ -986,11 +1005,13 @@ function renderGTDailyForm(region) {
     </div>
     <div class="card">
       <h3>📷 Hình ảnh <span class="store-count-badge zero" id="gt_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
-      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện (dùng app timestamp để chụp trước).</p>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc ít nhất 1 hình. Tối đa 30 hình — hình sẽ được <b>nén tự động</b> trước khi gửi.</p>
       <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
         📁 Chọn hình từ thư viện
         <input type="file" id="gt_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gt')">
       </label>
+      <div class="photo-compress-bar" id="gt_compress_bar"><div class="photo-compress-fill" id="gt_compress_fill"></div></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:4px" id="gt_compress_msg"></p>
       <div id="gt_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
     </div>
     <div class="card" style="padding:12px 8px">
@@ -1032,6 +1053,13 @@ function renderGTDailyForm(region) {
     </div>`;
 
   content.dataset.region = region;
+
+  // Init searchable market select
+  const markets = Object.keys(regionData).sort();
+  ssInit('gt_market_wrap', markets, function(val) {
+    document.getElementById('gt_market').value = val;
+    loadGTStoresChecklist(val, region);
+  });
 }
 
 function loadGTStoresChecklist(market, region) {
@@ -1137,6 +1165,8 @@ function renderGTNewForm(region) {
           📁 Chọn hình từ thư viện
           <input type="file" id="gtnew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gtnew')">
         </label>
+        <div class="photo-compress-bar" id="gtnew_compress_bar"><div class="photo-compress-fill" id="gtnew_compress_fill"></div></div>
+        <p style="font-size:11px;color:var(--text2);margin-top:4px" id="gtnew_compress_msg"></p>
         <div id="gtnew_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
       </div>
     </div>`;
@@ -1376,6 +1406,24 @@ async function sendData(payload, label) {
 
 async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
   var keys = Object.keys(photos);
+  // Build folder path: username / YYYY-MM / DD  (từ date dd/MM/yyyy hoặc yyyy-MM-dd)
+  var folderPath = '';
+  try {
+    var safeName = (salesperson || 'Unknown').replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF]/g,'_').trim();
+    var dateObj;
+    if (/\d{4}-\d{2}-\d{2}/.test(date)) {
+      dateObj = new Date(date);
+    } else if (/\d{2}\/\d{2}\/\d{4}/.test(date)) {
+      var parts = date.split('/');
+      dateObj = new Date(parts[2] + '-' + parts[1] + '-' + parts[0]);
+    } else {
+      dateObj = new Date();
+    }
+    var ym = dateObj.getFullYear() + '-' + String(dateObj.getMonth()+1).padStart(2,'0');
+    var dd = String(dateObj.getDate()).padStart(2,'0');
+    folderPath = safeName + '/' + ym + '/' + dd;
+  } catch(e) { folderPath = (salesperson||'Unknown') + '/Unknown'; }
+
   for (var i = 0; i < keys.length; i++) {
     try {
       var base64Data = photos[keys[i]];
@@ -1385,12 +1433,12 @@ async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
         survey_id: surveyId,
         salesperson: salesperson,
         date: date,
+        folder_path: folderPath,
         photo_key: keys[i],
         photo_index: i + 1,
         photo_total: keys.length,
         photo_b64: base64Data
       };
-      // Dùng fetch POST vì ảnh ~15KB không fit trong GET URL
       var postBody = JSON.stringify({data: btoa(unescape(encodeURIComponent(JSON.stringify(photoPayload))))});
       var controller = new AbortController();
       var timer = setTimeout(function(){ controller.abort(); }, 20000);
@@ -1403,7 +1451,7 @@ async function uploadPhotosToScript(surveyId, salesperson, date, photos) {
       } catch(fe) { /* silent — continue */ }
       clearTimeout(timer);
       // Small delay giữa các ảnh để tránh rate limit
-      await new Promise(function(r){ setTimeout(r, 500); });
+      await new Promise(function(r){ setTimeout(r, 400); });
     } catch(e) { /* tiếp tục với ảnh tiếp theo */ }
   }
 }
@@ -1419,8 +1467,8 @@ async function syncOfflineSend(item) {
   clearTimeout(timer);
 }
 
-// ── PHOTO UPLOAD HANDLER ──────────────────────────────────
-function handlePhotoUpload(input, prefix) {
+// ── PHOTO UPLOAD HANDLER — compress ngay khi chọn ──────────
+async function handlePhotoUpload(input, prefix) {
   var files = Array.from(input.files);
   var previewEl = document.getElementById(prefix + '_photo_preview');
   var existing = Object.keys(state.photos).filter(function(k){ return k.startsWith(prefix + '_'); }).length;
@@ -1429,28 +1477,70 @@ function handlePhotoUpload(input, prefix) {
     toast('⚠️ Chỉ còn thể thêm ' + remaining + ' hình (tối đa ' + PHOTO_MAX + ')');
     files = files.slice(0, remaining);
   }
-  files.forEach(function(file, i) {
+  if (files.length === 0) { input.value = ''; return; }
+
+  // Show compress progress bar
+  var bar = document.getElementById(prefix + '_compress_bar');
+  var fill = document.getElementById(prefix + '_compress_fill');
+  var msg = document.getElementById(prefix + '_compress_msg');
+  if (bar) bar.style.display = 'block';
+  if (msg) msg.textContent = '⏳ Đang nén ' + files.length + ' hình...';
+
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
     var key = prefix + '_' + (existing + i + 1);
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      state.photos[key] = e.target.result;
+    try {
+      // Read original
+      var original = await new Promise(function(resolve, reject) {
+        var r = new FileReader();
+        r.onload = function(e) { resolve(e.target.result); };
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      // Compress: 800px max, quality 0.65 — cân bằng giữa rõ ảnh và nhẹ file
+      var compressed = await resizeImage(original, 800, 0.65);
+      state.photos[key] = compressed;
+
+      // Render thumbnail
       if (previewEl) {
-        var thumb = document.createElement('div');
-        thumb.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
-        var img = document.createElement('img');
-        img.src = e.target.result;
-        img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border)';
-        var del = document.createElement('button');
-        del.textContent = '✕';
-        del.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:20px;text-align:center;padding:0';
-        (function(k, t){ del.onclick = function(){ delete state.photos[k]; t.remove(); updatePhotoBadge(prefix); }; })(key, thumb);
-        thumb.appendChild(img); thumb.appendChild(del);
-        previewEl.appendChild(thumb);
+        (function(k, src) {
+          var thumb = document.createElement('div');
+          thumb.style.cssText = 'position:relative;width:72px;height:72px;flex-shrink:0';
+          var img = document.createElement('img');
+          img.src = src;
+          img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border)';
+          var del = document.createElement('button');
+          del.textContent = '✕';
+          del.style.cssText = 'position:absolute;top:2px;right:2px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;line-height:20px;text-align:center;padding:0';
+          del.onclick = function(){ delete state.photos[k]; thumb.remove(); updatePhotoBadge(prefix); };
+          thumb.appendChild(img); thumb.appendChild(del);
+          previewEl.appendChild(thumb);
+        })(key, compressed);
       }
-      updatePhotoBadge(prefix);
-    };
-    reader.readAsDataURL(file);
-  });
+    } catch(e) {
+      // Fallback: dùng FileReader bình thường
+      await new Promise(function(resolve) {
+        var r = new FileReader();
+        r.onload = function(ev) {
+          state.photos[key] = ev.target.result;
+          resolve();
+        };
+        r.readAsDataURL(file);
+      });
+    }
+
+    // Update progress bar
+    if (fill) fill.style.width = Math.round((i + 1) / files.length * 100) + '%';
+    updatePhotoBadge(prefix);
+  }
+
+  // Hide bar after done
+  setTimeout(function() {
+    if (bar) bar.style.display = 'none';
+    if (fill) fill.style.width = '0';
+    if (msg) msg.textContent = '✅ Đã nén xong ' + files.length + ' hình — sẵn sàng gửi';
+  }, 600);
+
   input.value = '';
 }
 
@@ -1463,30 +1553,33 @@ function updatePhotoBadge(prefix) {
   }
 }
 
+// compressPhotos: ảnh đã nén từ trước, chỉ cần copy qua
 async function compressPhotos(payload) {
   var out = Object.assign({}, payload, {photos: {}});
   var photoCount = Object.keys(payload.photos || {}).length;
   out.photo_count = photoCount;
+  // Ảnh đã được compress ngay khi chọn → chỉ cần gán lại
   for (var key in (payload.photos || {})) {
-    try { out.photos[key] = await resizeImage(payload.photos[key], 500); }
-    catch(e) { out.photos[key] = payload.photos[key]; }
+    out.photos[key] = payload.photos[key];
   }
   return out;
 }
 
-function resizeImage(dataUrl, maxSize) {
-  return new Promise(res => {
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let w = img.width, h = img.height;
+function resizeImage(dataUrl, maxSize, quality) {
+  maxSize = maxSize || 800;
+  quality = quality || 0.65;
+  return new Promise(function(res) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var w = img.width, h = img.height;
       if (w > maxSize || h > maxSize) {
         if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
         else { w = Math.round(w * maxSize / h); h = maxSize; }
       }
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      res(canvas.toDataURL('image/jpeg', 0.75));
+      res(canvas.toDataURL('image/jpeg', quality));
     };
     img.src = dataUrl;
   });
@@ -1557,6 +1650,89 @@ function genID(type) { return (type||'XX').substr(0,2).toUpperCase()+'-'+new Dat
 function toast(msg) { const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 function showLoading(msg) { document.getElementById('loadingMsg').textContent=msg||'Đang xử lý...'; document.getElementById('loading').classList.add('show'); }
 function hideLoading() { document.getElementById('loading').classList.remove('show'); }
+
+// ============ SEARCHABLE SELECT ENGINE ============
+// ssInit(wrapId, items[], onSelect(value))
+function ssInit(wrapId, items, onSelect) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var dropdown = wrap.querySelector('.ss-dropdown');
+  var input = wrap.querySelector('.ss-input');
+  wrap._ssItems = items;
+  wrap._ssOnSelect = onSelect;
+  // Build initial dropdown
+  ssRender(wrapId, items);
+  // Allow typing to filter
+  if (input) input.removeAttribute('readonly');
+}
+
+function ssRender(wrapId, items) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var dropdown = wrap.querySelector('.ss-dropdown');
+  if (!dropdown) return;
+  if (!items || items.length === 0) {
+    dropdown.innerHTML = '<div class="ss-empty">Không có kết quả</div>';
+    return;
+  }
+  dropdown.innerHTML = items.map(function(item) {
+    return '<div class="ss-option" onmousedown="ssSelect(\'' + wrapId + '\',\'' + item.replace(/'/g, '&#39;') + '\')">' + escHtml(item) + '</div>';
+  }).join('');
+}
+
+function ssFilter(wrapId, query) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap || !wrap._ssItems) return;
+  var q = (query || '').toLowerCase().trim();
+  var filtered = q ? wrap._ssItems.filter(function(i) {
+    return i.toLowerCase().includes(q);
+  }) : wrap._ssItems;
+  ssRender(wrapId, filtered);
+  ssOpen(wrapId);
+}
+
+function ssOpen(wrapId) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var dropdown = wrap.querySelector('.ss-dropdown');
+  if (dropdown) dropdown.classList.add('open');
+}
+
+function ssBlur(wrapId) {
+  // Delay to allow mousedown on option to fire first
+  setTimeout(function() {
+    var wrap = document.getElementById(wrapId);
+    if (!wrap) return;
+    var dropdown = wrap.querySelector('.ss-dropdown');
+    if (dropdown) dropdown.classList.remove('open');
+    // If input doesn't match a selection, reset display to selected value
+    var input = wrap.querySelector('.ss-input');
+    var hidden = wrap.querySelector('input[type=hidden]');
+    if (input && hidden && hidden.value && input.value !== hidden.value) {
+      input.value = hidden.value;
+    }
+  }, 200);
+}
+
+function ssSelect(wrapId, value) {
+  var wrap = document.getElementById(wrapId);
+  if (!wrap) return;
+  var input = wrap.querySelector('.ss-input');
+  var hidden = wrap.querySelector('input[type=hidden]');
+  var dropdown = wrap.querySelector('.ss-dropdown');
+  if (input) input.value = value;
+  if (hidden) hidden.value = value;
+  if (dropdown) dropdown.classList.remove('open');
+  // Reset filter to full list
+  ssRender(wrapId, wrap._ssItems);
+  // Highlight selected
+  if (dropdown) {
+    Array.from(dropdown.querySelectorAll('.ss-option')).forEach(function(opt) {
+      opt.classList.toggle('selected', opt.textContent === value);
+    });
+  }
+  if (wrap._ssOnSelect) wrap._ssOnSelect(value);
+}
 
 
 function saveUrlConfig() {
