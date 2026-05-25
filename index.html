@@ -341,46 +341,49 @@ let GT_SOUTH   = {};
 const STORES_CACHE_KEY = 'dgm_stores_cache';
 const STORES_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 giờ
 
-async function loadStores() {
-  // 1. Thử load cache trước (dùng ngay)
+// storesReady resolves true khi có data (cache hoặc server)
+// storesFresh resolves khi server confirm mới nhất
+let _storesReadyResolve;
+const storesReady = new Promise(res => { _storesReadyResolve = res; });
+
+function loadStores() {
+  // 1. Apply cache ngay lập tức (sync) — không chờ server
+  let hasCache = false;
   try {
     const cached = localStorage.getItem(STORES_CACHE_KEY);
     if (cached) {
       const { data, ts } = JSON.parse(cached);
       applyStoreData(data);
+      hasCache = true;
       const age = Date.now() - ts;
-      if (age < STORES_CACHE_TTL) {
-        console.log('[Stores] Dùng cache (' + Math.round(age/60000) + ' phút tuổi)');
-        return;
-      }
-      console.log('[Stores] Cache cũ, đang refresh...');
+      console.log('[Stores] Cache loaded (' + Math.round(age/60000) + ' phút tuổi)');
+      _storesReadyResolve(true); // data sẵn sàng ngay
+      if (age < STORES_CACHE_TTL) return; // cache còn mới → không cần fetch
     }
-  } catch(e) { /* localStorage lỗi, bỏ qua */ }
+  } catch(e) {}
 
-  // 2. Fetch mới từ server nếu online
+  // 2. Fetch từ server (background, không block UI)
   if (!navigator.onLine) {
-    console.log('[Stores] Offline — dùng cache hoặc data trống');
+    if (!hasCache) _storesReadyResolve(false);
     return;
   }
-
   const scriptUrl = state.scriptUrl || HARDCODED_SCRIPT_URL;
-  if (!scriptUrl) return;
+  if (!scriptUrl) { if (!hasCache) _storesReadyResolve(false); return; }
 
-  try {
-    const url = scriptUrl + '?action=getStores&_t=' + Date.now();
-    const res  = await fetch(url, { mode: 'cors' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const json = await res.json();
-    if (json.status === 'ok') {
-      applyStoreData(json);
-      try {
-        localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() }));
-      } catch(e) {}
-      console.log('[Stores] Đã cập nhật storelist từ server (' + json.generated_at + ')');
-    }
-  } catch(err) {
-    console.warn('[Stores] Fetch thất bại, dùng cache:', err.message);
-  }
+  fetch(scriptUrl + '?action=getStores&_t=' + Date.now(), { mode: 'cors' })
+    .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
+    .then(json => {
+      if (json.status === 'ok') {
+        applyStoreData(json);
+        try { localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() })); } catch(e) {}
+        console.log('[Stores] ✅ Đã cập nhật từ server (' + json.generated_at + ')');
+        if (!hasCache) _storesReadyResolve(true);
+      }
+    })
+    .catch(err => {
+      console.warn('[Stores] Fetch thất bại:', err);
+      if (!hasCache) _storesReadyResolve(false);
+    });
 }
 
 function applyStoreData(data) {
@@ -461,7 +464,7 @@ document.addEventListener('DOMContentLoaded', () => {
           var userForRender = Object.assign({}, sess.user, { team: region });
           state.user = userForRender;
           document.getElementById('gtSubtitle').textContent = sess.user.name + ' · ' + region;
-          renderGTDailyForm(region);
+          storesReady.then(() => { renderGTDailyForm(region); });
           goTo('scGTDaily');
           initGPS();
           // Khôi phục lại team gốc
@@ -487,7 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Auto-sync offline queue khi load trang (nếu có mạng)
   if (navigator.onLine && state.scriptUrl) syncOffline();
-  loadStores(); // v4.2: fetch storelist động
+  loadStores(); // v4.2: fetch storelist động — cache applied sync, server refresh in background
 });
 
 // Lưu session đầy đủ khi chuyển màn hình
@@ -801,12 +804,13 @@ function collectSKUs(prefix, skuList) {
 }
 
 // ============ MT FORM ============
-function startMT(mode) {
+async function startMT(mode) {
   state.photos = {};
   state.skuData = {};
   state.mtMode = mode;
   mtPhotoCount = 4; // reset photo count
   document.getElementById('mtSubtitle').textContent = state.user.name;
+  await storesReady;
   renderMTForm(mode);
   goTo('scMT');
   initGPS();
@@ -990,13 +994,14 @@ function renderMTForm(mode) {
 }
 
 // ============ GT DAILY FORM ============
-function startGTDaily() {
+async function startGTDaily() {
   state.photos = {};
   state.skuData = {};
   gtPhotoCount = 4; // reset photo count
   const region = state.user.team;
   state.user = Object.assign({}, state.user, { _gtRegion: region });
   document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
+  await storesReady;
   renderGTDailyForm(region);
   goTo('scGTDaily');
   initGPS();
