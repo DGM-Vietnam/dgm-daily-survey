@@ -804,16 +804,17 @@ function collectSKUs(prefix, skuList) {
 }
 
 // ============ MT FORM ============
-async function startMT(mode) {
+function startMT(mode) {
   state.photos = {};
   state.skuData = {};
   state.mtMode = mode;
   mtPhotoCount = 4; // reset photo count
   document.getElementById('mtSubtitle').textContent = state.user.name;
-  await storesReady;
-  renderMTForm(mode);
   goTo('scMT');
   initGPS();
+  storesReady.then(() => {
+    renderMTForm(mode);
+  });
 }
 
 function renderMTForm(mode) {
@@ -994,17 +995,18 @@ function renderMTForm(mode) {
 }
 
 // ============ GT DAILY FORM ============
-async function startGTDaily() {
+function startGTDaily() {
   state.photos = {};
   state.skuData = {};
   gtPhotoCount = 4; // reset photo count
   const region = state.user.team;
   state.user = Object.assign({}, state.user, { _gtRegion: region });
   document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
-  await storesReady;
-  renderGTDailyForm(region);
   goTo('scGTDaily');
   initGPS();
+  storesReady.then(() => {
+    renderGTDailyForm(region);
+  });
 }
 
 function renderGTDailyForm(region) {
