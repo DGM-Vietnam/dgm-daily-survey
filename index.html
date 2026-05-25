@@ -810,11 +810,14 @@ function startMT(mode) {
   state.mtMode = mode;
   mtPhotoCount = 4; // reset photo count
   document.getElementById('mtSubtitle').textContent = state.user.name;
+  // Render form trước — nếu stores chưa ready thì chain list trống, sẽ được fill sau
+  renderMTForm(mode);
   goTo('scMT');
   initGPS();
-  storesReady.then(() => {
-    renderMTForm(mode);
-  });
+  // Nếu stores chưa có (first load không có cache), re-render khi sẵn sàng
+  if (Object.keys(MT_CHAINS).length === 0) {
+    storesReady.then(() => { renderMTForm(mode); });
+  }
 }
 
 function renderMTForm(mode) {
@@ -853,13 +856,11 @@ function renderMTForm(mode) {
           <input type="hidden" id="mt_chain" value="">
         </div>
       </div>
-      <div class="field required" id="mt_store_field" style="display:none"><label>Điểm bán</label>
-        <div class="ss-wrap" id="mt_store_wrap">
-          <input type="text" class="ss-input" id="mt_store_input" placeholder="🔍 Gõ để tìm điểm bán..." autocomplete="off"
-            oninput="ssFilter('mt_store_wrap',this.value)" onfocus="ssOpen('mt_store_wrap')" onblur="ssBlur('mt_store_wrap')">
-          <span class="ss-arrow">▼</span>
-          <div class="ss-dropdown" id="mt_store_dropdown"></div>
-          <input type="hidden" id="mt_store" value="">
+      <div class="field required" id="mt_store_field">
+        <label>Điểm bán <span class="store-count-badge zero" id="mt_store_count">0 đã chọn</span></label>
+        <input type="text" id="mt_store_search" placeholder="🔍 Tìm điểm bán trong chain..." style="margin-bottom:6px" oninput="filterMTStoreChecklist(this.value)">
+        <div class="store-checklist" id="mt_store_checklist">
+          <div style="padding:14px;text-align:center;color:var(--text2);font-size:13px">← Chọn chain trước</div>
         </div>
       </div>
       <div class="field"><label>Ghi chú địa chỉ</label>
@@ -974,24 +975,63 @@ function renderMTForm(mode) {
 
   // Init searchable selects for MT daily
   if (mode !== 'other') {
-    ssInit('mt_chain_wrap', Object.keys(MT_CHAINS).sort(), function(val) {
+    const chainKeys = Object.keys(MT_CHAINS).sort();
+    ssInit('mt_chain_wrap', chainKeys, function(val) {
       document.getElementById('mt_chain').value = val;
-      // Reset store
-      document.getElementById('mt_store').value = '';
-      const inp = document.getElementById('mt_store_input');
-      if (inp) inp.value = '';
-      const storeField = document.getElementById('mt_store_field');
-      const stores = (MT_CHAINS[val] || []).slice().sort();
-      if (stores.length > 0) {
-        storeField.style.display = '';
-        ssInit('mt_store_wrap', stores, function(sv) {
-          document.getElementById('mt_store').value = sv;
-        });
-      } else {
-        storeField.style.display = 'none';
-      }
+      loadMTStoresChecklist(val);
     });
   }
+}
+
+// MT multi-select store checklist (giống GT)
+function loadMTStoresChecklist(chain) {
+  const cl = document.getElementById('mt_store_checklist');
+  const sf = document.getElementById('mt_store_field');
+  if (!cl || !sf) return;
+  if (!chain) {
+    cl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2);font-size:13px">← Chọn chain trước</div>';
+    sf.style.display = '';
+    updateMTStoreCount();
+    return;
+  }
+  const stores = (MT_CHAINS[chain] || []).slice().sort();
+  sf.style.display = '';
+  if (stores.length === 0) {
+    cl.innerHTML = '<div style="padding:14px;text-align:center;color:var(--text2);font-size:13px">Không có điểm bán trong chain này</div>';
+  } else {
+    cl.innerHTML = stores.map((s,i) => `
+      <div class="store-check-item" onclick="toggleMTStoreCheck(${i})">
+        <input type="checkbox" id="mt_cb_${i}" value="${s.replace(/"/g,'&quot;')}" onchange="updateMTStoreCount()">
+        <label for="mt_cb_${i}">${s}</label>
+      </div>`).join('');
+  }
+  updateMTStoreCount();
+}
+
+function toggleMTStoreCheck(i) {
+  const cb = document.getElementById('mt_cb_' + i);
+  if (cb) { cb.checked = !cb.checked; updateMTStoreCount(); }
+}
+
+function updateMTStoreCount() {
+  const checked = document.querySelectorAll('#mt_store_checklist input[type=checkbox]:checked').length;
+  const badge = document.getElementById('mt_store_count');
+  if (badge) {
+    badge.textContent = checked + ' đã chọn';
+    badge.className = 'store-count-badge' + (checked === 0 ? ' zero' : '');
+  }
+}
+
+function filterMTStoreChecklist(query) {
+  const q = query.toLowerCase().trim();
+  document.querySelectorAll('#mt_store_checklist .store-check-item').forEach(item => {
+    const lbl = (item.querySelector('label') || {}).textContent || '';
+    item.style.display = (!q || lbl.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+function getMTSelectedStores() {
+  return Array.from(document.querySelectorAll('#mt_store_checklist input[type=checkbox]:checked')).map(cb => cb.value);
 }
 
 // ============ GT DAILY FORM ============
@@ -1002,11 +1042,15 @@ function startGTDaily() {
   const region = state.user.team;
   state.user = Object.assign({}, state.user, { _gtRegion: region });
   document.getElementById('gtSubtitle').textContent = state.user.name + ' · ' + region;
+  // Render form trước rồi mới goTo
+  renderGTDailyForm(region);
   goTo('scGTDaily');
   initGPS();
-  storesReady.then(() => {
-    renderGTDailyForm(region);
-  });
+  // Nếu stores chưa có (first load không có cache), re-render khi sẵn sàng
+  const regionData = region === 'GT Central' ? GT_CENTRAL : (region === 'GT North' ? GT_NORTH : GT_SOUTH);
+  if (Object.keys(regionData).length === 0) {
+    storesReady.then(() => { renderGTDailyForm(region); });
+  }
 }
 
 function renderGTDailyForm(region) {
@@ -1268,9 +1312,10 @@ async function submitMT() {
   }
   
   const chain = (document.getElementById('mt_chain')?document.getElementById('mt_chain').value:'');
-  const store = (document.getElementById('mt_store')?document.getElementById('mt_store').value:'');
+  const selectedStores = getMTSelectedStores();
+  const store = selectedStores.join(' | ');
   if (!chain) { toast('⚠️ Vui lòng chọn chain'); return; }
-  if (!store) { toast('⚠️ Vui lòng chọn điểm bán'); return; }
+  if (selectedStores.length === 0) { toast('⚠️ Vui lòng chọn ít nhất 1 điểm bán'); return; }
   if (!getChips('mt_display'))  { toast('⚠️ Vui lòng chọn Tình trạng trưng bày'); return; }
   if (!getChips('mt_price'))    { toast('⚠️ Vui lòng chọn Thông tin bảng giá'); return; }
   if (!getChips('mt_goods'))    { toast('⚠️ Vui lòng chọn Tình trạng hàng hóa'); return; }
