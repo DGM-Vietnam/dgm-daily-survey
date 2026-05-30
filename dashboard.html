@@ -9,217 +9,130 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-:root{
-  --red:#C8102E;--yellow:#FFE140;--navy:#1B3A57;--navy2:#112840;
-  --white:#F8F6F1;--gray:#D4CFC6;--gray2:#9A9590;
-  --bg:#0F1E2E;--card:#162536;--card2:#1D3045;--border:rgba(255,255,255,0.07);
-  --green:#4caf82;--orange:#f59e42;--blue:#4A9EBF;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans Thai',sans-serif;
+:root {
+  --red:    #C8102E;
+  --yellow: #FFE140;
+  --navy:   #1B3A57;
+  --navy2:  #112840;
+  --white:  #F8F6F1;
+  --gray:   #D4CFC6;
+  --gray2:  #9A9590;
+  --bg:     #0F1E2E;
+  --card:   #162536;
+  --card2:  #1D3045;
+  --border: rgba(255,255,255,0.07);
+  --green:  #22C55E;
+  --orange: #F59E0B;
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'IBM Plex Sans Thai', sans-serif;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 body{font-family:var(--sans);background:var(--bg);color:var(--white);min-height:100vh;}
 
-/* LOGIN */
+/* ── LOGIN ── */
 #loginScreen{position:fixed;inset:0;z-index:9999;background:var(--bg);display:flex;align-items:center;justify-content:center;}
-.login-box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--red);padding:48px 40px 40px;width:360px;border-radius:4px;}
-.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:32px;}
-.login-logo .badge{width:40px;height:40px;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:14px;color:#fff;}
-.login-logo .brand{font-size:13px;color:var(--gray2);line-height:1.4;}
-.login-logo .brand strong{display:block;color:var(--white);font-size:15px;}
-.login-title{font-size:22px;font-weight:700;margin-bottom:6px;}
-.login-sub{font-size:13px;color:var(--gray2);margin-bottom:28px;}
-.login-box label{display:block;font-size:11px;font-family:var(--mono);color:var(--gray2);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
-.login-box input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--white);padding:12px 14px;font-size:15px;font-family:var(--sans);border-radius:3px;outline:none;letter-spacing:.12em;transition:border-color .2s;}
-.login-box input:focus{border-color:var(--red);}
-.login-btn{margin-top:20px;width:100%;padding:13px;background:var(--red);color:#fff;border:none;font-size:15px;font-family:var(--sans);font-weight:600;cursor:pointer;border-radius:3px;transition:opacity .15s;}
-.login-btn:hover{opacity:.88;}
-.login-err{margin-top:12px;font-size:13px;color:#ff6b6b;display:none;text-align:center;}
+.login-box{background:var(--card);border:1px solid var(--border);border-top:3px solid var(--red);padding:44px 36px 36px;width:340px;border-radius:6px;}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+.login-logo .badge{width:36px;height:36px;background:var(--red);display:flex;align-items:center;justify-content:center;border-radius:6px;font-size:16px;}
+.login-title{font-size:15px;font-weight:700;color:var(--white);line-height:1.3;}
+.login-sub{font-size:11px;color:var(--gray2);margin-top:2px;}
+.login-label{font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;display:block;}
+.login-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:11px 14px;color:var(--white);font-size:14px;font-family:var(--sans);outline:none;transition:border .15s;}
+.login-input:focus{border-color:var(--red);}
+.login-btn{width:100%;margin-top:18px;padding:12px;background:var(--red);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--sans);letter-spacing:.03em;}
+.login-btn:hover{background:#a00d24;}
+.login-err{font-size:12px;color:#ff6b6b;margin-top:10px;text-align:center;min-height:18px;}
 
-/* APP SHELL */
-#app{display:none;flex-direction:column;min-height:100vh;}
-.topbar{background:var(--navy2);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
-.topbar-left{display:flex;align-items:center;gap:14px;}
-.topbar-badge{width:32px;height:32px;background:var(--red);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;font-size:11px;color:#fff;flex-shrink:0;}
-.topbar-title{font-size:14px;font-weight:600;}
-.topbar-sub{font-size:11px;color:var(--gray2);font-family:var(--mono);}
-.topbar-right{display:flex;align-items:center;gap:12px;}
-#lastUpdate{font-size:11px;font-family:var(--mono);color:var(--gray2);}
-.btn-sm{background:transparent;border:1px solid var(--border);color:var(--gray2);padding:5px 12px;font-size:11px;font-family:var(--mono);cursor:pointer;border-radius:2px;transition:all .15s;}
-.btn-sm:hover{border-color:var(--red);color:var(--red);}
-.btn-sm.active-btn{border-color:var(--yellow);color:var(--yellow);}
+/* ── SHELL ── */
+#appShell{display:none;}
+.topbar{background:var(--navy2);border-bottom:2px solid var(--red);padding:0 20px;height:52px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100;}
+.topbar .logo{font-weight:700;font-size:14px;color:var(--white);letter-spacing:.03em;}
+.topbar .logo span{color:var(--yellow);}
+.topbar .sync-info{margin-left:auto;font-size:11px;color:var(--gray2);display:flex;align-items:center;gap:8px;}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#555;}
+.sync-dot.live{background:var(--green);animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.sync-btn{background:transparent;border:1px solid var(--border);color:var(--gray2);padding:4px 10px;border-radius:4px;font-size:11px;cursor:pointer;font-family:var(--sans);}
+.sync-btn:hover{border-color:var(--gray2);color:var(--white);}
+.logout-btn{background:transparent;border:none;color:var(--gray2);font-size:20px;cursor:pointer;padding:4px;}
+.logout-btn:hover{color:var(--white);}
 
-/* FILTER BAR */
-.filter-bar{background:var(--card);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
-.filter-bar label{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;}
-.filter-bar input[type=date]{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:5px 10px;font-size:12px;font-family:var(--mono);border-radius:2px;outline:none;}
-.filter-bar input[type=date]:focus{border-color:var(--yellow);}
-.filter-tag{padding:4px 12px;border-radius:2px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);color:var(--gray2);transition:all .15s;}
-.filter-tag.active{background:var(--red);border-color:var(--red);color:#fff;}
-.filter-tag:hover:not(.active){border-color:var(--gray2);}
-
-/* TABS */
-.tabs{display:flex;border-bottom:1px solid var(--border);background:var(--card);padding:0 24px;overflow-x:auto;}
-.tab{padding:14px 18px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;color:var(--gray2);transition:all .15s;white-space:nowrap;}
+/* ── TABS ── */
+.tabs{background:var(--card);border-bottom:1px solid var(--border);display:flex;gap:0;padding:0 20px;overflow-x:auto;}
+.tab{padding:12px 18px;font-size:13px;color:var(--gray2);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;font-weight:500;transition:all .15s;}
 .tab:hover{color:var(--white);}
-.tab.active{color:var(--white);border-bottom-color:var(--red);}
+.tab.active{color:var(--yellow);border-bottom-color:var(--yellow);}
 
-/* CONTENT */
-.tab-content{display:none;padding:20px 24px;}
-.tab-content.active{display:block;}
+/* ── MAIN ── */
+.tab-panel{display:none;padding:20px;max-width:1200px;margin:0 auto;}
+.tab-panel.active{display:block;}
 
-/* SCORECARDS */
-.scorecards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:20px;}
-.sc{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:16px 18px;border-left:3px solid var(--red);}
-.sc.yellow{border-left-color:var(--yellow);}
-.sc.blue{border-left-color:var(--blue);}
-.sc.green{border-left-color:var(--green);}
-.sc.orange{border-left-color:var(--orange);}
-.sc-label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
-.sc-value{font-size:30px;font-weight:700;font-family:var(--mono);line-height:1;}
-.sc-sub{font-size:11px;color:var(--gray2);margin-top:5px;}
-.sc-alert{border-left-color:#ff6b6b;}
-.sc-alert .sc-value{color:#ff6b6b;}
+/* ── KPI CARDS ── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px 14px;}
+.kpi-card .kpi-label{font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+.kpi-card .kpi-val{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--white);}
+.kpi-card .kpi-sub{font-size:11px;color:var(--gray2);margin-top:4px;}
+.kpi-card.highlight{border-color:var(--yellow);background:rgba(255,225,64,.05);}
+.kpi-card.red-highlight{border-color:var(--red);background:rgba(200,16,46,.07);}
 
-/* GRIDS */
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;}
-.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
-.grid4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:16px;}
-@media(max-width:1100px){.grid4{grid-template-columns:1fr 1fr;}.grid3{grid-template-columns:1fr 1fr;}}
-@media(max-width:700px){.grid2,.grid3,.grid4{grid-template-columns:1fr;}}
+/* ── ALERT SECTION ── */
+.alert-section{background:var(--card);border:1px solid var(--border);border-radius:8px;margin-bottom:20px;overflow:hidden;}
+.alert-header{padding:14px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.alert-header .alert-badge{background:var(--red);color:#fff;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;}
+.alert-header .alert-title{font-size:13px;font-weight:600;color:var(--white);}
+.alert-header .alert-icon{font-size:16px;}
+.alert-header .toggle-icon{margin-left:auto;color:var(--gray2);font-size:14px;transition:transform .2s;}
+.alert-header.collapsed .toggle-icon{transform:rotate(-90deg);}
+.alert-body{padding:0;}
+.alert-item{padding:12px 16px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start;}
+.alert-item:last-child{border-bottom:none;}
+.alert-item-name{font-size:13px;font-weight:600;color:var(--white);}
+.alert-item-detail{font-size:11px;color:var(--gray2);margin-top:3px;line-height:1.5;}
+.alert-item-time{font-size:11px;color:var(--orange);font-family:var(--mono);white-space:nowrap;}
+.alert-item-flag{display:inline-block;background:rgba(245,158,11,.15);color:var(--orange);border:1px solid rgba(245,158,11,.3);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:700;}
+.alert-empty{padding:20px;text-align:center;color:var(--gray2);font-size:13px;}
 
-/* CHART CARD */
-.chart-card{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;}
-.chart-card h3{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;}
-.chart-wrap{position:relative;}
-.h200{height:200px;}
-.h260{height:260px;}
-.h300{height:300px;}
-.h340{height:340px;}
+/* ── SECTION TITLE ── */
+.section-title{font-size:13px;font-weight:600;color:var(--gray2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border);}
 
-/* TABLE */
-.tbl-card{background:var(--card);border:1px solid var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px;}
-.tbl-card h3{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;padding:14px 18px;border-bottom:1px solid var(--border);}
-table{width:100%;border-collapse:collapse;}
-thead tr{background:var(--card2);}
-th{padding:9px 14px;text-align:left;font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap;}
-td{padding:9px 14px;font-size:13px;border-bottom:1px solid var(--border);}
-tr:last-child td{border-bottom:none;}
-tr:hover td{background:rgba(255,255,255,.025);}
-.num{font-family:var(--mono);text-align:right;}
-.rank{font-family:var(--mono);color:var(--gray2);font-size:11px;}
+/* ── TABLE ── */
+.data-table{width:100%;border-collapse:collapse;font-size:12px;}
+.data-table th{background:var(--card2);color:var(--gray2);font-weight:600;text-transform:uppercase;font-size:10px;letter-spacing:.05em;padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);}
+.data-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--white);}
+.data-table tr:hover td{background:rgba(255,255,255,.02);}
+.data-table .badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;}
+.badge-mt{background:rgba(47,120,152,.2);color:#5bc8f5;}
+.badge-gt{background:rgba(34,197,94,.1);color:#4ade80;}
+.badge-fraud{background:rgba(200,16,46,.2);color:#ff6b6b;}
+.badge-clean{background:rgba(34,197,94,.1);color:#4ade80;}
 
-/* PILLS */
-.pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:600;}
-.pill-mt{background:rgba(200,16,46,.2);color:#ff6b8a;}
-.pill-gtn{background:rgba(74,158,191,.2);color:#7dd3f0;}
-.pill-gtc{background:rgba(255,225,64,.2);color:#FFE140;}
-.pill-gts{background:rgba(76,175,130,.2);color:#4caf82;}
-.pill-ok{background:rgba(76,175,130,.15);color:#4caf82;}
-.pill-warn{background:rgba(245,158,66,.15);color:#f59e42;}
-.pill-bad{background:rgba(255,107,107,.15);color:#ff6b6b;}
+/* ── CHART ── */
+.chart-wrap{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:20px;}
+.chart-wrap canvas{max-height:220px;}
 
-/* SECTION DIVIDER */
-.sec{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 12px;display:flex;align-items:center;gap:8px;}
-.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+/* ── MAP ── */
+#mapContainer{height:400px;border-radius:8px;overflow:hidden;border:1px solid var(--border);}
 
-/* ALERT ROW */
-.alert-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
-.alert-chip{padding:6px 14px;border-radius:3px;font-size:12px;font-family:var(--mono);background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.3);color:#ff8f8f;}
-.alert-chip.ok{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.3);color:var(--green);}
+/* ── LOADING ── */
+.loading{display:flex;align-items:center;justify-content:center;height:200px;flex-direction:column;gap:12px;color:var(--gray2);font-size:13px;}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ══ MAP v3 ══ */
-.map-controls-bar{padding:10px 18px;background:var(--card2);border:1px solid var(--border);border-radius:4px 4px 0 0;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
-.map-controls-bar label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;}
-.map-select{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:4px 10px;font-size:11px;border-radius:2px;font-family:var(--mono);}
-.map-day-tags,.map-ch-tags{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
-.map-day-tag,.map-ch-tag{padding:3px 10px;border-radius:2px;font-size:10px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);color:var(--gray2);transition:all .12s;white-space:nowrap;user-select:none;}
-.map-day-tag.active{background:var(--red);border-color:var(--red);color:#fff;}
-.map-ch-tag.active{background:rgba(74,158,191,.15);border-color:var(--blue);color:var(--blue);}
-.map-day-tag:hover:not(.active),.map-ch-tag:hover:not(.active){border-color:var(--gray2);}
-.map-body{display:flex;border:1px solid var(--border);border-top:none;background:var(--card);overflow:hidden;}
-.map-unified-el{flex:1;min-width:0;height:500px;transition:height .25s ease;}
-.map-unified-el.map-h-member{height:650px;}
-.map-side-panel{width:255px;flex-shrink:0;background:var(--card2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
-.map-side-panel.hidden{display:none;}
-.msp-header{padding:12px 14px;border-bottom:1px solid var(--border);}
-.msp-name{font-size:13px;font-weight:700;color:var(--white);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.msp-sub{font-size:10px;font-family:var(--mono);color:var(--gray2);}
-.msp-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);}
-.msp-stat{background:var(--bg);border-radius:3px;padding:8px 10px;}
-.msp-stat-val{font-size:22px;font-weight:700;font-family:var(--mono);line-height:1;}
-.msp-stat-lbl{font-size:9px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.04em;margin-top:3px;}
-.msp-timeline{flex:1;overflow-y:auto;padding:10px 12px;}
-.msp-tl-title{font-size:9px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
-.msp-tl-item{display:flex;gap:8px;margin-bottom:10px;position:relative;}
-.msp-tl-item:not(:last-child)::after{content:'';position:absolute;left:8px;top:20px;bottom:-8px;width:1px;background:var(--border);}
-.msp-tl-dot{width:17px;height:17px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-family:var(--mono);font-weight:700;color:#fff;}
-.msp-tl-body{flex:1;min-width:0;}
-.msp-tl-name{font-size:11px;font-weight:600;color:var(--white);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.msp-tl-meta{font-size:10px;font-family:var(--mono);color:var(--gray2);margin-top:1px;}
-.map-footer{background:var(--card2);border:1px solid var(--border);border-top:none;border-radius:0 0 4px 4px;padding:9px 18px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;}
-.map-legend-bar{display:flex;gap:12px;flex-wrap:wrap;flex:1;}
-.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--gray2);}
-.leg-dot{width:9px;height:9px;border-radius:50%;}
-.map-dist-summary{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-family:var(--mono);font-size:11px;}
-.map-dist-total-badge{background:rgba(255,225,64,.1);border:1px solid rgba(255,225,64,.2);color:var(--yellow);padding:2px 10px;border-radius:2px;font-size:10px;font-weight:600;}
-.map-note{font-size:10px;font-family:var(--mono);color:var(--gray2);opacity:.55;}
+/* ── DATE FILTER ── */
+.filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;}
+.filter-bar label{font-size:12px;color:var(--gray2);}
+.filter-bar input[type=date],.filter-bar select{background:var(--card2);border:1px solid var(--border);color:var(--white);padding:7px 10px;border-radius:6px;font-size:12px;font-family:var(--sans);outline:none;}
+.filter-bar input[type=date]:focus,.filter-bar select:focus{border-color:var(--red);}
+.filter-btn{background:var(--red);color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;cursor:pointer;font-family:var(--sans);}
+.filter-btn:hover{background:#a00d24;}
 
-/* ── NEW: SALES ACTIVITY TABLE ── */
-.sales-activity-table{width:100%;border-collapse:collapse;}
-.sales-activity-table th{padding:9px 12px;text-align:left;font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap;background:var(--card2);}
-.sales-activity-table td{padding:8px 12px;font-size:12px;border-bottom:1px solid var(--border);}
-.sales-activity-table tr:last-child td{border-bottom:none;}
-.sales-activity-table tr:hover td{background:rgba(255,255,255,.025);}
-.sat-num{font-family:var(--mono);text-align:right;}
-.sat-zero{color:var(--gray2);}
-.sat-group-header td{background:rgba(255,255,255,.03);font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;padding:6px 12px;}
-
-/* MAPS OLD (kept for backward compat) */
-.maps-vertical{display:flex;flex-direction:column;gap:16px;}
-.map-section{background:var(--card);border:1px solid var(--border);border-radius:4px;overflow:hidden;}
-.map-header{padding:12px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.map-header h3{font-size:12px;font-family:var(--mono);color:var(--white);text-transform:uppercase;letter-spacing:.06em;}
-.map-header .map-meta{font-size:11px;color:var(--gray2);font-family:var(--mono);}
-.map-el{height:340px;}
-
-/* CALENDAR HEATMAP */
-.cal-grid{display:grid;grid-template-columns:60px repeat(31,1fr);gap:3px;font-size:10px;font-family:var(--mono);}
-.cal-header{color:var(--gray2);text-align:center;padding:2px 0;}
-.cal-name{color:var(--gray2);padding:2px 4px;display:flex;align-items:center;}
-.cal-cell{width:100%;aspect-ratio:1;border-radius:2px;cursor:pointer;transition:transform .1s;}
-.cal-cell:hover{transform:scale(1.2);}
-.cal-0{background:rgba(255,255,255,.04);}
-.cal-1{background:rgba(200,16,46,.25);}
-.cal-2{background:rgba(200,16,46,.45);}
-.cal-3{background:rgba(200,16,46,.65);}
-.cal-4{background:rgba(200,16,46,.85);}
-.cal-5{background:#C8102E;}
-.cal-weekend{background:rgba(255,255,255,.02);}
-.cal-future{background:transparent;}
-.cal-wrap{background:var(--card);border:1px solid var(--border);border-radius:4px;padding:18px;overflow-x:auto;}
-.cal-wrap h3{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;}
-.cal-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:10px;color:var(--gray2);font-family:var(--mono);}
-
-/* QUALITY BARS */
-.qual-bar-wrap{margin-bottom:12px;}
-.qual-label{font-size:11px;color:var(--gray2);margin-bottom:4px;display:flex;justify-content:space-between;}
-.qual-track{height:10px;background:rgba(255,255,255,.07);border-radius:5px;overflow:hidden;}
-.qual-fill{height:100%;border-radius:5px;transition:width .6s ease;}
-
-/* LOADING */
-.loading-overlay{position:fixed;inset:0;background:rgba(15,30,46,.9);display:flex;align-items:center;justify-content:center;z-index:500;flex-direction:column;gap:14px;}
-.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.loading-overlay p{font-size:13px;font-family:var(--mono);color:var(--gray2);}
-
-.empty{padding:30px;text-align:center;color:var(--gray2);font-size:13px;}
-
-/* Leaflet popup override */
-.leaflet-popup-content-wrapper{background:var(--card2);color:var(--white);border:1px solid var(--border);border-radius:4px;font-family:var(--sans);font-size:12px;}
-.leaflet-popup-tip{background:var(--card2);}
-.leaflet-popup-content b{color:var(--yellow);}
-.leaflet-popup-content .cp-row{margin:2px 0;font-size:11px;color:var(--gray2);}
-.leaflet-popup-content .cp-count{font-family:var(--mono);color:var(--white);font-weight:600;}
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr);}
+  .topbar .logo{font-size:12px;}
+}
 </style>
 </head>
 <body>
@@ -228,1304 +141,393 @@ tr:hover td{background:rgba(255,255,255,.025);}
 <div id="loginScreen">
   <div class="login-box">
     <div class="login-logo">
-      <div class="badge">DGM</div>
-      <div class="brand"><strong>Denis G.M. Company</strong>Sales Survey Dashboard v3</div>
+      <div class="badge">🐔</div>
+      <div>
+        <div class="login-title">DGM Survey Dashboard</div>
+        <div class="login-sub">Ayam Brand · Sales & Marketing</div>
+      </div>
     </div>
-    <div class="login-title">Đăng nhập</div>
-    <div class="login-sub">Nhập mật khẩu để xem dashboard</div>
-    <label>Mật khẩu</label>
-    <input type="password" id="pwInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
-    <button class="login-btn" onclick="doLogin()">Xem Dashboard →</button>
-    <div class="login-err" id="loginErr">Mật khẩu không đúng.</div>
+    <label class="login-label">Mật khẩu</label>
+    <input class="login-input" type="password" id="pwInput" placeholder="Nhập mật khẩu..." onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="login-btn" onclick="doLogin()">Đăng nhập →</button>
+    <div class="login-err" id="loginErr"></div>
   </div>
 </div>
 
 <!-- APP -->
-<div id="app">
-  <div class="loading-overlay" id="loadingOverlay">
-    <div class="spinner"></div>
-    <p id="loadingMsg">Đang tải dữ liệu...</p>
-  </div>
-
-  <!-- Topbar -->
+<div id="appShell">
   <div class="topbar">
-    <div class="topbar-left">
-      <div class="topbar-badge">DGM</div>
-      <div>
-        <div class="topbar-title">Sales Survey Dashboard</div>
-        <div class="topbar-sub">Ayam Brand Vietnam · Denis G.M. Co., Ltd</div>
-      </div>
-    </div>
-    <div class="topbar-right">
-      <span id="lastUpdate">--</span>
-      <button class="btn-sm" onclick="loadData()">↻ Refresh</button>
+    <div class="logo">DGM <span>DASHBOARD</span></div>
+    <div class="sync-info">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Chưa tải</span>
+      <button class="sync-btn" onclick="loadData()">↻ Tải lại</button>
+      <button class="logout-btn" onclick="doLogout()" title="Đăng xuất">⎋</button>
     </div>
   </div>
 
-  <!-- Filter -->
-  <div class="filter-bar">
-    <label>Ngày:</label>
-    <span class="filter-tag active" onclick="setQuick('today',this)">Hôm nay</span>
-    <span class="filter-tag" onclick="setQuick('week',this)">7 ngày</span>
-    <span class="filter-tag" onclick="setQuick('month',this)">Tháng này</span>
-    <label style="margin-left:8px">Từ:</label>
-    <input type="date" id="dateFrom" onchange="clearQuick();renderAll()">
-    <label>Đến:</label>
-    <input type="date" id="dateTo" onchange="clearQuick();renderAll()">
-  </div>
-
-  <!-- Tabs -->
   <div class="tabs">
-    <div class="tab active" onclick="switchTab('overview',this)">📊 Tổng quan</div>
-    <div class="tab" onclick="switchTab('mt',this)">🏬 MT Team</div>
-    <div class="tab" onclick="switchTab('gt',this)">🏪 GT Team</div>
-    <div class="tab" onclick="switchTab('map',this)">🗺️ Bản đồ</div>
-    <div class="tab" onclick="switchTab('calendar',this)">📅 Lịch Survey</div>
-    <div class="tab" onclick="switchTab('quality',this)">✅ Chất lượng</div>
-    <div class="tab" onclick="switchTab('stores',this)">🏪 Điểm bán</div>
+    <div class="tab active" onclick="switchTab('overview')">📊 Tổng quan</div>
+    <div class="tab" onclick="switchTab('mt')">🏪 MT</div>
+    <div class="tab" onclick="switchTab('gt')">📦 GT</div>
+    <div class="tab" onclick="switchTab('map')">🗺️ Bản đồ</div>
+    <div class="tab" onclick="switchTab('raw')">📋 Dữ liệu</div>
   </div>
 
-  <!-- ── TAB OVERVIEW ── -->
-  <div class="tab-content active" id="tab-overview">
-    <div class="sec">Tổng quan toàn team</div>
-    <div id="alertBar" class="alert-row"></div>
-    <div class="scorecards" id="sc-overview"></div>
-    <div class="grid2">
-      <div class="chart-card">
-        <h3>Điểm survey theo ngày</h3>
-        <div class="chart-wrap h260"><canvas id="chartDaily"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <h3>Phân bổ MT vs GT (tháng này)</h3>
-        <div class="chart-wrap h260"><canvas id="chartMtGt"></canvas></div>
-      </div>
+  <!-- OVERVIEW TAB -->
+  <div class="tab-panel active" id="tab-overview">
+    <div class="filter-bar">
+      <label>Từ ngày</label>
+      <input type="date" id="filterFrom">
+      <label>Đến ngày</label>
+      <input type="date" id="filterTo">
+      <button class="filter-btn" onclick="applyFilter()">Lọc</button>
+      <button class="filter-btn" style="background:var(--card2);color:var(--white)" onclick="setToday()">Hôm nay</button>
     </div>
-
-    <!-- ★ NEW: SALES ACTIVITY TABLE ★ -->
-    <div class="sec">Hoạt động theo Sales — hôm nay &amp; lũy kế tháng</div>
-    <div class="tbl-card">
-      <h3>Tổng hợp theo kênh · vùng · nhân viên</h3>
-      <div style="overflow-x:auto;">
-        <table class="sales-activity-table">
-          <thead>
-            <tr>
-              <th>Nhân viên</th>
-              <th>Kênh</th>
-              <th>Vùng / Chain</th>
-              <th class="sat-num">Chợ/Chain hôm nay</th>
-              <th class="sat-num">Điểm bán hôm nay</th>
-              <th class="sat-num">Chợ/Chain tháng</th>
-              <th class="sat-num">Điểm bán tháng</th>
-            </tr>
-          </thead>
-          <tbody id="tbSalesActivity"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="sec">Xếp hạng nhân viên</div>
-    <div class="tbl-card">
-      <h3>Top nhân viên — lũy kế tháng này</h3>
-      <table><thead><tr><th>#</th><th>Nhân viên</th><th>Team</th><th class="num">Hôm nay</th><th class="num">Tuần này</th><th class="num">Tháng này</th><th>Trạng thái</th></tr></thead>
-      <tbody id="tbOverview"></tbody></table>
+    <div id="overviewContent">
+      <div class="loading"><div class="spinner"></div><span>Đang tải dữ liệu...</span></div>
     </div>
   </div>
 
-  <!-- ── TAB MT ── -->
-  <div class="tab-content" id="tab-mt">
-    <div class="sec">MT Team — hôm nay</div>
-    <div class="scorecards" id="sc-mt"></div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Điểm theo nhân viên — hôm nay</h3><div class="chart-wrap h300"><canvas id="chartMtToday"></canvas></div></div>
-      <div class="chart-card"><h3>Lũy kế tháng này</h3><div class="chart-wrap h300"><canvas id="chartMtMonth"></canvas></div></div>
-    </div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Survey theo Chain (tháng này)</h3><div class="chart-wrap h260"><canvas id="chartMtChain"></canvas></div></div>
-      <div class="chart-card"><h3>Trend 7 ngày gần nhất</h3><div class="chart-wrap h260"><canvas id="chartMt7d"></canvas></div></div>
-    </div>
-    <div class="tbl-card">
-      <h3>Chi tiết MT Team</h3>
-      <table><thead><tr><th>#</th><th>Nhân viên</th><th class="num">Hôm nay</th><th class="num">Tuần</th><th class="num">Tháng</th><th>Chain nhiều nhất</th><th>Trưng bày OK</th></tr></thead>
-      <tbody id="tbMt"></tbody></table>
-    </div>
-    <div class="tbl-card">
-      <h3>Survey gần nhất — MT</h3>
-      <table><thead><tr><th>Giờ</th><th>Nhân viên</th><th>Chain</th><th>Điểm bán</th><th>Trưng bày</th><th>Bảng giá</th><th>HSD</th></tr></thead>
-      <tbody id="tbMtRecent"></tbody></table>
+  <!-- MT TAB -->
+  <div class="tab-panel" id="tab-mt">
+    <div id="mtContent">
+      <div class="loading"><div class="spinner"></div><span>Đang tải dữ liệu...</span></div>
     </div>
   </div>
 
-  <!-- ── TAB GT ── -->
-  <div class="tab-content" id="tab-gt">
-    <div class="sec">GT Team — hôm nay</div>
-    <div class="scorecards" id="sc-gt"></div>
-    <div class="grid3">
-      <div class="chart-card"><h3>🔵 GT North — hôm nay</h3><div class="chart-wrap h200"><canvas id="chartGtN"></canvas></div></div>
-      <div class="chart-card"><h3>🟡 GT Central — hôm nay</h3><div class="chart-wrap h200"><canvas id="chartGtC"></canvas></div></div>
-      <div class="chart-card"><h3>🟢 GT South — hôm nay</h3><div class="chart-wrap h200"><canvas id="chartGtS"></canvas></div></div>
-    </div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Lũy kế tháng theo vùng</h3><div class="chart-wrap h260"><canvas id="chartGtRegion"></canvas></div></div>
-      <div class="chart-card"><h3>GT New Customer — tháng này</h3><div class="chart-wrap h260"><canvas id="chartGtNew"></canvas></div></div>
-    </div>
-    <div class="tbl-card">
-      <h3>Chi tiết GT Team</h3>
-      <table><thead><tr><th>#</th><th>Nhân viên</th><th>Vùng</th><th class="num">Hôm nay</th><th class="num">Tuần</th><th class="num">Tháng</th><th class="num">KH mới tháng</th></tr></thead>
-      <tbody id="tbGt"></tbody></table>
-    </div>
-    <div class="tbl-card">
-      <h3>Survey gần nhất — GT</h3>
-      <table><thead><tr><th>Giờ</th><th>Nhân viên</th><th>Vùng</th><th>Điểm bán</th><th>Loại</th><th>Ghi chú</th></tr></thead>
-      <tbody id="tbGtRecent"></tbody></table>
+  <!-- GT TAB -->
+  <div class="tab-panel" id="tab-gt">
+    <div id="gtContent">
+      <div class="loading"><div class="spinner"></div><span>Đang tải dữ liệu...</span></div>
     </div>
   </div>
 
-  <!-- ── TAB MAP v3 ── -->
-  <div class="tab-content" id="tab-map">
-    <!-- Filter bar -->
-    <div class="map-controls-bar">
-      <label>Ngày xem:</label>
-      <div class="map-day-tags">
-        <span class="map-day-tag active" data-range="today" onclick="setMapDay('today',this)">Hôm nay</span>
-        <span class="map-day-tag" data-range="week" onclick="setMapDay('week',this)">Tuần này</span>
-        <select id="mapMonthSelect" class="map-select" style="padding:2px 6px;font-size:10px;" onchange="setMapDay('month',null,this.value)">
-          <option value="">Chọn tháng...</option>
-        </select>
-        <span class="map-day-tag" data-range="all" onclick="setMapDay('all',this)">Tất cả</span>
-      </div>
-      <label style="margin-left:8px;">Kênh:</label>
-      <div class="map-ch-tags">
-        <span class="map-ch-tag active" data-ch="all" onclick="setMapChannel('all',this)">Tất cả</span>
-        <span class="map-ch-tag" data-ch="MT" onclick="setMapChannel('MT',this)">MT</span>
-        <span class="map-ch-tag" data-ch="GTN" onclick="setMapChannel('GTN',this)">GT North</span>
-        <span class="map-ch-tag" data-ch="GTC" onclick="setMapChannel('GTC',this)">GT Central</span>
-        <span class="map-ch-tag" data-ch="GTS" onclick="setMapChannel('GTS',this)">GT South</span>
-      </div>
-      <label style="margin-left:8px;">Nhân viên:</label>
-      <select id="mapMember" class="map-select" onchange="renderUnifiedMap()"><option value="all">Tất cả</option></select>
-      <span id="mapTotalCount" style="font-size:10px;font-family:var(--mono);color:var(--gray2);margin-left:4px;"></span>
-    </div>
-
-    <!-- Map body: map + side panel -->
-    <div class="map-body">
-      <div id="mapUnified" class="map-unified-el"></div>
-      <!-- Member side panel (shown when specific member selected) -->
-      <div class="map-side-panel hidden" id="mapSidePanel">
-        <div class="msp-header">
-          <div class="msp-name" id="mspName">—</div>
-          <div class="msp-sub" id="mspSub">—</div>
-        </div>
-        <div class="msp-stats" id="mspStats"></div>
-        <div class="msp-timeline">
-          <div class="msp-tl-title">Lịch trình hôm nay</div>
-          <div id="mspTimeline"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Footer: legend + distance summary -->
-    <div class="map-footer">
-      <div class="map-legend-bar" id="legendUnified"></div>
-      <div class="map-dist-summary">
-        <span id="mapDistTotal" class="map-dist-total-badge">— km</span>
-        <span id="mapDistMembers" style="color:var(--gray2);font-size:11px;"></span>
-        <span class="map-note">· Đường thẳng × 1.35</span>
-      </div>
-    </div>
+  <!-- MAP TAB -->
+  <div class="tab-panel" id="tab-map">
+    <div class="section-title">Vị trí khảo sát GPS</div>
+    <div id="mapContainer"></div>
   </div>
 
-  <!-- ── TAB CALENDAR ── -->
-  <div class="tab-content" id="tab-calendar">
-    <div class="sec">Lịch survey tháng này — từng nhân viên</div>
-    <div class="cal-wrap" id="calWrap">
-      <h3>Tần suất survey theo ngày</h3>
-      <div id="calGrid"></div>
-      <div class="cal-legend">
-        <span>Ít</span>
-        <div style="width:12px;height:12px;border-radius:2px;background:rgba(200,16,46,.2)"></div>
-        <div style="width:12px;height:12px;border-radius:2px;background:rgba(200,16,46,.45)"></div>
-        <div style="width:12px;height:12px;border-radius:2px;background:rgba(200,16,46,.7)"></div>
-        <div style="width:12px;height:12px;border-radius:2px;background:#C8102E"></div>
-        <span>Nhiều</span>
-        <span style="margin-left:12px">⬜ = Chưa survey</span>
-      </div>
-    </div>
-    <div class="sec" style="margin-top:20px">Nhân viên chưa survey hôm nay</div>
-    <div id="notSurveyedToday" class="alert-row"></div>
-    <div class="tbl-card" style="margin-top:16px">
-      <h3>Tổng hợp số ngày survey trong tháng</h3>
-      <table><thead><tr><th>Nhân viên</th><th>Team</th><th class="num">Ngày có survey</th><th class="num">Tổng điểm tháng</th><th class="num">TB điểm/ngày</th></tr></thead>
-      <tbody id="tbCalSummary"></tbody></table>
+  <!-- RAW TAB -->
+  <div class="tab-panel" id="tab-raw">
+    <div id="rawContent">
+      <div class="loading"><div class="spinner"></div><span>Đang tải dữ liệu...</span></div>
     </div>
   </div>
-
-  <!-- ── TAB QUALITY ── -->
-  <div class="tab-content" id="tab-quality">
-    <div class="sec">Chất lượng survey — MT Team</div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Trưng bày tại điểm bán</h3><div id="qualTrungBay"></div></div>
-      <div class="chart-card"><h3>Bảng giá</h3><div id="qualBangGia"></div></div>
-    </div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Tình trạng hàng hóa</h3><div id="qualTinhTrang"></div></div>
-      <div class="chart-card"><h3>HSD sản phẩm</h3><div id="qualHSD"></div></div>
-    </div>
-    <div class="sec">Trend chất lượng 7 ngày gần nhất</div>
-    <div class="chart-card">
-      <h3>% Trưng bày tốt (Đúng vị trí, Tầm mắt) theo ngày</h3>
-      <div class="chart-wrap h260"><canvas id="chartQualTrend"></canvas></div>
-    </div>
-    <div class="sec">Chi tiết theo nhân viên</div>
-    <div class="tbl-card">
-      <h3>Chỉ số chất lượng từng nhân viên MT (tháng này)</h3>
-      <table><thead><tr><th>Nhân viên</th><th class="num">Tổng survey</th><th>Trưng bày tốt</th><th>Bảng giá đúng</th><th>HSD tốt</th></tr></thead>
-      <tbody id="tbQuality"></tbody></table>
-    </div>
-  </div>
-
-  <!-- ── TAB STORES ── -->
-  <div class="tab-content" id="tab-stores">
-    <div class="sec">Phân tích điểm bán</div>
-    <div class="scorecards" id="sc-stores"></div>
-    <div class="grid2">
-      <div class="chart-card"><h3>Top 10 điểm bán được survey nhiều nhất (tháng này)</h3><div class="chart-wrap h340"><canvas id="chartTopStores"></canvas></div></div>
-      <div class="chart-card"><h3>MT — Phân bổ theo Chain</h3><div class="chart-wrap h340"><canvas id="chartStoreChain"></canvas></div></div>
-    </div>
-    <div class="tbl-card">
-      <h3>Điểm bán có vấn đề trưng bày (tháng này)</h3>
-      <table><thead><tr><th>Điểm bán</th><th>Chain</th><th class="num">Lần survey</th><th class="num">Lần có vấn đề</th><th>Vấn đề chính</th></tr></thead>
-      <tbody id="tbStoreIssues"></tbody></table>
-    </div>
-    <div class="tbl-card">
-      <h3>GT New Customer — danh sách tháng này</h3>
-      <table><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Vùng</th><th>Điểm bán</th><th>Hình thức KD</th><th>Tiềm năng</th></tr></thead>
-      <tbody id="tbNewCustomers"></tbody></table>
-    </div>
-  </div>
-
-</div><!-- end #app -->
+</div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// CONFIG
-// ══════════════════════════════════════════════════════════
-const PASS = '2026';
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYpHeVVTpLGXwzp0T6CRkjakkucSD3i27hkXMD5Af3mv7V5dsmG1Hyrng8aSx5NoH5vw/exec';
+// ── CONFIG ─────────────────────────────────────────────────
+// TODO: Thay bằng URL Apps Script doGet() của bạn
+const SCRIPT_URL = localStorage.getItem('dgm_dash_url') || '';
+const PASSWORD = '2026';
 
-const TEAM_COLORS = ['#C8102E','#FFE140','#4A9EBF','#4caf82','#f59e42','#b39ddb','#80deea','#f48fb1','#a5d6a7','#fff176','#90caf9','#ffcc80','#bcaaa4','#c5e1a5','#80cbc4','#ffe082','#ef9a9a','#ce93d8'];
+let rawMT = [], rawGT = [], filtered = { mt: [], gt: [] };
+let mapInstance = null;
 
-// Unified map storage
-let MAP_UNIFIED = null;
-const UMAP_MARKERS = [];
-const UMAP_LINES = [];
-let UMAP_START_MARKERS = [];
-let CHART_INSTANCES = {};
-let RAW = null;
-
-// ══════════════════════════════════════════════════════════
-// LOGIN
-// ══════════════════════════════════════════════════════════
+// ── AUTH ────────────────────────────────────────────────────
 function doLogin() {
-  const v = document.getElementById('pwInput').value;
-  if (v === PASS) {
-    sessionStorage.setItem('dgm_auth','1');
-    showApp();
+  const v = document.getElementById('pwInput').value.trim();
+  if (v === PASSWORD) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    initDateFilter();
+    loadData();
   } else {
-    document.getElementById('loginErr').style.display = 'block';
-    document.getElementById('pwInput').value = '';
-    document.getElementById('pwInput').focus();
+    document.getElementById('loginErr').textContent = '❌ Mật khẩu không đúng';
+    setTimeout(() => document.getElementById('loginErr').textContent = '', 2000);
   }
 }
-function showApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  const app = document.getElementById('app');
-  app.style.display = 'flex';
-  app.style.flexDirection = 'column';
+function doLogout() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+  document.getElementById('pwInput').value = '';
+}
+
+// ── DATE FILTER ─────────────────────────────────────────────
+function initDateFilter() {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('filterFrom').value = today;
+  document.getElementById('filterTo').value = today;
+}
+function setToday() {
   initDateFilter();
-  loadData();
+  applyFilter();
 }
-(function(){ if(sessionStorage.getItem('dgm_auth')==='1') showApp(); })();
-
-// ══════════════════════════════════════════════════════════
-// DATE FILTER
-// ══════════════════════════════════════════════════════════
-function toYMD(d){ return d.toISOString().slice(0,10); }
-function todayYMD(){ return toYMD(new Date()); }
-function initDateFilter(){
-  const t = todayYMD();
-  document.getElementById('dateFrom').value = t;
-  document.getElementById('dateTo').value = t;
-}
-function clearQuick(){ document.querySelectorAll('.filter-tag').forEach(e=>e.classList.remove('active')); }
-function setQuick(range, el){
-  clearQuick(); el.classList.add('active');
-  const today = new Date(), to = toYMD(today);
-  let from = to;
-  if(range==='week'){ const d=new Date(today); d.setDate(d.getDate()-6); from=toYMD(d); }
-  else if(range==='month'){ from=toYMD(new Date(today.getFullYear(),today.getMonth(),1)); }
-  document.getElementById('dateFrom').value = from;
-  document.getElementById('dateTo').value = to;
-  renderAll();
-}
-function getRange(){ return { from: document.getElementById('dateFrom').value, to: document.getElementById('dateTo').value }; }
-
-function normalizeDate(s){
-  if(!s) return '';
-  s = String(s).trim();
-  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if(m) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
-  return s.slice(0,10);
-}
-function getDS(r){ return normalizeDate(r['Ngày']||r['Timestamp']||r['timestamp']||r['Date']||''); }
-function inRange(r){ const d=getDS(r); if(!d) return false; const {from,to}=getRange(); return d>=from&&d<=to; }
-function isToday(r){ return getDS(r)===todayYMD(); }
-function isThisMonth(r){ return getDS(r).slice(0,7)===todayYMD().slice(0,7); }
-function isThisWeek(r){
-  const d=getDS(r); if(!d) return false;
-  const now=new Date(), day=now.getDay()||7;
-  const mon=new Date(now); mon.setDate(now.getDate()-day+1);
-  return d>=toYMD(mon)&&d<=todayYMD();
-}
-
-// ══════════════════════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════════════════════
-function nameKey(r){ return r['Nhân Viên']||r['NhanVien']||r['Tên Nhân Viên']||r['NHÂN VIÊN']||r['salesName']||r['SalesID']||'?'; }
-function teamKey(r){ return r['Team']||r['Team / Kênh']||r['Kênh']||r['Channel']||''; }
-function regionKey(r){ return r['Khu Vực']||r['KhuVuc']||r['Team / Kênh']||r['Team']||r['Region']||''; }
-function groupBy(arr, fn){ return arr.reduce((a,r)=>{ const k=fn(r); if(!a[k]) a[k]=[]; a[k].push(r); return a; },{}); }
-function fmt(n){ return Number(n).toLocaleString('vi-VN'); }
-
-function isNorth(r){ const v=(regionKey(r)||'').toLowerCase(); return v.includes('north')||v.includes('bắc'); }
-function isCentral(r){ const v=(regionKey(r)||'').toLowerCase(); return v.includes('central')||v.includes('trung'); }
-function isSouth(r){ const v=(regionKey(r)||'').toLowerCase(); return v.includes('south')||v.includes('nam'); }
-function isMT(r){ return (teamKey(r)||'').toUpperCase().includes('MT'); }
-
-function pct(num,den){ return den===0?'—':(num/den*100).toFixed(0)+'%'; }
-
-function destroyChart(id){ if(CHART_INSTANCES[id]){ CHART_INSTANCES[id].destroy(); delete CHART_INSTANCES[id]; } }
-
-// ══════════════════════════════════════════════════════════
-// CHART — with stable data labels via afterDraw
-// ══════════════════════════════════════════════════════════
-// Standalone afterDraw label painter — no external plugin needed
-function drawLabels(chart){
-  const type=chart.config.type;
-  const c=chart.ctx;
-  c.save();
-  c.font="600 10px 'IBM Plex Mono',monospace";
-  c.textBaseline='middle';
-  c.textAlign='center';
-
-  if(type==='bar'){
-    const isHoriz=chart.options.indexAxis==='y';
-    chart.data.datasets.forEach((ds,di)=>{
-      const meta=chart.getDatasetMeta(di);
-      if(meta.hidden) return;
-      meta.data.forEach((el,ii)=>{
-        const v=ds.data[ii];
-        if(!v||v<=0) return;
-        c.fillStyle='rgba(255,255,255,0.9)';
-        if(isHoriz){
-          // horizontal bar — label to the right of bar end
-          c.textAlign='left';
-          c.fillText(v, el.x+4, el.y);
-        } else {
-          // vertical bar — label above bar
-          c.textAlign='center';
-          c.fillText(v, el.x, el.y-8);
-        }
-      });
-    });
-  } else if(type==='doughnut'||type==='pie'){
-    chart.data.datasets.forEach((ds,di)=>{
-      const meta=chart.getDatasetMeta(di);
-      if(meta.hidden) return;
-      const total=ds.data.reduce((a,b)=>a+(b||0),0);
-      meta.data.forEach((el,ii)=>{
-        const v=ds.data[ii];
-        if(!v||!total||v/total<0.05) return;
-        const angle=(el.startAngle+el.endAngle)/2;
-        const r=(el.outerRadius+el.innerRadius)/2;
-        const x=el.x+Math.cos(angle)*r;
-        const y=el.y+Math.sin(angle)*r;
-        const pct=Math.round(v/total*100);
-        c.fillStyle='rgba(255,255,255,0.9)';
-        c.textAlign='center';
-        c.fillText(v, x, y-6);
-        c.font="500 9px 'IBM Plex Mono',monospace";
-        c.fillStyle='rgba(255,255,255,0.7)';
-        c.fillText(pct+'%', x, y+5);
-        c.font="600 10px 'IBM Plex Mono',monospace";
-      });
-    });
-  }
-  c.restore();
-}
-
-// Global afterDraw plugin — registered once, safe
-const DGM_LABEL_PLUGIN={
-  id:'dgmLabels',
-  afterDatasetsDraw(chart){ try{ drawLabels(chart); }catch(e){} }
-};
-if(!Chart.registry.plugins.get('dgmLabels')) Chart.register(DGM_LABEL_PLUGIN);
-
-function mkChart(id, type, labels, datasets, extraOpts={}){
-  destroyChart(id);
-  const ctx=document.getElementById(id); if(!ctx) return;
-  const baseOpts={
-    responsive:true, maintainAspectRatio:false,
-    plugins:{ legend:{ labels:{ color:'#9A9590', font:{size:10}, boxWidth:12 } } },
-  };
-  if(type==='bar'||type==='line'){
-    baseOpts.scales={
-      x:{ ticks:{color:'#9A9590',font:{size:10}}, grid:{color:'rgba(255,255,255,.04)'} },
-      y:{ ticks:{color:'#9A9590',font:{size:10}}, grid:{color:'rgba(255,255,255,.06)'}, beginAtZero:true }
-    };
-  }
-  const merged={...baseOpts,...extraOpts};
-  if(extraOpts.plugins) merged.plugins={...baseOpts.plugins,...extraOpts.plugins};
-  if(extraOpts.scales) merged.scales={...baseOpts.scales,...extraOpts.scales};
-  CHART_INSTANCES[id]=new Chart(ctx,{type,data:{labels,datasets},options:merged});
-}
-
-function qualBar(containerId, items){
-  const el = document.getElementById(containerId); if(!el) return;
-  el.innerHTML = items.map(it=>{
-    const p = it.total?Math.round(it.count/it.total*100):0;
-    return `<div class="qual-bar-wrap">
-      <div class="qual-label"><span>${it.label}</span><span style="color:var(--white)">${it.count}/${it.total} (${p}%)</span></div>
-      <div class="qual-track"><div class="qual-fill" style="width:${p}%;background:${it.color}"></div></div>
-    </div>`;
-  }).join('');
-}
-
-function teamPill(t){
-  if(!t) return '';
-  const tl=t.toLowerCase();
-  if(tl.includes('mt')) return `<span class="pill pill-mt">MT</span>`;
-  if(tl.includes('north')||tl.includes('bắc')) return `<span class="pill pill-gtn">GT-N</span>`;
-  if(tl.includes('central')||tl.includes('trung')) return `<span class="pill pill-gtc">GT-C</span>`;
-  if(tl.includes('south')||tl.includes('nam')) return `<span class="pill pill-gts">GT-S</span>`;
-  return `<span class="pill pill-gtn">${t}</span>`;
-}
-
-// ══════════════════════════════════════════════════════════
-// DATA LOADING
-// ══════════════════════════════════════════════════════════
-async function loadData(){
-  document.getElementById('loadingOverlay').style.display='flex';
-  document.getElementById('loadingMsg').textContent='Đang tải dữ liệu từ Google Sheet...';
-  try {
-    const res = await fetch(SCRIPT_URL+'?action=dashboard');
-    RAW = await res.json();
-    const mt=(RAW.mt_daily||[]).length, gt=(RAW.gt_daily||[]).length;
-    document.getElementById('lastUpdate').textContent =
-      'Cập nhật: '+new Date().toLocaleTimeString('vi-VN')+' | MT:'+mt+' GT:'+gt+' rows';
-    if(mt>0&&RAW.mt_daily[0]) console.log('MT cols:',Object.keys(RAW.mt_daily[0]));
-    if(gt>0&&RAW.gt_daily[0]) console.log('GT cols:',Object.keys(RAW.gt_daily[0]));
-    populateMapDayFilter();
-    populateMapMemberFilter();
-    renderAll();
-  } catch(e){
-    alert('Lỗi kết nối: '+e.message);
-  } finally {
-    document.getElementById('loadingOverlay').style.display='none';
-  }
-}
-
-// ══════════════════════════════════════════════════════════
-// RENDER ALL
-// ══════════════════════════════════════════════════════════
-function renderAll(){
-  if(!RAW) return;
+function applyFilter() {
+  const from = document.getElementById('filterFrom').value;
+  const to   = document.getElementById('filterTo').value;
+  filtered.mt = rawMT.filter(r => r.date >= from && r.date <= to);
+  filtered.gt = rawGT.filter(r => r.date >= from && r.date <= to);
   renderOverview();
   renderMT();
   renderGT();
-  renderCalendar();
-  renderQuality();
-  renderStores();
+  renderRaw();
 }
 
-// ══════════════════════════════════════════════════════════
-// TAB: OVERVIEW
-// ══════════════════════════════════════════════════════════
-function renderOverview(){
-  const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
-  const all=[...mt,...gt];
-  const allToday=all.filter(isToday);
-  const allMonth=all.filter(isThisMonth);
-  const allWeek=all.filter(isThisWeek);
-
-  const salesTeam=(RAW.sales_team||[]).filter(s=>{
-    const t=(s['Team / Kênh']||s['Team']||'').toLowerCase();
-    return !t.includes('back') && !t.includes('office') && !t.includes('trade') && !t.includes('admin') && !t.includes('marketing') && !t.includes('digital');
-  });
-  const surveyedToday=new Set(allToday.map(nameKey));
-  const notSurveyed=salesTeam.filter(s=>!surveyedToday.has(s['Tên Nhân Viên']||s['SalesID']||''));
-  const alertBar=document.getElementById('alertBar');
-  if(notSurveyed.length===0){
-    alertBar.innerHTML=`<span class="alert-chip ok">✅ Tất cả nhân viên đã survey hôm nay</span>`;
-  } else {
-    alertBar.innerHTML=`<span class="alert-chip">⚠️ Chưa survey hôm nay:</span>`+
-      notSurveyed.map(s=>`<span class="alert-chip">${s['Tên Nhân Viên']||s['SalesID']}</span>`).join('');
+// ── DATA LOAD ───────────────────────────────────────────────
+async function loadData() {
+  setSyncState('loading');
+  if (!SCRIPT_URL) {
+    const url = prompt('Nhập URL Apps Script Web App:');
+    if (url) { localStorage.setItem('dgm_dash_url', url); location.reload(); }
+    return;
   }
-
-  document.getElementById('sc-overview').innerHTML=`
-    <div class="sc"><div class="sc-label">Tổng hôm nay</div><div class="sc-value">${allToday.length}</div><div class="sc-sub">MT ${all.filter(r=>isToday(r)&&(teamKey(r)||'').includes('MT')).length} · GT ${all.filter(r=>isToday(r)&&!(teamKey(r)||'').includes('MT')).length}</div></div>
-    <div class="sc yellow"><div class="sc-label">Tuần này</div><div class="sc-value">${allWeek.length}</div><div class="sc-sub">${[...new Set(allWeek.map(nameKey))].length} nhân viên</div></div>
-    <div class="sc blue"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${allMonth.length}</div><div class="sc-sub">MT ${mt.filter(isThisMonth).length} · GT ${gt.filter(isThisMonth).length}</div></div>
-    <div class="sc green"><div class="sc-label">Nhân viên active</div><div class="sc-value">${surveyedToday.size}</div><div class="sc-sub">survey hôm nay</div></div>
-  `;
-
-  const filtered=all.filter(inRange);
-  const byDay={}; filtered.forEach(r=>{ const d=getDS(r); if(!d) return; if(!byDay[d]) byDay[d]={mt:0,gt:0}; if((teamKey(r)||'').includes('MT')) byDay[d].mt++; else byDay[d].gt++; });
-  const days=Object.keys(byDay).sort();
-  mkChart('chartDaily','bar',days,[
-    {label:'MT',data:days.map(d=>byDay[d].mt),backgroundColor:'rgba(200,16,46,.75)',borderRadius:3},
-    {label:'GT',data:days.map(d=>byDay[d].gt),backgroundColor:'rgba(74,158,191,.65)',borderRadius:3}
-  ],{scales:{x:{stacked:true},y:{stacked:true}}});
-
-  const mtM=mt.filter(isThisMonth).length, gtM=gt.filter(isThisMonth).length;
-  mkChart('chartMtGt','doughnut',['MT','GT'],[{data:[mtM,gtM],backgroundColor:['rgba(200,16,46,.8)','rgba(74,158,191,.7)'],borderColor:['#C8102E','#4A9EBF'],borderWidth:2}],{plugins:{legend:{position:'bottom'}}});
-
-  // ★ SALES ACTIVITY TABLE ★
-  renderSalesActivityTable(mt, gt);
-
-  const staff={};
-  [...mt,...gt].forEach(r=>{
-    const n=nameKey(r), t=teamKey(r)||regionKey(r)||'';
-    if(!staff[n]) staff[n]={team:t,today:0,week:0,month:0};
-    if(isToday(r)) staff[n].today++;
-    if(isThisWeek(r)) staff[n].week++;
-    if(isThisMonth(r)) staff[n].month++;
-  });
-  const sorted=Object.entries(staff).sort((a,b)=>b[1].month-a[1].month);
-  document.getElementById('tbOverview').innerHTML=sorted.map(([n,d],i)=>`
-    <tr>
-      <td class="rank">${i+1}</td><td>${n}</td><td>${teamPill(d.team)}</td>
-      <td class="num">${d.today||'—'}</td>
-      <td class="num">${d.week||'—'}</td>
-      <td class="num"><strong>${fmt(d.month)}</strong></td>
-      <td>${d.today>0?'<span class="pill pill-ok">✓ Đã survey</span>':'<span class="pill pill-bad">Chưa survey</span>'}</td>
-    </tr>`).join('')||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-}
-
-// ══════════════════════════════════════════════════════════
-// ★ SALES ACTIVITY TABLE — hôm nay & tháng ★
-// ══════════════════════════════════════════════════════════
-function renderSalesActivityTable(mt, gt){
-  const today = todayYMD();
-
-  // Build per-member stats
-  // MT: Chain = chợ/chain, Điểm Bán = điểm bán
-  // GT: Chợ/Khu Vực = chợ/chain, Điểm Bán = điểm bán (Số Điểm Bán col if exists)
-
-  const stats = {}; // key: name → { channel, region, todayChains, todayStores, monthChains, monthStores }
-
-  // Process MT
-  mt.forEach(r=>{
-    const n=nameKey(r);
-    if(!stats[n]) stats[n]={channel:'MT', region:'MT', todayChains:new Set(), todayStores:new Set(), monthChains:new Set(), monthStores:new Set()};
-    const chain=r['Chain']||'';
-    const store=r['Điểm Bán']||r['Diện Bán']||'';
-    if(isThisMonth(r)){
-      if(chain) stats[n].monthChains.add(chain);
-      if(store) stats[n].monthStores.add(store);
-    }
-    if(isToday(r)){
-      if(chain) stats[n].todayChains.add(chain);
-      if(store) stats[n].todayStores.add(store);
-    }
-  });
-
-  // Process GT
-  gt.forEach(r=>{
-    const n=nameKey(r);
-    const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]={channel:'GT', region:reg, todayChains:new Set(), todayStores:new Set(), monthChains:new Set(), monthStores:new Set()};
-    else if(stats[n].channel==='MT') return; // skip if already MT
-    // GT: Chợ/Khu Vực = checkpoint (chợ/chain), Điểm Bán = individual store
-    const cho=r['Chợ/Khu Vực']||r['Chợ']||r['Khu Vực']||'';
-    const store=r['Điểm Bán']||'';
-    // Số Điểm Bán = count of stores in one submission
-    const soDP=parseInt(r['Số Điểm Bán']||1)||1;
-    if(isThisMonth(r)){
-      if(cho) stats[n].monthChains.add(cho);
-      // accumulate store count differently for GT — use store name if available
-      if(store) stats[n].monthStores.add(store+(getDS(r))); // unique per day+name
-    }
-    if(isToday(r)){
-      if(cho) stats[n].todayChains.add(cho);
-      if(store) stats[n].todayStores.add(store+today);
-    }
-  });
-
-  // Group by channel then region
-  const groups = {};
-  Object.entries(stats).forEach(([n,d])=>{
-    const key=d.channel==='MT'?'MT':d.region;
-    if(!groups[key]) groups[key]=[];
-    groups[key].push({n,d});
-  });
-
-  const channelOrder=['MT','GT North','GT Central','GT South'];
-  let rows='';
-  channelOrder.forEach(grp=>{
-    const members=groups[grp];
-    if(!members||!members.length) return;
-    rows+=`<tr class="sat-group-header"><td colspan="7">${grp==='MT'?'🏬 MT — Modern Trade':grp==='GT North'?'🔵 GT Miền Bắc':grp==='GT Central'?'🟡 GT Miền Trung':'🟢 GT Miền Nam'}</td></tr>`;
-    members.sort((a,b)=>b.d.monthStores.size-a.d.monthStores.size);
-    members.forEach(({n,d})=>{
-      const todCh=d.todayChains.size, todSt=d.todayStores.size;
-      const moCh=d.monthChains.size, moSt=d.monthStores.size;
-      const isGT=d.channel==='GT';
-      rows+=`<tr>
-        <td>${n}</td>
-        <td>${teamPill(d.channel==='MT'?'mt':d.region)}</td>
-        <td style="font-size:11px;color:var(--gray2)">${d.region==='MT'?'Modern Trade':d.region}</td>
-        <td class="sat-num ${todCh===0?'sat-zero':''}">${todCh||'—'}</td>
-        <td class="sat-num ${todSt===0?'sat-zero':''}">${todSt||'—'}</td>
-        <td class="sat-num ${moCh===0?'sat-zero':''}">${moCh||'—'}</td>
-        <td class="sat-num ${moSt===0?'sat-zero':''}">${moSt||'—'}</td>
-      </tr>`;
-    });
-  });
-
-  document.getElementById('tbSalesActivity').innerHTML=rows||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-}
-
-// ══════════════════════════════════════════════════════════
-// TAB: MT
-// ══════════════════════════════════════════════════════════
-function renderMT(){
-  const mt=RAW.mt_daily||[];
-  const td=mt.filter(isToday), wk=mt.filter(isThisWeek), mo=mt.filter(isThisMonth);
-  const byMTd=groupBy(td,nameKey), active=Object.keys(byMTd).length;
-
-  document.getElementById('sc-mt').innerHTML=`
-    <div class="sc"><div class="sc-label">Hôm nay</div><div class="sc-value">${td.length}</div><div class="sc-sub">${active} nhân viên</div></div>
-    <div class="sc yellow"><div class="sc-label">Tuần này</div><div class="sc-value">${wk.length}</div><div class="sc-sub">${[...new Set(wk.map(nameKey))].length} nhân viên</div></div>
-    <div class="sc blue"><div class="sc-label">Tháng này</div><div class="sc-value">${mo.length}</div><div class="sc-sub">tính đến hôm nay</div></div>
-    <div class="sc green"><div class="sc-label">TB/người hôm nay</div><div class="sc-value">${active?(td.length/active).toFixed(1):'—'}</div></div>
-  `;
-
-  const mems=Object.keys(byMTd).sort();
-  mkChart('chartMtToday','bar',mems,[{label:'Hôm nay',data:mems.map(m=>byMTd[m].length),backgroundColor:mems.map((_,i)=>TEAM_COLORS[i%TEAM_COLORS.length]),borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
-
-  const byMo=groupBy(mo,nameKey), memsMo=Object.keys(byMo).sort((a,b)=>byMo[b].length-byMo[a].length);
-  mkChart('chartMtMonth','bar',memsMo,[{label:'Tháng này',data:memsMo.map(m=>byMo[m].length),backgroundColor:'rgba(200,16,46,.7)',borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
-
-  const byChain=groupBy(mo,r=>r['Chain']||'Khác');
-  const chains=Object.entries(byChain).sort((a,b)=>b[1].length-a[1].length).slice(0,10);
-  mkChart('chartMtChain','doughnut',chains.map(c=>c[0]),[{data:chains.map(c=>c[1].length),backgroundColor:TEAM_COLORS,borderWidth:1}],{plugins:{legend:{position:'right',labels:{font:{size:10}}}}});
-
-  const days7=[]; for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days7.push(toYMD(d)); }
-  const byDay7=groupBy(mt,getDS);
-  mkChart('chartMt7d','line',days7.map(d=>d.slice(5)),[{label:'Survey/ngày',data:days7.map(d=>(byDay7[d]||[]).length),borderColor:'#C8102E',backgroundColor:'rgba(200,16,46,.15)',fill:true,tension:.3,pointRadius:4}],{plugins:{legend:{display:false}}});
-
-  const staffMT={};
-  mt.forEach(r=>{ const n=nameKey(r); if(!staffMT[n]) staffMT[n]={today:0,week:0,month:0,chains:{},good_display:0,total_display:0}; if(isToday(r)) staffMT[n].today++; if(isThisWeek(r)) staffMT[n].week++; if(isThisMonth(r)){ staffMT[n].month++; const ch=r['Chain']||''; if(ch) staffMT[n].chains[ch]=(staffMT[n].chains[ch]||0)+1; const tb=(r['Trưng Bày']||'').toLowerCase(); staffMT[n].total_display++; if(tb.includes('tốt')||tb.includes('đúng')||tb.includes('tầm mắt')) staffMT[n].good_display++; } });
-  const sorted=Object.entries(staffMT).sort((a,b)=>b[1].month-a[1].month);
-  document.getElementById('tbMt').innerHTML=sorted.map(([n,d],i)=>{
-    const topChain=Object.entries(d.chains).sort((a,b)=>b[1]-a[1])[0];
-    const dispPct=d.total_display?Math.round(d.good_display/d.total_display*100):0;
-    return `<tr><td class="rank">${i+1}</td><td>${n}</td><td class="num">${d.today||'—'}</td><td class="num">${d.week||'—'}</td><td class="num"><strong>${fmt(d.month)}</strong></td><td style="font-size:12px;color:var(--gray2)">${topChain?topChain[0]:'—'}</td><td><span class="pill ${dispPct>=70?'pill-ok':dispPct>=40?'pill-warn':'pill-bad'}">${dispPct}%</span></td></tr>`;
-  }).join('')||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-
-  const recent=[...mt].sort((a,b)=>String(b.Timestamp||'').localeCompare(String(a.Timestamp||''))).slice(0,25);
-  document.getElementById('tbMtRecent').innerHTML=recent.map(r=>`
-    <tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${String(r.Timestamp||'').slice(11,16)||String(r['Ngày']||'').slice(11,16)}</td>
-    <td style="font-size:12px">${nameKey(r)}</td><td style="font-size:12px">${r['Chain']||'—'}</td>
-    <td style="font-size:12px">${r['Điểm Bán']||r['Diện Bán']||'—'}</td>
-    <td style="font-size:11px">${r['Trưng Bày']||'—'}</td>
-    <td style="font-size:11px">${r['Bảng Giá']||'—'}</td>
-    <td style="font-size:11px">${r['HSD']||'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-}
-
-// ══════════════════════════════════════════════════════════
-// TAB: GT
-// ══════════════════════════════════════════════════════════
-function renderGT(){
-  const gt=RAW.gt_daily||[];
-  const td=gt.filter(isToday), mo=gt.filter(isThisMonth), wk=gt.filter(isThisWeek);
-  const north=td.filter(isNorth), central=td.filter(isCentral), south=td.filter(isSouth);
-  const moN=mo.filter(isNorth), moC=mo.filter(isCentral), moS=mo.filter(isSouth);
-  const newCust=gt.filter(r=>(r['Loại Survey']||'').includes('new')&&isThisMonth(r));
-
-  document.getElementById('sc-gt').innerHTML=`
-    <div class="sc"><div class="sc-label">GT hôm nay</div><div class="sc-value">${td.length}</div><div class="sc-sub">${[...new Set(td.map(nameKey))].length} nhân viên</div></div>
-    <div class="sc blue"><div class="sc-label">GT North</div><div class="sc-value">${north.length}</div><div class="sc-sub">${[...new Set(north.map(nameKey))].length} NV</div></div>
-    <div class="sc yellow"><div class="sc-label">GT Central</div><div class="sc-value">${central.length}</div><div class="sc-sub">${[...new Set(central.map(nameKey))].length} NV</div></div>
-    <div class="sc green"><div class="sc-label">GT South</div><div class="sc-value">${south.length}</div><div class="sc-sub">${[...new Set(south.map(nameKey))].length} NV</div></div>
-    <div class="sc yellow"><div class="sc-label">Tháng này</div><div class="sc-value">${mo.length}</div><div class="sc-sub">N:${moN.length} C:${moC.length} S:${moS.length}</div></div>
-    <div class="sc orange"><div class="sc-label">KH mới tháng</div><div class="sc-value">${newCust.length}</div><div class="sc-sub">GT New Customer</div></div>
-  `;
-
-  const mkGt=(id,data,color)=>{ const bm=groupBy(data,nameKey); const ms=Object.keys(bm); mkChart(id,'bar',ms,[{label:'Điểm',data:ms.map(m=>bm[m].length),backgroundColor:color,borderRadius:3}],{plugins:{legend:{display:false}},indexAxis:'y'}); };
-  mkGt('chartGtN',north,'rgba(74,158,191,.75)');
-  mkGt('chartGtC',central,'rgba(255,225,64,.7)');
-  mkGt('chartGtS',south,'rgba(76,175,130,.75)');
-
-  mkChart('chartGtRegion','bar',['GT North','GT Central','GT South'],[{label:'Tháng này',data:[moN.length,moC.length,moS.length],backgroundColor:['rgba(74,158,191,.7)','rgba(255,225,64,.7)','rgba(76,175,130,.7)'],borderRadius:4}],{plugins:{legend:{display:false}}});
-
-  const byCustMem=groupBy(newCust,nameKey);
-  const custMems=Object.keys(byCustMem).sort((a,b)=>byCustMem[b].length-byCustMem[a].length);
-  mkChart('chartGtNew','bar',custMems,[{label:'KH mới',data:custMems.map(m=>byCustMem[m].length),backgroundColor:'rgba(245,158,66,.7)',borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
-
-  const staffGT={};
-  gt.forEach(r=>{ const n=nameKey(r),reg=regionKey(r)||'GT'; if(!staffGT[n]) staffGT[n]={region:reg,today:0,week:0,month:0,newCust:0}; if(isToday(r)) staffGT[n].today++; if(isThisWeek(r)) staffGT[n].week++; if(isThisMonth(r)){ staffGT[n].month++; if((r['Loại Survey']||'').includes('new')) staffGT[n].newCust++; } });
-  const regOrder=['GT North','GT Central','GT South'];
-  const sortedGT=Object.entries(staffGT).sort((a,b)=>{ const ri=regOrder.findIndex(x=>a[1].region.includes(x.split(' ')[1]))-regOrder.findIndex(x=>b[1].region.includes(x.split(' ')[1])); return ri!==0?ri:b[1].month-a[1].month; });
-  document.getElementById('tbGt').innerHTML=sortedGT.map(([n,d],i)=>`
-    <tr><td class="rank">${i+1}</td><td>${n}</td><td>${teamPill(d.region)}</td>
-    <td class="num">${d.today||'—'}</td><td class="num">${d.week||'—'}</td>
-    <td class="num"><strong>${fmt(d.month)}</strong></td>
-    <td class="num">${d.newCust||'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-
-  const recent=[...gt].sort((a,b)=>String(b.Timestamp||'').localeCompare(String(a.Timestamp||''))).slice(0,25);
-  document.getElementById('tbGtRecent').innerHTML=recent.map(r=>`
-    <tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${String(r.Timestamp||'').slice(11,16)||String(r['Ngày']||'').slice(0,10)}</td>
-    <td style="font-size:12px">${nameKey(r)}</td><td>${teamPill(regionKey(r))}</td>
-    <td style="font-size:12px">${r['Điểm Bán']||r['Chợ']||'—'}</td>
-    <td><span class="pill ${(r['Loại Survey']||'').includes('new')?'pill-gtc':'pill-gtn'}">${(r['Loại Survey']||'').includes('new')?'Mới':'Daily'}</span></td>
-    <td style="font-size:11px;color:var(--gray2)">${r['Ghi Chú']||'—'}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Không có dữ liệu</td></tr>';
-}
-
-// ══════════════════════════════════════════════════════════
-// TAB: MAP v3 — Card Overlay + GPS sanity + dynamic layout
-// ══════════════════════════════════════════════════════════
-
-// Vietnam bounding box for GPS sanity check
-const VN_LAT=[8,24], VN_LNG=[102,110];
-function validGPS(lat,lng){
-  return !isNaN(lat)&&!isNaN(lng)&&lat>=VN_LAT[0]&&lat<=VN_LAT[1]&&lng>=VN_LNG[0]&&lng<=VN_LNG[1];
-}
-function getGPS(r){
-  const lat=parseFloat(r['Latitude']||(r['GPS']||'').split(',')[0]);
-  const lng=parseFloat(r['Longitude']||(r['GPS']||'').split(',').slice(-1)[0]);
-  if(!validGPS(lat,lng)) return null;
-  return [lat,lng];
-}
-function haversine(a,b){
-  const R=6371,tr=x=>x*Math.PI/180;
-  const dLat=tr(b[0]-a[0]),dLng=tr(b[1]-a[1]);
-  const h=Math.sin(dLat/2)**2+Math.cos(tr(a[0]))*Math.cos(tr(b[0]))*Math.sin(dLng/2)**2;
-  return 2*R*Math.asin(Math.sqrt(h));
-}
-function hexAlpha(hex,a){
-  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return `rgba(${r},${g},${b},${a})`;
-}
-
-// Map state
-let MAP_FILTER_DAY='today';    // 'today'|'week'|'month:YYYY-MM'|'all'
-let MAP_FILTER_CH='all';       // 'all'|'MT'|'GTN'|'GTC'|'GTS'
-const CHANNEL_CENTERS={
-  all:[16.0,106.5],zoom:6,
-  MT:[10.76,106.66],zoom:11,
-  GTN:[21.02,105.83],zoom:11,
-  GTC:[16.05,108.2],zoom:11,
-  GTS:[10.76,106.66],zoom:11
-};
-
-function setMapDay(range,el,monthVal){
-  document.querySelectorAll('.map-day-tag').forEach(t=>t.classList.remove('active'));
-  if(range==='month'){
-    MAP_FILTER_DAY='month:'+(monthVal||'');
-  } else {
-    MAP_FILTER_DAY=range;
-    if(el) el.classList.add('active');
-    document.getElementById('mapMonthSelect').value='';
+  try {
+    const [rMT, rGT] = await Promise.all([
+      fetch(SCRIPT_URL + '?action=getData&sheet=MT_Survey_Data').then(r=>r.json()),
+      fetch(SCRIPT_URL + '?action=getData&sheet=GT_Survey_Data').then(r=>r.json())
+    ]);
+    rawMT = (rMT.data || rMT.records || []);
+    rawGT = (rGT.data || rGT.records || []);
+    setSyncState('live');
+    applyFilter();
+  } catch(e) {
+    console.error(e);
+    setSyncState('error');
+    renderFallback();
   }
-  updateMapMemberFilter();
-  renderUnifiedMap();
 }
 
-function setMapChannel(ch,el){
-  document.querySelectorAll('.map-ch-tag').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  MAP_FILTER_CH=ch;
-  // Zoom map to channel region
-  if(MAP_UNIFIED){
-    const cfg=CHANNEL_CENTERS[ch]||CHANNEL_CENTERS.all;
-    MAP_UNIFIED.setView(cfg,cfg.zoom||6);
-  }
-  updateMapMemberFilter();
-  renderUnifiedMap();
+function setSyncState(s) {
+  const dot = document.getElementById('syncDot');
+  const lbl = document.getElementById('syncLabel');
+  if (s === 'live') { dot.className='sync-dot live'; lbl.textContent='Live · '+new Date().toLocaleTimeString('vi-VN'); }
+  else if (s === 'loading') { dot.className='sync-dot'; lbl.textContent='Đang tải...'; }
+  else { dot.className='sync-dot'; lbl.style.color='#ff6b6b'; lbl.textContent='Lỗi kết nối'; }
 }
-
-function mapInRange(r){
-  const d=getDS(r); if(!d) return false;
-  if(MAP_FILTER_DAY==='today') return d===todayYMD();
-  if(MAP_FILTER_DAY==='week'){
-    const now=new Date(),day=now.getDay()||7;
-    const mon=new Date(now); mon.setDate(now.getDate()-day+1);
-    return d>=toYMD(mon)&&d<=todayYMD();
-  }
-  if(MAP_FILTER_DAY.startsWith('month:')){
-    const m=MAP_FILTER_DAY.slice(6);
-    return m?d.slice(0,7)===m:true;
-  }
-  return true; // all
-}
-
-function initUnifiedMap(){
-  if(MAP_UNIFIED) return;
-  const cfg=CHANNEL_CENTERS[MAP_FILTER_CH]||CHANNEL_CENTERS.all;
-  MAP_UNIFIED=L.map('mapUnified').setView([cfg[0]||16,cfg[1]||106.5],cfg.zoom||6);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(MAP_UNIFIED);
-}
-
-function populateMapDayFilter(){
-  if(!RAW) return;
-  const all=[...(RAW.mt_daily||[]),...(RAW.gt_daily||[])];
-  const months=[...new Set(all.map(r=>getDS(r).slice(0,7)).filter(Boolean))].sort().reverse();
-  const sel=document.getElementById('mapMonthSelect');
-  sel.innerHTML='<option value="">Chọn tháng...</option>'+months.map(m=>`<option value="${m}">${m}</option>`).join('');
-}
-
-function populateMapMemberFilter(){
-  if(!RAW) return;
-  updateMapMemberFilter();
-}
-
-function updateMapMemberFilter(){
-  if(!RAW) return;
-  const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
-  let pool;
-  if(MAP_FILTER_CH==='MT') pool=mt;
-  else if(MAP_FILTER_CH==='GTN') pool=gt.filter(isNorth);
-  else if(MAP_FILTER_CH==='GTC') pool=gt.filter(isCentral);
-  else if(MAP_FILTER_CH==='GTS') pool=gt.filter(isSouth);
-  else pool=[...mt,...gt];
-  // Apply day filter too
-  pool=pool.filter(mapInRange);
-  const names=[...new Set(pool.map(nameKey))].sort();
-  const sel=document.getElementById('mapMember');
-  const cur=sel.value;
-  sel.innerHTML='<option value="all">Tất cả</option>'+names.map(n=>`<option value="${n}" ${n===cur?'selected':''}>${n}</option>`).join('');
-}
-
-function renderUnifiedMap(){
-  if(!RAW) return;
-  initUnifiedMap();
-
-  // Clear layers
-  UMAP_MARKERS.forEach(m=>MAP_UNIFIED.removeLayer(m)); UMAP_MARKERS.length=0;
-  UMAP_LINES.forEach(l=>MAP_UNIFIED.removeLayer(l)); UMAP_LINES.length=0;
-  UMAP_START_MARKERS.forEach(m=>MAP_UNIFIED.removeLayer(m)); UMAP_START_MARKERS.length=0;
-
-  const selMember=document.getElementById('mapMember').value;
-  const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
-  let allData=[
-    ...mt.map(r=>({...r,_ch:'MT'})),
-    ...gt.filter(isNorth).map(r=>({...r,_ch:'GTN'})),
-    ...gt.filter(isCentral).map(r=>({...r,_ch:'GTC'})),
-    ...gt.filter(isSouth).map(r=>({...r,_ch:'GTS'})),
-  ];
-
-  // Apply day + channel filters
-  allData=allData.filter(mapInRange);
-  if(MAP_FILTER_CH!=='all') allData=allData.filter(r=>r._ch===MAP_FILTER_CH);
-  if(selMember!=='all') allData=allData.filter(r=>nameKey(r)===selMember);
-
-  document.getElementById('mapTotalCount').textContent=allData.length+' records';
-
-  // Dynamic map height + side panel
-  const mapEl=document.getElementById('mapUnified');
-  const sidePanel=document.getElementById('mapSidePanel');
-  if(selMember!=='all'){
-    mapEl.classList.add('map-h-member');
-    sidePanel.classList.remove('hidden');
-  } else {
-    mapEl.classList.remove('map-h-member');
-    sidePanel.classList.add('hidden');
-  }
-
-  const memberNames=[...new Set(allData.map(nameKey))].sort();
-  const colorMap={};
-  memberNames.forEach((n,i)=>colorMap[n]=TEAM_COLORS[i%TEAM_COLORS.length]);
-  const memberDistances={};
-  let allCheckpointsForPanel=[];
-
-  memberNames.forEach(mem=>{
-    const color=colorMap[mem];
-    const rows=allData.filter(r=>nameKey(r)===mem)
-      .sort((a,b)=>String(a.Timestamp||a['Ngày']||'').localeCompare(String(b.Timestamp||b['Ngày']||'')));
-
-    // Group into checkpoints
-    const checkpoints=[];
-    const cpMap={};
-    rows.forEach(r=>{
-      const gps=getGPS(r);
-      const cp=r['Chain']||r['Chợ/Khu Vực']||r['Chợ']||r['Điểm Bán']||r['Diện Bán']||'(Survey)';
-      const store=r['Điểm Bán']||r['Diện Bán']||'';
-      const time=String(r.Timestamp||r['Ngày']||'').slice(11,16)||'—';
-      const key=cp+'|'+(gps?gps[0].toFixed(4):'x')+'|'+(gps?gps[1].toFixed(4):'x');
-      if(cpMap[key]===undefined){
-        cpMap[key]=checkpoints.length;
-        checkpoints.push({name:cp,storeCount:0,coords:gps,time,stores:[]});
-      }
-      checkpoints[cpMap[key]].storeCount++;
-      if(store) checkpoints[cpMap[key]].stores.push(store);
-    });
-    if(selMember!=='all') allCheckpointsForPanel=checkpoints;
-
-    const routeCoords=checkpoints.filter(cp=>cp.coords).map(cp=>cp.coords);
-
-    // Gradient route: segments fade from full→light
-    if(routeCoords.length>1){
-      const total=routeCoords.length-1;
-      for(let i=0;i<total;i++){
-        const opacity=1-(i/total)*0.65;
-        const weight=3.5-(i/total)*1.2;
-        const seg=L.polyline([routeCoords[i],routeCoords[i+1]],{color,weight,opacity,lineJoin:'round',lineCap:'round'});
-        seg.addTo(MAP_UNIFIED); UMAP_LINES.push(seg);
-      }
-      // Glow
-      const glow=L.polyline(routeCoords,{color,weight:10,opacity:.07,lineJoin:'round'});
-      glow.addTo(MAP_UNIFIED); UMAP_LINES.push(glow);
-    }
-
-    // Distance (only valid GPS coords)
-    let distKm=0;
-    for(let i=1;i<routeCoords.length;i++) distKm+=haversine(routeCoords[i-1],routeCoords[i]);
-    memberDistances[mem]=distKm*1.35;
-
-    // Draw markers
-    checkpoints.forEach((cp,idx)=>{
-      if(!cp.coords) return;
-      const isStart=idx===0;
-      const isEnd=idx===checkpoints.length-1&&checkpoints.length>1;
-      const num=idx+1;
-      const shortName=mem.split(' ').slice(-1)[0];
-      const storeNames=cp.stores.slice(0,3).join('<br>');
-      const moreStores=cp.stores.length>3?`<span style="color:rgba(255,255,255,.4);font-size:9px">+${cp.stores.length-3} điểm khác</span>`:'';
-
-      if(isStart){
-        const html=`<div style="position:relative;display:inline-block;filter:drop-shadow(0 3px 6px rgba(0,0,0,0.5));">
-          <div style="position:absolute;bottom:calc(100% + 2px);left:50%;transform:translateX(-50%);background:${color};color:#fff;font-size:9px;font-family:'IBM Plex Mono',monospace;font-weight:700;padding:2px 7px;border-radius:3px;white-space:nowrap;">${shortName}</div>
-          <svg width="26" height="34" viewBox="0 0 26 34" xmlns="http://www.w3.org/2000/svg">
-            <ellipse cx="13" cy="32" rx="5" ry="2" fill="rgba(0,0,0,0.35)"/>
-            <path d="M13 1 C6.4 1 1 6.4 1 13 C1 22 13 33 13 33 C13 33 25 22 25 13 C25 6.4 19.6 1 13 1Z" fill="${color}" stroke="rgba(255,255,255,0.7)" stroke-width="1.2"/>
-            <circle cx="13" cy="13" r="5" fill="rgba(255,255,255,0.3)"/>
-            <circle cx="13" cy="13" r="3" fill="rgba(255,255,255,0.9)"/>
-          </svg></div>`;
-        const icon=L.divIcon({className:'',html,iconSize:[26,52],iconAnchor:[13,34]});
-        const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
-          <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🚩 ${mem} — Xuất phát</div>
-          <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
-          <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
-          ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
-        </div>`;
-        const mk=L.marker(cp.coords,{icon,zIndexOffset:1000}).bindPopup(popup,{maxWidth:200});
-        mk.addTo(MAP_UNIFIED); UMAP_START_MARKERS.push(mk);
-        return;
-      }
-      if(isEnd){
-        const html=`<div style="filter:drop-shadow(0 2px 5px rgba(0,0,0,0.5));">
-          <svg width="22" height="22" viewBox="0 0 22 22" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="11" cy="11" r="10" fill="${color}" stroke="rgba(255,255,255,0.85)" stroke-width="2"/>
-            <text x="11" y="15" text-anchor="middle" fill="#fff" font-size="11" font-family="monospace">🏁</text>
-          </svg></div>`;
-        const icon=L.divIcon({className:'',html,iconSize:[22,22],iconAnchor:[11,11]});
-        const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
-          <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">🏁 ${mem} — Điểm cuối</div>
-          <div style="color:rgba(255,255,255,.9);font-size:11px">${cp.name}</div>
-          <div style="color:rgba(255,255,255,.5);font-size:10px;margin-top:2px">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
-          ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:4px;line-height:1.5">${storeNames}</div>`:''}
-        </div>`;
-        const mk=L.marker(cp.coords,{icon}).bindPopup(popup,{maxWidth:200});
-        mk.addTo(MAP_UNIFIED); UMAP_MARKERS.push(mk);
-        return;
-      }
-      // Mid checkpoint — card overlay
-      const cardHtml=`<div style="position:relative;display:inline-block;">
-        <div style="position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%);background:#162536;border:1px solid ${hexAlpha(color,0.55)};border-top:2px solid ${color};border-radius:4px;padding:5px 8px;min-width:110px;max-width:155px;box-shadow:0 3px 10px rgba(0,0,0,0.55);pointer-events:none;white-space:nowrap;">
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:700;color:${color};margin-bottom:2px;">${num}. ${cp.name.length>18?cp.name.slice(0,17)+'…':cp.name}</div>
-          <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,.6);display:flex;gap:8px;"><span>📍 ${cp.storeCount}</span><span>🕐 ${cp.time}</span></div>
-        </div>
-        <div style="width:1px;height:5px;background:${hexAlpha(color,0.45)};margin:0 auto;"></div>
-        <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" style="filter:drop-shadow(0 2px 4px rgba(0,0,0,0.4));display:block;">
-          <circle cx="9" cy="9" r="8" fill="#162536" stroke="${color}" stroke-width="2"/>
-          <circle cx="9" cy="9" r="4" fill="${color}" opacity=".9"/>
-        </svg>
-      </div>`;
-      const icon=L.divIcon({className:'',html:cardHtml,iconSize:[18,80],iconAnchor:[9,80]});
-      const popup=`<div style="font-family:'IBM Plex Mono',monospace;">
-        <div style="color:${color};font-weight:700;font-size:12px;margin-bottom:4px">${mem} — Điểm ${num}</div>
-        <div style="color:rgba(255,255,255,.9);font-size:11px;margin-bottom:4px">${cp.name}</div>
-        <div style="color:rgba(255,255,255,.5);font-size:10px;">🕐 ${cp.time} · 📍 ${cp.storeCount} điểm bán</div>
-        ${storeNames?`<div style="color:rgba(255,255,255,.4);font-size:10px;margin-top:6px;border-top:1px solid rgba(255,255,255,.08);padding-top:5px;line-height:1.6">${storeNames}</div>`:''}
-        ${moreStores?`<div style="margin-top:2px">${moreStores}</div>`:''}
-      </div>`;
-      const mk=L.marker(cp.coords,{icon}).bindPopup(popup,{maxWidth:210});
-      mk.addTo(MAP_UNIFIED); UMAP_MARKERS.push(mk);
-    });
+function renderFallback() {
+  ['overviewContent','mtContent','gtContent','rawContent'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="loading" style="height:120px"><span style="color:#ff6b6b">⚠️ Không thể tải dữ liệu. Kiểm tra URL Apps Script.</span></div>';
   });
+}
 
-  // Fit bounds (only if valid points exist)
-  const allMks=[...UMAP_MARKERS,...UMAP_START_MARKERS];
-  if(allMks.length>0){
-    try{
-      const grp=L.featureGroup(allMks);
-      const bounds=grp.getBounds();
-      if(bounds.isValid()) MAP_UNIFIED.fitBounds(bounds.pad(.15));
-    }catch(e){}
-  } else if(MAP_FILTER_CH!=='all'){
-    // No data — zoom to channel region
-    const cfg=CHANNEL_CENTERS[MAP_FILTER_CH];
-    if(cfg) MAP_UNIFIED.setView([cfg[0],cfg[1]],cfg.zoom||10);
-  }
-  MAP_UNIFIED.invalidateSize();
+// ── FRAUD ALERTS ─────────────────────────────────────────────
+function getFraudAlerts(records) {
+  return records.filter(r =>
+    r.fraud_flag === 'SUSPICIOUS' || r.fraud_flag === 'SUSPECT' ||
+    (r.conflict_with && r.conflict_with.trim() !== '')
+  );
+}
 
-  // Update meta (top-right)
-  const metaEl=document.getElementById('mapUnifiedMeta');
-  if(metaEl) metaEl.textContent=(allMks.length)+' điểm có GPS · '+memberNames.length+' sales';
+function renderFraudSection(mtRecords, gtRecords) {
+  const allFraud = [...getFraudAlerts(mtRecords), ...getFraudAlerts(gtRecords)]
+    .sort((a,b) => (b.timestamp||'') > (a.timestamp||'') ? 1 : -1);
 
-  // Legend
-  document.getElementById('legendUnified').innerHTML=memberNames.map(n=>{
-    const ch=allData.find(r=>nameKey(r)===n)?._ch||'';
-    const chLabel=ch==='MT'?'MT':ch==='GTN'?'GT-N':ch==='GTC'?'GT-C':ch==='GTS'?'GT-S':'';
-    const km=(memberDistances[n]||0).toFixed(1);
-    return `<div class="leg-item">
-      <div class="leg-dot" style="background:${colorMap[n]}"></div>
-      <span style="font-weight:600;color:var(--white)">${n}</span>
-      ${chLabel?`<span style="font-size:9px;opacity:.5;margin-left:2px">(${chLabel})</span>`:''}
-      <span style="font-family:var(--mono);font-size:10px;margin-left:5px;color:${colorMap[n]}">${km}km</span>
+  const badge = allFraud.length > 0
+    ? `<span class="alert-badge">${allFraud.length}</span>`
+    : `<span style="font-size:11px;color:var(--green);margin-left:4px">✅ Không có cảnh báo</span>`;
+
+  const items = allFraud.length === 0
+    ? `<div class="alert-empty">✅ Tất cả báo cáo trong kỳ này đều sạch — không có cảnh báo thiết bị.</div>`
+    : allFraud.map(r => `
+        <div class="alert-item">
+          <div>
+            <div class="alert-item-name">⚠️ ${esc(r.salesperson || '—')}</div>
+            <div class="alert-item-detail">
+              📱 Thiết bị cũng được dùng bởi: <b style="color:#fbbf24">${esc(r.conflict_with || '—')}</b><br>
+              🏪 ${esc(r.store_name || r.outlet || r.customer || '—')} &nbsp;·&nbsp;
+              🏷️ ${r.channel || '—'} &nbsp;·&nbsp; ${r.team || '—'}<br>
+              🕐 Xung đột lúc: ${r.conflict_time || '—'}
+            </div>
+          </div>
+          <div>
+            <div class="alert-item-time">${(r.date||'')}</div>
+            <div class="alert-item-flag">SUSPICIOUS</div>
+          </div>
+        </div>`).join('');
+
+  return `
+    <div class="alert-section" id="fraudSection">
+      <div class="alert-header" onclick="toggleAlerts()">
+        <span class="alert-icon">🚨</span>
+        <span class="alert-title">Cảnh báo thiết bị trùng lặp (Fraud Alert)</span>
+        ${badge}
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="alert-body" id="alertBody">${items}</div>
     </div>`;
-  }).join('');
-
-  // Distance summary footer
-  const totalKm=Object.values(memberDistances).reduce((a,b)=>a+b,0);
-  document.getElementById('mapDistTotal').textContent=totalKm.toFixed(1)+' km cả team';
-  document.getElementById('mapDistMembers').innerHTML=memberNames.map(n=>{
-    const km=(memberDistances[n]||0).toFixed(1);
-    return `<span style="color:${colorMap[n]}">▸ ${n.split(' ').slice(-1)[0]}: <strong>${km}km</strong></span>`;
-  }).join('<span style="opacity:.3"> · </span>');
-
-  // Side panel (member selected)
-  if(selMember!=='all' && memberNames.length>0){
-    const mem=memberNames[0];
-    const color=colorMap[mem];
-    const ch=allData.find(r=>nameKey(r)===mem)?._ch||'';
-    const chLabel=ch==='MT'?'MT':ch==='GTN'?'GT North':ch==='GTC'?'GT Central':ch==='GTS'?'GT South':'';
-    const km=(memberDistances[mem]||0).toFixed(1);
-    const totalStores=allCheckpointsForPanel.reduce((s,cp)=>s+cp.storeCount,0);
-    const validCps=allCheckpointsForPanel.filter(cp=>cp.coords).length;
-
-    document.getElementById('mspName').textContent=mem;
-    document.getElementById('mspSub').textContent=chLabel+' · '+getDS(allData[0]||{});
-    document.getElementById('mspStats').innerHTML=`
-      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${km}</div><div class="msp-stat-lbl">km di chuyển</div></div>
-      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${totalStores}</div><div class="msp-stat-lbl">điểm bán</div></div>
-      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${validCps}</div><div class="msp-stat-lbl">checkpoint</div></div>
-      <div class="msp-stat"><div class="msp-stat-val" style="color:${color}">${allCheckpointsForPanel.length>0?allCheckpointsForPanel[0].time:'—'}</div><div class="msp-stat-lbl">giờ bắt đầu</div></div>
-    `;
-    // Timeline
-    document.getElementById('mspTimeline').innerHTML=allCheckpointsForPanel.map((cp,i)=>`
-      <div class="msp-tl-item">
-        <div class="msp-tl-dot" style="background:${i===0?color:i===allCheckpointsForPanel.length-1?'rgba(255,255,255,.2)':hexAlpha(color,.6)}">${i===0?'S':i===allCheckpointsForPanel.length-1?'E':i+1}</div>
-        <div class="msp-tl-body">
-          <div class="msp-tl-name">${cp.name}</div>
-          <div class="msp-tl-meta">🕐 ${cp.time} &nbsp;·&nbsp; 📍 ${cp.storeCount} điểm${cp.coords?'':' <span style="color:rgba(255,107,107,.6)">no GPS</span>'}</div>
-        </div>
-      </div>`).join('')||'<div style="color:var(--gray2);font-size:11px">Không có dữ liệu</div>';
-  }
 }
 
-// TAB: CALENDAR HEATMAP
-// ══════════════════════════════════════════════════════════
-function renderCalendar(){
-  const all=[...(RAW.mt_daily||[]),...(RAW.gt_daily||[])];
-  const now=new Date();
-  const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
-  const todayD=now.getDate();
-  const monthStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+function toggleAlerts() {
+  const h = document.querySelector('.alert-header');
+  const b = document.getElementById('alertBody');
+  if (b.style.display === 'none') { b.style.display = ''; h.classList.remove('collapsed'); }
+  else { b.style.display = 'none'; h.classList.add('collapsed'); }
+}
 
-  const teamMembers=(RAW.sales_team||[])
-    .filter(s=>{ const t=(s['Team / Kênh']||s['Team']||'').toLowerCase(); return !t.includes('back')&&!t.includes('office')&&!t.includes('admin')&&!t.includes('digital'); })
-    .map(s=>s['Tên Nhân Viên']||s['SalesID']||'');
-  const dataMembers=[...new Set(all.map(nameKey))];
-  const allMembers=[...new Set([...teamMembers,...dataMembers])].filter(n=>n&&n!=='?').sort();
+// ── OVERVIEW RENDER ──────────────────────────────────────────
+function renderOverview() {
+  const mt = filtered.mt, gt = filtered.gt;
+  const all = [...mt, ...gt];
+  const totalSubmissions = all.length;
+  const uniqueStaff = new Set(all.map(r=>r.salesperson).filter(Boolean)).size;
+  const uniqueStores = new Set(all.map(r=>r.store_name||r.outlet||r.customer).filter(Boolean)).size;
+  const fraudCount = getFraudAlerts(all).length;
 
-  const countMap={};
-  allMembers.forEach(n=>{ countMap[n]={}; });
-  all.forEach(r=>{
-    const d=getDS(r); if(!d||!d.startsWith(monthStr)) return;
-    const day=parseInt(d.slice(8,10)); const n=nameKey(r);
-    if(!countMap[n]) countMap[n]={};
-    countMap[n][day]=(countMap[n][day]||0)+1;
-  });
+  const byTeam = {};
+  all.forEach(r => { byTeam[r.team||'—'] = (byTeam[r.team||'—']||0)+1; });
+  const teamRows = Object.entries(byTeam).sort((a,b)=>b[1]-a[1])
+    .map(([t,c]) => `<tr><td>${esc(t)}</td><td style="font-family:var(--mono);text-align:right">${c}</td></tr>`).join('');
 
-  const dayNums=Array.from({length:daysInMonth},(_,i)=>i+1);
-  let html=`<div class="cal-grid">`;
-  html+=`<div class="cal-header" style="color:var(--gray2);font-size:9px">Nhân viên</div>`;
-  dayNums.forEach(d=>{ html+=`<div class="cal-header">${d}</div>`; });
+  const byDate = {};
+  all.forEach(r => { if(r.date) byDate[r.date] = (byDate[r.date]||0)+1; });
+  const dates = Object.keys(byDate).sort();
+  const chartId = 'chartDaily_' + Date.now();
 
-  allMembers.forEach(mem=>{
-    html+=`<div class="cal-name" style="font-size:10px">${mem.split(' ').slice(-1)[0]}</div>`;
-    dayNums.forEach(d=>{
-      const count=(countMap[mem]||{})[d]||0;
-      const isFut=d>todayD;
-      let cls='cal-0';
-      if(isFut) cls='cal-future';
-      else if(count===0) cls='cal-0';
-      else if(count<=2) cls='cal-1';
-      else if(count<=5) cls='cal-2';
-      else if(count<=9) cls='cal-3';
-      else if(count<=14) cls='cal-4';
-      else cls='cal-5';
-      html+=`<div class="${cls}" title="${mem}: ${count} surveys ngày ${d}/${now.getMonth()+1}"></div>`;
+  document.getElementById('overviewContent').innerHTML = `
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">Tổng báo cáo</div><div class="kpi-val">${totalSubmissions}</div><div class="kpi-sub">MT + GT</div></div>
+      <div class="kpi-card"><div class="kpi-label">MT</div><div class="kpi-val">${mt.length}</div><div class="kpi-sub">Modern Trade</div></div>
+      <div class="kpi-card"><div class="kpi-label">GT</div><div class="kpi-val">${gt.length}</div><div class="kpi-sub">General Trade</div></div>
+      <div class="kpi-card"><div class="kpi-label">Nhân viên</div><div class="kpi-val">${uniqueStaff}</div><div class="kpi-sub">có báo cáo</div></div>
+      <div class="kpi-card"><div class="kpi-label">Điểm bán</div><div class="kpi-val">${uniqueStores}</div><div class="kpi-sub">được khảo sát</div></div>
+      <div class="kpi-card ${fraudCount>0?'red-highlight':''}"><div class="kpi-label">Cảnh báo</div><div class="kpi-val" style="color:${fraudCount>0?'var(--red)':'var(--green)'}">${fraudCount}</div><div class="kpi-sub">thiết bị trùng</div></div>
+    </div>
+
+    ${renderFraudSection(mt, gt)}
+
+    <div class="section-title">Theo kênh & khu vực</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+      <div class="chart-wrap">
+        <div style="font-size:12px;color:var(--gray2);margin-bottom:10px">Theo nhóm / kênh</div>
+        <table class="data-table">${teamRows}</table>
+      </div>
+      <div class="chart-wrap">
+        <div style="font-size:12px;color:var(--gray2);margin-bottom:10px">Xu hướng theo ngày</div>
+        <canvas id="${chartId}"></canvas>
+      </div>
+    </div>`;
+
+  // Chart
+  setTimeout(() => {
+    const ctx = document.getElementById(chartId);
+    if (!ctx || !dates.length) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: dates,
+        datasets: [{
+          label: 'Báo cáo',
+          data: dates.map(d => byDate[d]),
+          backgroundColor: 'rgba(200,16,46,0.7)',
+          borderColor: 'var(--red)',
+          borderWidth: 1,
+          borderRadius: 3
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9A9590', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+          y: { ticks: { color: '#9A9590', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' }, beginAtZero: true }
+        }
+      }
     });
-  });
-  html+=`</div>`;
-  document.getElementById('calGrid').innerHTML=html;
-
-  const notToday=allMembers.filter(n=>!(countMap[n]||{})[todayD]);
-  const notEl=document.getElementById('notSurveyedToday');
-  notEl.innerHTML=notToday.length===0
-    ?`<span class="alert-chip ok">✅ Tất cả đã survey hôm nay</span>`
-    :`<span class="alert-chip">⚠️ Chưa survey hôm nay:</span>`+notToday.map(n=>`<span class="alert-chip">${n}</span>`).join('');
-
-  document.getElementById('tbCalSummary').innerHTML=allMembers.map(mem=>{
-    const days=Object.keys(countMap[mem]||{}).filter(d=>parseInt(d)<=todayD).length;
-    const total=Object.values(countMap[mem]||{}).reduce((s,v)=>s+v,0);
-    const avg=days?+(total/days).toFixed(1):0;
-    return `<tr><td>${mem}</td><td>${teamPill(teamKey(all.find(r=>nameKey(r)===mem)||{})||'')}</td><td class="num">${days}</td><td class="num">${total}</td><td class="num">${avg}</td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+  }, 50);
 }
 
-// ══════════════════════════════════════════════════════════
-// TAB: QUALITY
-// ══════════════════════════════════════════════════════════
-function renderQuality(){
-  const mt=(RAW.mt_daily||[]).filter(isThisMonth);
-  const total=mt.length;
-  if(total===0){ document.getElementById('qualTrungBay').innerHTML='<div class="empty">Không có dữ liệu</div>'; return; }
-
-  const tbOk=mt.filter(r=>{ const v=(r['Trưng Bày']||'').toLowerCase(); return v.includes('tốt')||v.includes('đúng')||v.includes('tầm mắt'); }).length;
-  const tbPart=mt.filter(r=>{ const v=(r['Trưng Bày']||'').toLowerCase(); return v.includes('thiếu')||v.includes('nhưng'); }).length;
-  const tbNo=mt.filter(r=>{ const v=(r['Trưng Bày']||'').toLowerCase(); return v.includes('chưa')||v.includes('không'); }).length;
-  qualBar('qualTrungBay',[
-    {label:'✅ Tốt / Đúng vị trí',count:tbOk,total,color:'#4caf82'},
-    {label:'⚠️ Có nhưng thiếu',count:tbPart,total,color:'#f59e42'},
-    {label:'❌ Chưa trưng bày',count:tbNo,total,color:'#ff6b6b'},
-  ]);
-
-  const bgOk=mt.filter(r=>(r['Bảng Giá']||'').toLowerCase().includes('đúng')).length;
-  const bgNo=mt.filter(r=>{ const v=(r['Bảng Giá']||'').toLowerCase(); return v.includes('chưa')||v.includes('không'); }).length;
-  qualBar('qualBangGia',[
-    {label:'✅ Đúng giá',count:bgOk,total,color:'#4caf82'},
-    {label:'❌ Chưa có bảng giá',count:bgNo,total,color:'#ff6b6b'},
-  ]);
-
-  const ttOk=mt.filter(r=>(r['Tình Trạng Hàng']||'').toLowerCase().includes('đủ')).length;
-  const ttLow=mt.filter(r=>{ const v=(r['Tình Trạng Hàng']||'').toLowerCase(); return v.includes('thiếu')||v.includes('ít'); }).length;
-  const ttNo=mt.filter(r=>{ const v=(r['Tình Trạng Hàng']||'').toLowerCase(); return v.includes('hết')||v.includes('trống'); }).length;
-  qualBar('qualTinhTrang',[
-    {label:'✅ Đủ mã listing',count:ttOk,total,color:'#4caf82'},
-    {label:'⚠️ Thiếu một số mã',count:ttLow,total,color:'#f59e42'},
-    {label:'❌ Hết hàng / Trống kệ',count:ttNo,total,color:'#ff6b6b'},
-  ]);
-
-  const hsdOk=mt.filter(r=>(r['HSD']||'').toLowerCase().includes('>50%')||r['HSD']==='Tất cả >50% HSD').length;
-  const hsdWarn=mt.filter(r=>{ const v=(r['HSD']||'').toLowerCase(); return v.includes('<50')||v.includes('gần'); }).length;
-  qualBar('qualHSD',[
-    {label:'✅ Tất cả >50% HSD',count:hsdOk,total,color:'#4caf82'},
-    {label:'⚠️ Có SP <50% HSD',count:hsdWarn,total,color:'#f59e42'},
-  ]);
-
-  const days7=[]; for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days7.push(toYMD(d)); }
-  const byDay7=groupBy(RAW.mt_daily||[],getDS);
-  const trendPct=days7.map(d=>{
-    const rows=byDay7[d]||[];
-    if(!rows.length) return null;
-    const ok=rows.filter(r=>{ const v=(r['Trưng Bày']||'').toLowerCase(); return v.includes('tốt')||v.includes('đúng')||v.includes('tầm mắt'); }).length;
-    return +(ok/rows.length*100).toFixed(0);
-  });
-  mkChart('chartQualTrend','line',days7.map(d=>d.slice(5)),[
-    {label:'% Trưng bày tốt',data:trendPct,borderColor:'#4caf82',backgroundColor:'rgba(76,175,130,.15)',fill:true,tension:.3,pointRadius:4,spanGaps:true}
-  ],{plugins:{legend:{display:false}},scales:{y:{min:0,max:100,ticks:{callback:v=>v+'%'}}}});
-
-  const staffQ={};
-  mt.forEach(r=>{
-    const n=nameKey(r); if(!staffQ[n]) staffQ[n]={total:0,dispOk:0,bgOk:0,hsdOk:0};
-    staffQ[n].total++;
-    const tb=(r['Trưng Bày']||'').toLowerCase(); if(tb.includes('tốt')||tb.includes('đúng')||tb.includes('tầm mắt')) staffQ[n].dispOk++;
-    const bg=(r['Bảng Giá']||'').toLowerCase(); if(bg.includes('đúng')) staffQ[n].bgOk++;
-    const hsd=(r['HSD']||'').toLowerCase(); if(hsd.includes('>50%')||hsd.includes('tất cả')) staffQ[n].hsdOk++;
-  });
-  document.getElementById('tbQuality').innerHTML=Object.entries(staffQ).sort((a,b)=>b[1].total-a[1].total).map(([n,d])=>{
-    const pp=(v,t)=>{ const p=t?Math.round(v/t*100):0; return `<span class="pill ${p>=70?'pill-ok':p>=40?'pill-warn':'pill-bad'}">${p}%</span>`; };
-    return `<tr><td>${n}</td><td class="num">${d.total}</td><td>${pp(d.dispOk,d.total)}</td><td>${pp(d.bgOk,d.total)}</td><td>${pp(d.hsdOk,d.total)}</td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="empty">Không có dữ liệu</td></tr>';
+// ── MT RENDER ────────────────────────────────────────────────
+function renderMT() {
+  const data = filtered.mt;
+  if (!data.length) { document.getElementById('mtContent').innerHTML = '<div class="loading" style="height:120px"><span>Không có dữ liệu MT trong kỳ này</span></div>'; return; }
+  const byStaff = {};
+  data.forEach(r => { byStaff[r.salesperson||'—'] = (byStaff[r.salesperson||'—']||0)+1; });
+  const staffRows = Object.entries(byStaff).sort((a,b)=>b[1]-a[1])
+    .map(([n,c]) => `<tr><td>${esc(n)}</td><td><span class="badge badge-mt">MT</span></td><td style="font-family:var(--mono)">${c}</td></tr>`).join('');
+  document.getElementById('mtContent').innerHTML = `
+    <div class="section-title">Nhân viên MT</div>
+    <div class="chart-wrap">
+      <table class="data-table">
+        <thead><tr><th>Nhân viên</th><th>Kênh</th><th>Số báo cáo</th></tr></thead>
+        <tbody>${staffRows}</tbody>
+      </table>
+    </div>
+    <div class="section-title">Chi tiết gần đây</div>
+    <div class="chart-wrap" style="overflow-x:auto">
+      ${renderDetailTable(data.slice(-30).reverse())}
+    </div>`;
 }
 
-// ══════════════════════════════════════════════════════════
-// TAB: STORES
-// ══════════════════════════════════════════════════════════
-function renderStores(){
-  const mt=(RAW.mt_daily||[]).filter(isThisMonth);
-  const gt=(RAW.gt_daily||[]).filter(isThisMonth);
-  const allGt=RAW.gt_daily||[];
-  const newCust=allGt.filter(r=>(r['Loại Survey']||'').includes('new')&&isThisMonth(r));
-
-  const storeSet=new Set(mt.map(r=>r['Điểm Bán']||r['Diện Bán']||'').filter(Boolean));
-  const chainSet=new Set(mt.map(r=>r['Chain']||'').filter(Boolean));
-  document.getElementById('sc-stores').innerHTML=`
-    <div class="sc"><div class="sc-label">MT Điểm bán (tháng)</div><div class="sc-value">${storeSet.size}</div><div class="sc-sub">unique stores</div></div>
-    <div class="sc yellow"><div class="sc-label">MT Chain</div><div class="sc-value">${chainSet.size}</div><div class="sc-sub">chuỗi khác nhau</div></div>
-    <div class="sc green"><div class="sc-label">GT New KH</div><div class="sc-value">${newCust.length}</div><div class="sc-sub">tháng này</div></div>
-    <div class="sc blue"><div class="sc-label">GT Điểm survey</div><div class="sc-value">${new Set(gt.map(r=>r['Điểm Bán']||r['Chợ']||'').filter(Boolean)).size}</div><div class="sc-sub">unique</div></div>
-  `;
-
-  const byStore=groupBy(mt,r=>r['Điểm Bán']||r['Diện Bán']||'?');
-  const topStores=Object.entries(byStore).sort((a,b)=>b[1].length-a[1].length).slice(0,10);
-  mkChart('chartTopStores','bar',topStores.map(s=>s[0].slice(0,20)),[{label:'Số survey',data:topStores.map(s=>s[1].length),backgroundColor:'rgba(200,16,46,.7)',borderRadius:3}],{plugins:{legend:{display:false}},indexAxis:'y'});
-
-  const byChain=groupBy(mt,r=>r['Chain']||'Khác');
-  const chainData=Object.entries(byChain).sort((a,b)=>b[1].length-a[1].length);
-  mkChart('chartStoreChain','doughnut',chainData.map(c=>c[0]),[{data:chainData.map(c=>c[1].length),backgroundColor:TEAM_COLORS,borderWidth:1}],{plugins:{legend:{position:'right',labels:{font:{size:10}}}}});
-
-  const issueStores={};
-  mt.forEach(r=>{
-    const store=r['Điểm Bán']||r['Diện Bán']||'?', chain=r['Chain']||'';
-    if(!issueStores[store]) issueStores[store]={chain,count:0,issues:0,problems:{}};
-    issueStores[store].count++;
-    const tb=(r['Trưng Bày']||'').toLowerCase();
-    if(tb.includes('thiếu')||tb.includes('chưa')||tb.includes('không')){ issueStores[store].issues++; const prob=r['Trưng Bày']||''; issueStores[store].problems[prob]=(issueStores[store].problems[prob]||0)+1; }
-  });
-  const issueList=Object.entries(issueStores).filter(([,d])=>d.issues>0).sort((a,b)=>b[1].issues-a[1].issues).slice(0,15);
-  document.getElementById('tbStoreIssues').innerHTML=issueList.map(([store,d])=>{
-    const topProb=Object.entries(d.problems).sort((a,b)=>b[1]-a[1])[0];
-    const issuePct=Math.round(d.issues/d.count*100);
-    return `<tr><td style="font-size:12px">${store}</td><td style="font-size:12px;color:var(--gray2)">${d.chain}</td><td class="num">${d.count}</td><td class="num"><span class="pill ${issuePct>50?'pill-bad':'pill-warn'}">${d.issues}</span></td><td style="font-size:11px;color:var(--gray2)">${topProb?topProb[0]:'—'}</td></tr>`;
-  }).join('')||'<tr><td colspan="5" class="empty">Không có vấn đề trưng bày</td></tr>';
-
-  const recentNew=[...newCust].sort((a,b)=>String(b.Timestamp||'').localeCompare(String(a.Timestamp||''))).slice(0,30);
-  document.getElementById('tbNewCustomers').innerHTML=recentNew.map(r=>`
-    <tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${getDS(r).slice(5)||'—'}</td>
-    <td style="font-size:12px">${nameKey(r)}</td><td>${teamPill(regionKey(r))}</td>
-    <td style="font-size:12px">${r['Tên Điểm Bán Mới']||r['Điểm Bán']||r['Diện Bán']||'—'}</td>
-    <td style="font-size:11px;color:var(--gray2)">${r['Hình Thức KD']||'—'}</td>
-    <td><span class="pill ${(r['Tiềm Năng']||'').includes('Cao')?'pill-ok':(r['Tiềm Năng']||'').includes('Thấp')?'pill-bad':'pill-warn'}">${r['Tiềm Năng']||'—'}</span></td></tr>`).join('')||'<tr><td colspan="6" class="empty">Chưa có KH mới tháng này</td></tr>';
+// ── GT RENDER ────────────────────────────────────────────────
+function renderGT() {
+  const data = filtered.gt;
+  if (!data.length) { document.getElementById('gtContent').innerHTML = '<div class="loading" style="height:120px"><span>Không có dữ liệu GT trong kỳ này</span></div>'; return; }
+  const byRegion = {};
+  data.forEach(r => { byRegion[r.region||r.team||'—'] = (byRegion[r.region||r.team||'—']||0)+1; });
+  const regionRows = Object.entries(byRegion).sort((a,b)=>b[1]-a[1])
+    .map(([n,c]) => `<tr><td>${esc(n)}</td><td style="font-family:var(--mono)">${c}</td></tr>`).join('');
+  document.getElementById('gtContent').innerHTML = `
+    <div class="section-title">Theo khu vực GT</div>
+    <div class="chart-wrap">
+      <table class="data-table">
+        <thead><tr><th>Khu vực</th><th>Báo cáo</th></tr></thead>
+        <tbody>${regionRows}</tbody>
+      </table>
+    </div>
+    <div class="section-title">Chi tiết gần đây</div>
+    <div class="chart-wrap" style="overflow-x:auto">
+      ${renderDetailTable(data.slice(-30).reverse())}
+    </div>`;
 }
 
-// ══════════════════════════════════════════════════════════
-// TAB SWITCHING
-// ══════════════════════════════════════════════════════════
-function switchTab(name, el){
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-  document.getElementById('tab-'+name).classList.add('active');
-  if(name==='map'){
-    initUnifiedMap();
-    setTimeout(()=>{ MAP_UNIFIED&&MAP_UNIFIED.invalidateSize(); renderUnifiedMap(); },120);
+function renderDetailTable(rows) {
+  if (!rows.length) return '<div style="color:var(--gray2);font-size:12px;padding:10px">Không có dữ liệu</div>';
+  const header = `<thead><tr><th>Nhân viên</th><th>Kênh</th><th>Cửa hàng</th><th>Ngày</th><th>Giờ</th><th>GPS</th><th>Fraud</th></tr></thead>`;
+  const body = rows.map(r => `
+    <tr>
+      <td>${esc(r.salesperson||'—')}</td>
+      <td><span class="badge ${r.channel==='MT'?'badge-mt':'badge-gt'}">${r.channel||r.team||'—'}</span></td>
+      <td>${esc(r.store_name||r.outlet||r.customer||'—')}</td>
+      <td style="font-family:var(--mono);white-space:nowrap">${r.date||'—'}</td>
+      <td style="font-family:var(--mono);white-space:nowrap">${r.time||'—'}</td>
+      <td style="font-size:10px;color:var(--gray2)">${r.lat&&r.lng?r.lat+','+r.lng:r.gps||'—'}</td>
+      <td><span class="badge ${(r.fraud_flag==='SUSPICIOUS'||r.fraud_flag==='SUSPECT')?'badge-fraud':'badge-clean'}">${r.fraud_flag||'CLEAN'}</span></td>
+    </tr>`).join('');
+  return `<table class="data-table">${header}<tbody>${body}</tbody></table>`;
+}
+
+// ── RAW RENDER ───────────────────────────────────────────────
+function renderRaw() {
+  const all = [...filtered.mt, ...filtered.gt].sort((a,b)=>(b.timestamp||'')>(a.timestamp||'')?1:-1);
+  document.getElementById('rawContent').innerHTML = `
+    <div class="section-title">Tất cả báo cáo (${all.length})</div>
+    <div class="chart-wrap" style="overflow-x:auto">${renderDetailTable(all)}</div>`;
+}
+
+// ── MAP ──────────────────────────────────────────────────────
+function renderMap() {
+  if (!mapInstance) {
+    mapInstance = L.map('mapContainer').setView([14.0, 108.0], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(mapInstance);
   }
+  mapInstance.eachLayer(l => { if (l instanceof L.CircleMarker) mapInstance.removeLayer(l); });
+  const all = [...filtered.mt, ...filtered.gt];
+  all.forEach(r => {
+    const lat = parseFloat(r.lat || (r.gps ? r.gps.split(/[\s,]+/)[0] : null));
+    const lng = parseFloat(r.lng || (r.gps ? r.gps.split(/[\s,]+/)[1] : null));
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+    const isFraud = r.fraud_flag === 'SUSPICIOUS' || r.fraud_flag === 'SUSPECT';
+    L.circleMarker([lat, lng], {
+      radius: 7, fillColor: isFraud ? '#C8102E' : (r.channel === 'MT' ? '#5bc8f5' : '#4ade80'),
+      color: '#fff', weight: 1.5, fillOpacity: .8
+    }).bindPopup(`<b>${r.salesperson||'—'}</b><br>${r.store_name||r.outlet||'—'}<br>${r.date||''} ${r.time||''}<br>${isFraud?'⚠️ SUSPICIOUS':''}`).addTo(mapInstance);
+  });
 }
+
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (id === 'map') { renderMap(); setTimeout(()=>mapInstance&&mapInstance.invalidateSize(),100); }
+}
+
+// ── UTIL ─────────────────────────────────────────────────────
+function esc(s){ const d=document.createElement('div');d.textContent=String(s||'');return d.innerHTML; }
 </script>
 </body>
 </html>
