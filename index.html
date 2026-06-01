@@ -234,7 +234,6 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <div class="staff-list" id="staffList"></div>
     </div>
-    <div id="completedTodayBox" class="card" style="display:none;border:1.5px solid #c3e6cb;background:#f0fff4;margin-top:0;padding:12px"></div>
     <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
       <h3 style="color:var(--text2);font-size:12px">✏️ Nhập thủ công (nếu chưa có trong danh sách)</h3>
       <div class="field" style="margin-bottom:10px">
@@ -670,8 +669,6 @@ function selectUser(user) {
   state.user = user;
   // Fraud: show early warning banner before navigating
   showFraudBannerIfNeeded(user.name);
-  // Show completed-today list for this user
-  showCompletedToday(user.name);
   document.getElementById('typeTitle').textContent = `Xin chào, ${user.name.split(' ').pop()}!`;
   document.getElementById('typeSubtitle').textContent = user.team;
   renderTypeCards(user.team);
@@ -1924,75 +1921,7 @@ function saveOffline(payload) {
   localStorage.setItem('dgm_offline', JSON.stringify(queue));
 }
 
-// ─── COMPLETED TODAY TRACKING ────────────────────────────────
-const COMPLETED_KEY = 'dgm_completed_today';
-
-function recordCompleted(payload, label) {
-  try {
-    const today = new Date().toISOString().slice(0,10);
-    const now = new Date().toLocaleTimeString('vi-VN', {hour:'2-digit',minute:'2-digit'});
-    const raw = localStorage.getItem(COMPLETED_KEY);
-    let all = {};
-    try { all = raw ? JSON.parse(raw) : {}; } catch(e) {}
-    const username = payload.salesperson || (state.user && state.user.name) || '';
-    if (!all[username]) all[username] = {};
-    if (!all[username][today]) all[username][today] = [];
-    // Keep max 20 per day
-    const entry = {
-      time: now,
-      label: label || payload.type,
-      store: payload.store_name || payload.outlet_name || payload.location_note || '',
-      type: payload.type || ''
-    };
-    all[username][today].push(entry);
-    if (all[username][today].length > 20) all[username][today].shift();
-    // Clean up days older than 3 days to save space
-    const threeDaysAgo = new Date(Date.now() - 3*86400000).toISOString().slice(0,10);
-    Object.keys(all).forEach(u => {
-      if (all[u]) Object.keys(all[u]).forEach(d => { if (d < threeDaysAgo) delete all[u][d]; });
-    });
-    localStorage.setItem(COMPLETED_KEY, JSON.stringify(all));
-  } catch(e) {}
-}
-
-function getTodayCompleted(username) {
-  try {
-    const today = new Date().toISOString().slice(0,10);
-    const raw = localStorage.getItem(COMPLETED_KEY);
-    if (!raw) return [];
-    const all = JSON.parse(raw);
-    return (all[username] && all[username][today]) ? all[username][today] : [];
-  } catch(e) { return []; }
-}
-
-function showCompletedToday(username) {
-  const box = document.getElementById('completedTodayBox');
-  if (!box) return;
-  const list = getTodayCompleted(username);
-  if (!list.length) {
-    box.style.display = 'none';
-    return;
-  }
-  const icons = { MT_Daily:'🏪', GT_Daily:'📊', GT_New:'➕', MT_Other:'📝', GT_Other:'📝' };
-  box.style.display = 'block';
-  box.innerHTML = `
-    <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;display:flex;align-items:center;gap:6px">
-      <span>✅</span> Báo cáo đã hoàn thành hôm nay (${list.length})
-    </div>
-    <div style="display:flex;flex-direction:column;gap:6px">
-      ${list.map(e => `
-        <div style="background:var(--bg);border-radius:8px;padding:8px 10px;border-left:3px solid #28a745">
-          <div style="font-size:12px;font-weight:600;color:var(--text)">${icons[e.type]||'📋'} ${e.label}</div>
-          ${e.store ? `<div style="font-size:11px;color:var(--text2);margin-top:2px">🏬 ${e.store}</div>` : ''}
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">🕐 ${e.time}</div>
-        </div>`).join('')}
-    </div>`;
-}
-// ─────────────────────────────────────────────────────────────
-
 function showSuccess(label, payload, offline) {
-  // Record completed before showing success
-  recordCompleted(payload, label);
   hideLoading();
   const surveyId = genID(payload.type);
   document.getElementById('successSub').textContent = offline
@@ -2008,7 +1937,7 @@ function showSuccess(label, payload, offline) {
   `;
   goTo('scSuccess');
 
-  let countdown = 2;
+  let countdown = 10;
   const countEl = document.getElementById('successCountdown');
   if (countEl) countEl.textContent = countdown;
   const timer = setInterval(() => {
