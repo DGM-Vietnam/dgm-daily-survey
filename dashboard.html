@@ -128,6 +128,24 @@ tr:hover td{background:rgba(255,255,255,.025);}
 .alert-chip.ok{background:rgba(76,175,130,.1);border-color:rgba(76,175,130,.3);color:var(--green);}
 
 /* FRAUD ALERT SECTION */
+.dupe-section{background:var(--card);border:1px solid rgba(245,158,66,.2);border-left:3px solid var(--orange);border-radius:4px;margin-bottom:20px;overflow:hidden;}
+.dupe-section.clean{border-color:rgba(76,175,130,.25);border-left-color:var(--green);}
+.dupe-header{padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.dupe-header h3{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;flex:1;}
+.dupe-badge{padding:2px 9px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:700;background:rgba(245,158,66,.2);color:var(--orange);}
+.dupe-badge.ok{background:rgba(76,175,130,.15);color:var(--green);}
+.dupe-toggle{font-size:11px;color:var(--gray2);transition:transform .2s;}
+.dupe-toggle.up{transform:rotate(180deg);}
+.dupe-body{border-top:1px solid var(--border);}
+.dupe-row{padding:12px 18px;border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr auto;gap:12px;align-items:start;}
+.dupe-row:last-child{border-bottom:none;}
+.dupe-row:hover{background:rgba(255,255,255,.02);}
+.dupe-tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-family:var(--mono);font-weight:700;margin-right:4px;margin-bottom:2px;}
+.tag-store{background:rgba(200,16,46,.15);color:#ff8f8f;border:1px solid rgba(200,16,46,.25);}
+.tag-gps{background:rgba(74,158,191,.15);color:#7dd3f0;border:1px solid rgba(74,158,191,.25);}
+.tag-time{background:rgba(178,132,255,.15);color:#c4a3ff;border:1px solid rgba(178,132,255,.25);}
+
+/* FRAUD ALERT SECTION */
 .fraud-section{background:var(--card);border:1px solid rgba(255,107,107,.25);border-left:3px solid #ff6b6b;border-radius:4px;margin-bottom:20px;overflow:hidden;}
 .fraud-section.clean{border-color:rgba(76,175,130,.25);border-left-color:var(--green);}
 .fraud-header{padding:12px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
@@ -322,6 +340,17 @@ tr:hover td{background:rgba(255,255,255,.025);}
         <span class="fraud-toggle" id="fraudToggle">▼</span>
       </div>
       <div class="fraud-body" id="fraudBody" style="display:none"></div>
+    </div>
+
+    <!-- DUPLICATE SURVEY SECTION -->
+    <div class="dupe-section clean" id="dupeSection">
+      <div class="dupe-header" onclick="toggleDupe()">
+        <span style="font-size:15px">👥</span>
+        <h3>Cảnh báo survey trùng lặp giữa nhân viên</h3>
+        <span class="dupe-badge ok" id="dupeBadge">✅ Không có</span>
+        <span class="dupe-toggle" id="dupeToggle">▼</span>
+      </div>
+      <div class="dupe-body" id="dupeBody" style="display:none"></div>
     </div>
 
     <div class="scorecards" id="sc-overview"></div>
@@ -847,6 +876,132 @@ function toggleFraud(){
   document.getElementById('fraudToggle').className='fraud-toggle'+(_fraudOpen?' up':'');
 }
 
+// ── DUPLICATE SURVEY DETECTION ───────────────────────────────
+// Detect 2+ nhân viên khác nhau survey cùng điểm bán / GPS / thời gian
+function detectDuplicates(allData){
+  const dupes=[];
+  const byDate=groupBy(allData, getDS);
+
+  Object.entries(byDate).forEach(([date, recs])=>{
+    // So sánh từng cặp records trong cùng ngày
+    for(let i=0;i<recs.length;i++){
+      for(let j=i+1;j<recs.length;j++){
+        const a=recs[i], b=recs[j];
+        const nA=nameKey(a), nB=nameKey(b);
+        if(nA===nB) continue; // cùng người → bỏ qua
+
+        const reasons=[];
+
+        // Tiêu chí 1: Cùng điểm bán (Chain + Điểm Bán khớp, không rỗng)
+        const storeA=(a['Chain']||a['Chợ / Khu Vực']||'').trim().toLowerCase();
+        const storeB=(b['Chain']||b['Chợ / Khu Vực']||'').trim().toLowerCase();
+        const outletA=(a['Điểm Bán']||'').trim().toLowerCase();
+        const outletB=(b['Điểm Bán']||'').trim().toLowerCase();
+        if(storeA && storeA===storeB) reasons.push('store');
+        if(outletA && outletA===outletB && outletA.length>3) reasons.push('outlet');
+
+        // Tiêu chí 2: Cùng GPS (khoảng cách <200m)
+        const latA=parseFloat(a['Latitude']||(a['GPS']||'').split(',')[0]);
+        const lngA=parseFloat(a['Longitude']||(a['GPS']||'').split(',')[1]);
+        const latB=parseFloat(b['Latitude']||(b['GPS']||'').split(',')[0]);
+        const lngB=parseFloat(b['Longitude']||(b['GPS']||'').split(',')[1]);
+        if(!isNaN(latA)&&!isNaN(lngA)&&!isNaN(latB)&&!isNaN(lngB)){
+          const dist=haversine([latA,lngA],[latB,lngB])*1000; // metres
+          if(dist<200) reasons.push('gps');
+        }
+
+        // Tiêu chí 3: Cùng thời gian submit (trong vòng 30 phút)
+        const tsA=a['Timestamp']||'', tsB=b['Timestamp']||'';
+        if(tsA && tsB){
+          const tA=new Date(tsA.replace(' ','T')), tB=new Date(tsB.replace(' ','T'));
+          if(!isNaN(tA)&&!isNaN(tB)){
+            const diffMin=Math.abs(tA-tB)/60000;
+            if(diffMin<=30) reasons.push('time');
+          }
+        }
+
+        if(reasons.length===0) continue;
+
+        // Tránh duplicate pair (A-B và B-A)
+        const pairKey=[nA,nB].sort().join('|')+'|'+date+'|'+(storeA||outletA||'');
+        if(dupes.find(d=>d.pairKey===pairKey)) continue;
+
+        dupes.push({
+          pairKey,
+          date,
+          nameA: nA, nameB: nB,
+          store:  a['Chain']||a['Chợ / Khu Vực']||'—',
+          outlet: a['Điểm Bán']||'—',
+          timeA:  (a['Timestamp']||'').slice(11,16),
+          timeB:  (b['Timestamp']||'').slice(11,16),
+          teamA:  a['Kênh']||a['Khu Vực']||'',
+          teamB:  b['Kênh']||b['Khu Vực']||'',
+          reasons
+        });
+      }
+    }
+  });
+
+  return dupes.sort((a,b)=>b.date.localeCompare(a.date));
+}
+
+function renderDupeAlert(allData){
+  const dupes=detectDuplicates(allData);
+  const section=document.getElementById('dupeSection');
+  const badge=document.getElementById('dupeBadge');
+  const body=document.getElementById('dupeBody');
+
+  if(dupes.length===0){
+    section.className='dupe-section clean';
+    badge.textContent='✅ Không có'; badge.className='dupe-badge ok';
+    body.innerHTML='<div class="empty" style="padding:16px">✅ Không phát hiện survey trùng lặp giữa các nhân viên.</div>';
+    return;
+  }
+
+  section.className='dupe-section';
+  badge.textContent='⚠️ '+dupes.length+' trường hợp'; badge.className='dupe-badge';
+
+  const tagLabel={
+    store:'🏪 Cùng chain/chợ',
+    outlet:'📍 Cùng điểm bán',
+    gps:'🛰️ GPS <200m',
+    time:'🕐 Trong 30 phút'
+  };
+
+  body.innerHTML=dupes.map(d=>`
+    <div class="dupe-row">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">
+          <span style="font-size:13px;font-weight:700;color:var(--orange)">👥 ${esc(d.nameA)}</span>
+          <span style="font-size:11px;color:var(--gray2)">và</span>
+          <span style="font-size:13px;font-weight:700;color:var(--orange)">👥 ${esc(d.nameB)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--gray2);line-height:1.7">
+          🏪 ${esc(d.store)} ${d.outlet!=='—'?'· '+esc(d.outlet):''}<br>
+          🕐 ${esc(d.nameA)}: <strong style="color:var(--white)">${d.timeA||'—'}</strong>
+          &nbsp;·&nbsp;
+          🕐 ${esc(d.nameB)}: <strong style="color:var(--white)">${d.timeB||'—'}</strong>
+        </div>
+        <div style="margin-top:6px">
+          ${d.reasons.map(r=>`<span class="dupe-tag tag-${r}">${tagLabel[r]}</span>`).join('')}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${d.date}</div>
+        <div style="margin-top:4px;display:flex;gap:4px;justify-content:flex-end;flex-wrap:wrap">
+          ${teamPill(d.teamA)}${teamPill(d.teamB)}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+let _dupeOpen=false;
+function toggleDupe(){
+  _dupeOpen=!_dupeOpen;
+  document.getElementById('dupeBody').style.display=_dupeOpen?'':'none';
+  document.getElementById('dupeToggle').className='dupe-toggle'+(_dupeOpen?' up':'');
+}
+
 // ══════════════════════════════════════════════════════════
 // TAB: OVERVIEW
 // ══════════════════════════════════════════════════════════
@@ -857,6 +1012,7 @@ function renderOverview(){
 
   // Fraud alert
   renderFraudAlert(all.filter(inRange));
+  renderDupeAlert(all.filter(inRange));
 
   // Alert: chưa survey
   const salesTeam=(RAW.sales_team||[]).filter(s=>{
