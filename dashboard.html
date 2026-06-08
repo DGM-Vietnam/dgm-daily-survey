@@ -1038,12 +1038,44 @@ function renderOverview(){
 
   const fraudCount=all.filter(r=>(r['fraud_flag']||'').toUpperCase()==='SUSPICIOUS'||(r['conflict_with']||'').trim()).length;
   const openNewMonth=gton.filter(isThisMonth).length;
+  // GT OpenNew by region
+  const gtonMonth=gton.filter(isThisMonth);
+  const onNorth=gtonMonth.filter(isNorth).length;
+  const onCentral=gtonMonth.filter(isCentral).length;
+  const onSouth=gtonMonth.filter(isSouth).length;
+  const gtonToday=gton.filter(isToday);
+  const onNorthTd=gtonToday.filter(isNorth).length;
+  const onCentralTd=gtonToday.filter(isCentral).length;
+  const onSouthTd=gtonToday.filter(isSouth).length;
   document.getElementById('sc-overview').innerHTML=`
     <div class="sc"><div class="sc-label">Tổng hôm nay</div><div class="sc-value">${allToday.length}</div><div class="sc-sub">MT ${allToday.filter(isMT).length} · GT ${allToday.filter(r=>!isMT(r)).length}</div></div>
     <div class="sc yellow"><div class="sc-label">Tuần này</div><div class="sc-value">${allWeek.length}</div><div class="sc-sub">${[...new Set(allWeek.map(nameKey))].length} nhân viên</div></div>
     <div class="sc blue"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${allMonth.length}</div><div class="sc-sub">MT ${[...mt,...mto].filter(isThisMonth).length} · GT ${[...gt,...gto,...gton].filter(isThisMonth).length}</div></div>
     <div class="sc green"><div class="sc-label">🏆 Mở mới TC</div><div class="sc-value">${openNewMonth}</div><div class="sc-sub">tháng này</div></div>
     <div class="sc ${fraudCount>0?'alert':'green'}"><div class="sc-label">Cảnh báo</div><div class="sc-value ${fraudCount>0?'red':''}">${fraudCount}</div><div class="sc-sub">thiết bị trùng</div></div>
+    <div class="sc" style="border-left:3px solid #4A9EBF">
+      <div class="sc-label">🆕 Mở mới theo vùng GT</div>
+      <div style="display:flex;gap:10px;align-items:flex-end;margin-top:6px">
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#4A9EBF">${onNorth}</div>
+          <div style="font-size:10px;color:var(--gray2);margin-top:2px">North</div>
+          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onNorthTd}</div>
+        </div>
+        <div style="color:rgba(255,255,255,0.15);font-size:18px;padding-bottom:18px">|</div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#FFE140">${onCentral}</div>
+          <div style="font-size:10px;color:var(--gray2);margin-top:2px">Central</div>
+          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onCentralTd}</div>
+        </div>
+        <div style="color:rgba(255,255,255,0.15);font-size:18px;padding-bottom:18px">|</div>
+        <div style="text-align:center">
+          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#4caf82">${onSouth}</div>
+          <div style="font-size:10px;color:var(--gray2);margin-top:2px">South</div>
+          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onSouthTd}</div>
+        </div>
+      </div>
+      <div class="sc-sub" style="margin-top:6px">lũy kế tháng này</div>
+    </div>
   `;
 
   const filtered=all.filter(inRange);
