@@ -425,6 +425,10 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <div class="chart-card"><h3>Lũy kế tháng theo vùng</h3><div class="chart-wrap h260"><canvas id="chartGtRegion"></canvas></div></div>
       <div class="chart-card"><h3>GT New Customer — tháng này</h3><div class="chart-wrap h260"><canvas id="chartGtNew"></canvas></div></div>
     </div>
+    <div class="grid2">
+      <div class="chart-card" style="border-left:3px solid #4caf82"><h3>🏆 Mở mới thành công — tháng này</h3><div class="chart-wrap h200"><canvas id="chartGtOpenNew"></canvas></div></div>
+      <div class="chart-card"><h3>GT Other — tháng này</h3><div class="chart-wrap h200"><canvas id="chartGtOtherByName"></canvas></div></div>
+    </div>
     <div class="tbl-card">
       <h3>Chi tiết GT Team</h3>
       <table><thead><tr><th>#</th><th>Nhân viên</th><th>Vùng</th><th class="num">Hôm nay</th><th class="num">Tuần</th><th class="num">Tháng</th><th class="num">KH mới tháng</th></tr></thead>
@@ -808,7 +812,8 @@ async function loadData(){
     const res=await fetch(SCRIPT_URL+'?action=dashboard');
     RAW=await res.json();
     const mt=(RAW.mt_daily||[]).length, gt=(RAW.gt_daily||[]).length;
-    document.getElementById('lastUpdate').textContent='Cập nhật: '+new Date().toLocaleTimeString('vi-VN')+' | MT:'+mt+' GT:'+gt;
+    const mto=(RAW.mt_other||[]).length, gto=(RAW.gt_other||[]).length, gton=(RAW.gt_opennew||[]).length;
+    document.getElementById('lastUpdate').textContent='Cập nhật: '+new Date().toLocaleTimeString('vi-VN')+' | MT:'+mt+'+'+mto+' GT:'+gt+'+'+gto+(gton?'+🏆'+gton:'');
     populateMapDayFilter(); populateMapMemberFilter();
     renderAll();
   }catch(e){ alert('Lỗi kết nối: '+e.message); }
@@ -1011,7 +1016,8 @@ function toggleDupe(){
 // ══════════════════════════════════════════════════════════
 function renderOverview(){
   const mt=RAW.mt_daily||[], gt=RAW.gt_daily||[];
-  const all=[...mt,...gt];
+  const mto=RAW.mt_other||[], gto=RAW.gt_other||[], gton=RAW.gt_opennew||[];
+  const all=[...mt,...gt,...mto,...gto,...gton];
   const allToday=all.filter(isToday), allMonth=all.filter(isThisMonth), allWeek=all.filter(isThisWeek);
 
   // Fraud alert
@@ -1031,11 +1037,12 @@ function renderOverview(){
     :`<span class="alert-chip">⚠️ Chưa survey hôm nay:</span>`+notSurveyed.map(s=>`<span class="alert-chip">${s['Tên Nhân Viên']}</span>`).join('');
 
   const fraudCount=all.filter(r=>(r['fraud_flag']||'').toUpperCase()==='SUSPICIOUS'||(r['conflict_with']||'').trim()).length;
+  const openNewMonth=gton.filter(isThisMonth).length;
   document.getElementById('sc-overview').innerHTML=`
     <div class="sc"><div class="sc-label">Tổng hôm nay</div><div class="sc-value">${allToday.length}</div><div class="sc-sub">MT ${allToday.filter(isMT).length} · GT ${allToday.filter(r=>!isMT(r)).length}</div></div>
     <div class="sc yellow"><div class="sc-label">Tuần này</div><div class="sc-value">${allWeek.length}</div><div class="sc-sub">${[...new Set(allWeek.map(nameKey))].length} nhân viên</div></div>
-    <div class="sc blue"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${allMonth.length}</div><div class="sc-sub">MT ${mt.filter(isThisMonth).length} · GT ${gt.filter(isThisMonth).length}</div></div>
-    <div class="sc green"><div class="sc-label">Nhân viên active</div><div class="sc-value">${surveyedToday.size}</div><div class="sc-sub">survey hôm nay</div></div>
+    <div class="sc blue"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${allMonth.length}</div><div class="sc-sub">MT ${[...mt,...mto].filter(isThisMonth).length} · GT ${[...gt,...gto,...gton].filter(isThisMonth).length}</div></div>
+    <div class="sc green"><div class="sc-label">🏆 Mở mới TC</div><div class="sc-value">${openNewMonth}</div><div class="sc-sub">tháng này</div></div>
     <div class="sc ${fraudCount>0?'alert':'green'}"><div class="sc-label">Cảnh báo</div><div class="sc-value ${fraudCount>0?'red':''}">${fraudCount}</div><div class="sc-sub">thiết bị trùng</div></div>
   `;
 
@@ -1161,25 +1168,37 @@ function filterByPeriod(arr, period){
 function renderStats(){
   if(!RAW) return;
   const mt=filterByPeriod(RAW.mt_daily||[], STAT_PERIOD);
+  const mto=filterByPeriod(RAW.mt_other||[], STAT_PERIOD);
   const gt=filterByPeriod(RAW.gt_daily||[], STAT_PERIOD);
+  const gto=filterByPeriod(RAW.gt_other||[], STAT_PERIOD);
+  const gton=filterByPeriod(RAW.gt_opennew||[], STAT_PERIOD);
 
   const stats={};
-  // MT
+  // MT Daily
   mt.forEach(r=>{
     const n=nameKey(r);
-    if(!stats[n]) stats[n]={channel:'MT',region:'MT',chains:new Set(),stores:new Set(),firstTime:null};
+    if(!stats[n]) stats[n]={channel:'MT',region:'MT',chains:new Set(),stores:new Set(),firstTime:null,other:0};
     const chain=r['Chain']||'', store=r['Điểm Bán']||'';
     if(chain) stats[n].chains.add(chain);
     if(store) stats[n].stores.add(store);
     const t=(r['Timestamp']||'').slice(11,16);
     if(t&&(!stats[n].firstTime||t<stats[n].firstTime)) stats[n].firstTime=t;
   });
-  // GT
-  gt.forEach(r=>{
+  // MT Other
+  mto.forEach(r=>{
+    const n=nameKey(r);
+    if(!stats[n]) stats[n]={channel:'MT',region:'MT',chains:new Set(),stores:new Set(),firstTime:null,other:0};
+    stats[n].other=(stats[n].other||0)+1;
+  });
+  // GT Daily + Other + OpenNew
+  [...gt,...gto,...gton].forEach(r=>{
     const n=nameKey(r);
     const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]={channel:'GT',region:reg,chains:new Set(),gtStoreCnt:0,firstTime:null};
+    if(!stats[n]) stats[n]={channel:'GT',region:reg,chains:new Set(),gtStoreCnt:0,firstTime:null,other:0,openNew:0};
     else if(stats[n].channel==='MT') return;
+    const surveyType=(r['Loại Survey']||r['type']||'').toUpperCase();
+    if(surveyType==='GT_OPENNEW') { stats[n].openNew=(stats[n].openNew||0)+1; return; }
+    if(surveyType==='GT_OTHER') { stats[n].other=(stats[n].other||0)+1; return; }
     const cho=r['Chợ / Khu Vực']||'';
     if(cho) stats[n].chains.add(cho);
     stats[n].gtStoreCnt=(stats[n].gtStoreCnt||0)+(parseInt(r['Số Điểm Bán']||1)||1);
@@ -1196,13 +1215,15 @@ function renderStats(){
 
   document.getElementById('tbStatActivity').innerHTML=sorted.map(([n,d])=>{
     const storeCount=d.channel==='GT'?(d.gtStoreCnt||0):d.stores.size;
+    const otherBadge=d.other?`<span style="font-size:10px;color:var(--orange);margin-left:4px">+${d.other}cv</span>`:'';
+    const openNewBadge=d.openNew?`<span style="font-size:10px;color:#4caf82;margin-left:4px">🏆${d.openNew}</span>`:'';
     return `<tr>
       <td>${esc(n)}</td>
       <td>${teamPill(d.channel==='MT'?'mt':d.region)}</td>
       <td style="font-size:11px;color:var(--gray2)">${d.region==='MT'?'Modern Trade':d.region}</td>
       <td class="num ${d.chains.size===0?'sat-zero':''}">${d.chains.size||'—'}</td>
-      <td class="num ${storeCount===0?'sat-zero':''}">${storeCount||'—'}</td>
-      <td class="start-time">${d.firstTime||'—'}</td>
+      <td class="num ${storeCount===0?'sat-zero':''}">${storeCount||'—'}${openNewBadge}</td>
+      <td class="start-time">${d.firstTime||'—'}${otherBadge}</td>
     </tr>`;
   }).join('')||'<tr><td colspan="6" class="empty">Không có dữ liệu</td></tr>';
 }
@@ -1301,40 +1322,59 @@ function renderMT(){
 // TAB: GT
 // ══════════════════════════════════════════════════════════
 function renderGT(){
-  const gt=RAW.gt_daily||[];
+  const gt=RAW.gt_daily||[], gto=RAW.gt_other||[], gton=RAW.gt_opennew||[];
   const td=gt.filter(isToday), mo=gt.filter(isThisMonth), wk=gt.filter(isThisWeek);
   const north=td.filter(isNorth), central=td.filter(isCentral), south=td.filter(isSouth);
   const moN=mo.filter(isNorth), moC=mo.filter(isCentral), moS=mo.filter(isSouth);
   const newCust=(RAW.gt_new||[]).filter(isThisMonth);
+  const openNewMo=gton.filter(isThisMonth);
   document.getElementById('sc-gt').innerHTML=`
     <div class="sc"><div class="sc-label">GT hôm nay</div><div class="sc-value">${td.length}</div><div class="sc-sub">${[...new Set(td.map(nameKey))].length} nhân viên</div></div>
     <div class="sc blue"><div class="sc-label">GT North</div><div class="sc-value">${north.length}</div><div class="sc-sub">${[...new Set(north.map(nameKey))].length} NV</div></div>
     <div class="sc yellow"><div class="sc-label">GT Central</div><div class="sc-value">${central.length}</div><div class="sc-sub">${[...new Set(central.map(nameKey))].length} NV</div></div>
     <div class="sc green"><div class="sc-label">GT South</div><div class="sc-value">${south.length}</div><div class="sc-sub">${[...new Set(south.map(nameKey))].length} NV</div></div>
     <div class="sc yellow"><div class="sc-label">Tháng này</div><div class="sc-value">${mo.length}</div><div class="sc-sub">N:${moN.length} C:${moC.length} S:${moS.length}</div></div>
-    <div class="sc orange"><div class="sc-label">KH mới tháng</div><div class="sc-value">${newCust.length}</div><div class="sc-sub">GT New Customer</div></div>`;
+    <div class="sc orange"><div class="sc-label">KH mới tháng</div><div class="sc-value">${newCust.length}</div><div class="sc-sub">GT New Customer</div></div>
+    <div class="sc green"><div class="sc-label">🏆 Mở mới TC</div><div class="sc-value">${openNewMo.length}</div><div class="sc-sub">tháng này</div></div>`;
   const mkGt=(id,data,color)=>{ const bm=groupBy(data,nameKey); const ms=Object.keys(bm); mkChart(id,'bar',ms,[{label:'Điểm',data:ms.map(m=>bm[m].length),backgroundColor:color,borderRadius:3}],{plugins:{legend:{display:false}},indexAxis:'y'}); };
   mkGt('chartGtN',north,'rgba(74,158,191,.75)'); mkGt('chartGtC',central,'rgba(255,225,64,.7)'); mkGt('chartGtS',south,'rgba(76,175,130,.75)');
   mkChart('chartGtRegion','bar',['GT North','GT Central','GT South'],[{label:'Tháng này',data:[moN.length,moC.length,moS.length],backgroundColor:['rgba(74,158,191,.7)','rgba(255,225,64,.7)','rgba(76,175,130,.7)'],borderRadius:4}],{plugins:{legend:{display:false}}});
   const byCustMem=groupBy(newCust,nameKey), custMems=Object.keys(byCustMem).sort((a,b)=>byCustMem[b].length-byCustMem[a].length);
   mkChart('chartGtNew','bar',custMems,[{label:'KH mới',data:custMems.map(m=>byCustMem[m].length),backgroundColor:'rgba(245,158,66,.7)',borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
+  // 🏆 GT OpenNew chart
+  const byOpenNewMem=groupBy(openNewMo,nameKey), openNewMems=Object.keys(byOpenNewMem).sort((a,b)=>byOpenNewMem[b].length-byOpenNewMem[a].length);
+  mkChart('chartGtOpenNew','bar',openNewMems,[{label:'Mở mới TC',data:openNewMems.map(m=>byOpenNewMem[m].length),backgroundColor:'rgba(76,175,130,.75)',borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
+  // GT Other chart
+  const gtoMo=gto.filter(isThisMonth); const byGtoMem=groupBy(gtoMo,nameKey), gtoMems=Object.keys(byGtoMem).sort((a,b)=>byGtoMem[b].length-byGtoMem[a].length);
+  mkChart('chartGtOtherByName','bar',gtoMems,[{label:'GT Other',data:gtoMems.map(m=>byGtoMem[m].length),backgroundColor:'rgba(245,158,66,.5)',borderRadius:4}],{plugins:{legend:{display:false}},indexAxis:'y'});
   const staffGT={};
-  gt.forEach(r=>{ const n=nameKey(r),reg=regionKey(r)||'GT'; if(!staffGT[n]) staffGT[n]={region:reg,today:0,week:0,month:0,newCust:0};
+  gt.forEach(r=>{ const n=nameKey(r),reg=regionKey(r)||'GT'; if(!staffGT[n]) staffGT[n]={region:reg,today:0,week:0,month:0,newCust:0,openNew:0,other:0};
     if(isToday(r)) staffGT[n].today++; if(isThisWeek(r)) staffGT[n].week++;
     if(isThisMonth(r)){ staffGT[n].month++; } });
-  // GT New count from gt_new
   (RAW.gt_new||[]).forEach(r=>{ const n=nameKey(r); if(staffGT[n]&&isThisMonth(r)) staffGT[n].newCust++; });
+  gton.forEach(r=>{ const n=nameKey(r); if(!staffGT[n]) staffGT[n]={region:regionKey(r)||'GT',today:0,week:0,month:0,newCust:0,openNew:0,other:0}; if(isThisMonth(r)) staffGT[n].openNew++; });
+  gto.forEach(r=>{ const n=nameKey(r); if(!staffGT[n]) staffGT[n]={region:regionKey(r)||'GT',today:0,week:0,month:0,newCust:0,openNew:0,other:0}; if(isThisMonth(r)) staffGT[n].other++; });
   document.getElementById('tbGt').innerHTML=Object.entries(staffGT).sort((a,b)=>b[1].month-a[1].month).map(([n,d],i)=>`
     <tr><td class="rank">${i+1}</td><td>${esc(n)}</td><td>${teamPill(d.region)}</td>
     <td class="num">${d.today||'—'}</td><td class="num">${d.week||'—'}</td>
-    <td class="num"><strong>${fmt(d.month)}</strong></td><td class="num">${d.newCust||'—'}</td></tr>`).join('')||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
-  const recent=[...gt].sort((a,b)=>String(b['Timestamp']||'').localeCompare(String(a['Timestamp']||''))).slice(0,25);
-  document.getElementById('tbGtRecent').innerHTML=recent.map(r=>`
-    <tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${String(r['Timestamp']||'').slice(11,16)||'—'}</td>
+    <td class="num"><strong>${fmt(d.month)}</strong></td><td class="num">${d.newCust||'—'}</td>
+    <td class="num" style="color:#4caf82">${d.openNew||'—'}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">Không có dữ liệu</td></tr>';
+  // GT tab header update
+  const gtDetailHdr=document.querySelector('#tab-gt .tbl-card table thead tr');
+  if(gtDetailHdr&&!gtDetailHdr.querySelector('[data-opennew]')){
+    const th=document.createElement('th'); th.className='num'; th.textContent='🏆Mở mới'; th.setAttribute('data-opennew','1');
+    gtDetailHdr.appendChild(th);
+  }
+  const recent=[...gt,...gto,...gton].sort((a,b)=>String(b['Timestamp']||'').localeCompare(String(a['Timestamp']||''))).slice(0,25);
+  document.getElementById('tbGtRecent').innerHTML=recent.map(r=>{
+    const lt=(r['Loại Survey']||r['type']||'').toUpperCase();
+    const pill=lt==='GT_OPENNEW'?'<span class="pill" style="background:rgba(76,175,130,.2);color:#4caf82">🏆Mở mới</span>':lt==='GT_OTHER'?'<span class="pill pill-warn">Other</span>':'<span class="pill pill-gtn">Daily</span>';
+    return `<tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${String(r['Timestamp']||'').slice(11,16)||'—'}</td>
     <td style="font-size:12px">${esc(nameKey(r))}</td><td>${teamPill(regionKey(r))}</td>
-    <td style="font-size:12px">${esc(r['Điểm Bán']||r['Chợ / Khu Vực']||'—')}</td>
-    <td><span class="pill pill-gtn">Daily</span></td>
-    <td style="font-size:11px;color:var(--gray2)">${esc(r['Ghi Chú']||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">Không có dữ liệu</td></tr>';
+    <td style="font-size:12px">${esc(r['Điểm Bán']||r['Chợ / Khu Vực']||r['Tên Điểm Bán']||'—')}</td>
+    <td>${pill}</td>
+    <td style="font-size:11px;color:var(--gray2)">${esc(r['Ghi Chú']||'—')}</td></tr>`;
+  }).join('')||'<tr><td colspan="6" class="empty">Không có dữ liệu</td></tr>';
 }
 
 // ══════════════════════════════════════════════════════════

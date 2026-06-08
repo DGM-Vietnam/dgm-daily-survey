@@ -234,6 +234,11 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <div class="staff-list" id="staffList"></div>
     </div>
+    <div class="card" style="border:1.5px solid #e0e0e0;background:#f5f5f5;padding:12px 14px">
+      <h3 style="font-size:12px;color:var(--text2);margin-bottom:8px">🔄 Cập nhật danh sách</h3>
+      <button class="btn btn-secondary" onclick="forceRefreshStores()" style="padding:10px;font-size:13px;width:100%">🔄 Cập nhật Store & Sản phẩm</button>
+      <p style="font-size:11px;color:var(--text2);margin-top:6px">Bấm để lấy dữ liệu store & SKU mới nhất từ server</p>
+    </div>
     <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
       <h3 style="color:var(--text2);font-size:12px">✏️ Nhập thủ công (nếu chưa có trong danh sách)</h3>
       <div class="field" style="margin-bottom:10px">
@@ -303,6 +308,16 @@ textarea{resize:vertical;min-height:80px}
   </div>
   <div class="content" id="gtotherContent"></div>
   <div class="bottom-bar"><button class="btn btn-primary" onclick="submitGTOther()">📤 Gửi Báo Cáo</button></div>
+</div>
+
+<!-- SCREEN: GT OPEN NEW (Mở mới thành công) -->
+<div class="screen" id="scGTOpenNew">
+  <div class="header" style="background:#2e7d32">
+    <button class="btn-back" onclick="goTo('scType')" style="background:transparent;border:none;color:#fff;padding:8px 12px;cursor:pointer;font-size:14px;font-weight:700">◂ Back</button>
+    <div><h1 style="color:#fff">🏆 Mở Mới Thành Công</h1><div class="sub" id="gtopennewSubtitle" style="color:rgba(255,255,255,.8)"></div></div>
+  </div>
+  <div class="content" id="gtopennewContent"></div>
+  <div class="bottom-bar"><button class="btn" style="background:#2e7d32;color:#fff;width:100%;padding:14px;border:none;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer" onclick="submitGTOpenNew()">🏆 Xác nhận mở mới thành công</button></div>
 </div>
 
 <!-- SCREEN: SUCCESS -->
@@ -566,6 +581,14 @@ document.addEventListener('DOMContentLoaded', () => {
           initGPS();
           state.user = Object.assign({}, userForRender3, { team: sess.user.team });
 
+        } else if (sc === 'scGTOpenNew') {
+          var region4 = sess.gtRegion || sess.user.team;
+          state.user = Object.assign({}, sess.user, { _gtRegion: region4 });
+          document.getElementById('gtopennewSubtitle').textContent = sess.user.name + ' · ' + region4;
+          renderGTOpenNewForm(region4);
+          goTo('scGTOpenNew');
+          initGPS();
+
         } else {
           // Màn hình khác (scLogin, scSuccess): về home
           goTo('scLogin');
@@ -697,6 +720,7 @@ function renderTypeCards(team) {
     html += `<div class="type-cards">
       <div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán GT hàng ngày</div></div>
       <div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">Điểm Bán Mới</div><div class="desc">Khảo sát & chào hàng điểm mới</div></div>
+      <div class="type-card" onclick="startGTOpenNew()" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">🏆</div><div class="title" style="color:#2e7d32">Mở Mới Thành Công</div><div class="desc">Đã chốt được điểm bán mới</div></div>
       <div class="type-card" onclick="startGTOther()"><div class="icon">📝</div><div class="title">Công việc khác</div><div class="desc">Ghi nhận hoạt động GT khác</div></div>
     </div>`;
   } else if (team === 'MT/GT') {
@@ -705,6 +729,7 @@ function renderTypeCards(team) {
       <div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>
       <div class="type-card" onclick="showGTRegionPicker()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>
       <div class="type-card" onclick="showGTRegionPicker('new')"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>
+      <div class="type-card" onclick="showGTRegionPicker('opennew')" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">🏆</div><div class="title" style="color:#2e7d32">GT Mở Mới TC</div><div class="desc">Chốt được điểm bán GT mới</div></div>
       <div class="type-card" onclick="showGTRegionPicker('other')"><div class="icon">📝</div><div class="title">GT Khác</div><div class="desc">Công việc GT khác</div></div>
     </div>`;
   } else {
@@ -736,6 +761,8 @@ function pickGTRegion(region, mode) {
   state.user = { ...state.user, team: region, _gtRegion: region };
   if (mode === 'new') {
     startGTNew();
+  } else if (mode === 'opennew') {
+    startGTOpenNew();
   } else if (mode === 'other') {
     startGTOther();
   } else {
@@ -1663,6 +1690,102 @@ async function submitGTOther() {
     (state.user && state.user.name) || payload.salesperson || '',
     async function() { await sendData(payload, 'GT Công việc khác'); }
   );
+}
+
+
+// ============ GT OPEN NEW — Mở mới thành công ============
+function startGTOpenNew() {
+  state.photos = {};
+  state.skuData = {};
+  var region = state.user._gtRegion || state.user.team;
+  state.user = Object.assign({}, state.user, { _gtRegion: region });
+  document.getElementById('gtopennewSubtitle').textContent = state.user.name + (region ? ' · ' + region : '');
+  renderGTOpenNewForm(region);
+  goTo('scGTOpenNew');
+  initGPS();
+}
+
+function renderGTOpenNewForm(region) {
+  var content = document.getElementById('gtopennewContent');
+  var bizTypes = ['Tiệm tạp hóa','Siêu thị mini / CVS','Nhà buôn (bán sỉ)','Sạp trong chợ','Nhà hàng / Khách sạn'];
+  var products = ['Đậu sốt cà','Puree cà chua','Đậu trắng','Đậu gà','Cá ngừ','Cá trích','Cá thu','Bắp','Nước cốt dừa','Tương ớt Sriracha'];
+  content.innerHTML = '<div class="card" style="border-top:3px solid #2e7d32">'
+    + '<h3 style="color:#2e7d32">🏆 Thông tin điểm bán đã mở được</h3>'
+    + '<div class="field required"><label>Ngày mở mới</label>' + dateFieldHTML('opennew_date') + '</div>'
+    + '<div class="field required"><label>Tên điểm bán</label><input type="text" id="opennew_store" placeholder="Tên cửa hàng, sạp, đại lý..."></div>'
+    + '<div class="field required"><label>Địa chỉ</label><input type="text" id="opennew_addr" placeholder="Địa chỉ cụ thể, số nhà, đường..."></div>'
+    + '<div class="field required"><label>Hình thức kinh doanh</label>'
+    + '<div class="chips" id="opennew_biztype">'
+    + bizTypes.map(function(v){return '<span class="chip" onclick="selectChip(this,\'opennew_biztype\')">'+v+'</span>';}).join('')
+    + '</div></div>'
+    + '<div class="field"><label>GPS vị trí</label><div id="gpsBoxOpenNew">' + gpsBoxHTML('gpsBoxOpenNew',false) + '</div></div>'
+    + '</div>'
+    + '<div class="card"><h3>📞 Thông tin liên hệ</h3>'
+    + '<div class="field"><label>Người liên hệ / Chủ cửa hàng</label><input type="text" id="opennew_contact" placeholder="Họ tên chủ sạp..."></div>'
+    + '<div class="field"><label>Số điện thoại</label><input type="tel" id="opennew_phone" placeholder="0909..." inputmode="tel"></div>'
+    + '</div>'
+    + '<div class="card"><h3>🛒 Đơn đầu tiên</h3>'
+    + '<div class="field required"><label>Sản phẩm trong đơn đầu</label>'
+    + '<div class="chips" id="opennew_products">'
+    + products.map(function(v){return '<span class="chip" onclick="toggleChip(this)">'+v+'</span>';}).join('')
+    + '</div></div>'
+    + '<div class="field required"><label>Thông tin đơn đầu (số lượng, giá trị)</label>'
+    + '<textarea id="opennew_firstorder" placeholder="VD: 3 thùng đậu sốt cà + 2 thùng cá ngừ, tổng 1.2tr..." style="min-height:80px"></textarea>'
+    + '</div></div>'
+    + '<div class="card"><h3>📷 Hình ảnh <span class="store-count-badge zero" id="opennew_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>'
+    + '<p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc ít nhất 1 hình (mặt tiền, hóa đơn...).</p>'
+    + '<label style="display:block;width:100%;padding:14px;border:2px dashed #2e7d32;border-radius:10px;background:#e8f5e9;color:#2e7d32;font-size:14px;font-weight:600;cursor:pointer;text-align:center">'
+    + '📁 Chọn hình từ thư viện'
+    + '<input type="file" id="opennew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'opennew')">'
+    + '</label>'
+    + '<div class="photo-compress-bar" id="opennew_compress_bar"><div class="photo-compress-fill" id="opennew_compress_fill"></div></div>'
+    + '<p style="font-size:11px;color:var(--text2);margin-top:4px" id="opennew_compress_msg"></p>'
+    + '<div id="opennew_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>'
+    + '</div>'
+    + '<div class="card"><h3>📝 Ghi chú thêm</h3>'
+    + '<textarea id="opennew_note" placeholder="Thông tin đặc biệt, tiềm năng..."></textarea>'
+    + '</div>';
+}
+
+async function submitGTOpenNew() {
+  var store = (function(){var _e=document.getElementById('opennew_store');return _e&&_e.value?_e.value.trim():'';})() || '';
+  var addr  = (function(){var _e=document.getElementById('opennew_addr');return _e&&_e.value?_e.value.trim():'';})() || '';
+  if (!store) { toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
+  if (!getChips('opennew_biztype')) { toast('⚠️ Vui lòng chọn hình thức kinh doanh'); return; }
+  if (!getChips('opennew_products')) { toast('⚠️ Vui lòng chọn sản phẩm trong đơn đầu'); return; }
+  var firstOrder = (function(){var _e=document.getElementById('opennew_firstorder');return _e&&_e.value?_e.value.trim():'';})() || '';
+  if (!firstOrder) { toast('⚠️ Vui lòng nhập thông tin đơn đầu'); return; }
+  var _onp = Object.keys(state.photos).filter(function(k){return k.startsWith('opennew_');});
+  if (_onp.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
+  var region = state.user._gtRegion || state.user.team;
+  var payload = {
+    type: 'GT_OpenNew', date: getDateValue('opennew_date'),
+    salesperson: state.user.name, salesName: state.user.name, salesId: state.user.name,
+    channel: 'GT', team: state.user.team, region: region,
+    store_name: store, storeName: store, tenDiemBan: store,
+    address: addr, hinhThucKD: getChips('opennew_biztype'), biz_type: getChips('opennew_biztype'),
+    contactName: (function(){var _e=document.getElementById('opennew_contact');return _e&&_e.value?_e.value.trim():'';})() || '',
+    contact_name: (function(){var _e=document.getElementById('opennew_contact');return _e&&_e.value?_e.value.trim():'';})() || '',
+    phone: (function(){var _e=document.getElementById('opennew_phone');return _e&&_e.value?_e.value.trim():'';})() || '',
+    sanPham: getChips('opennew_products'), products_pitched: getChips('opennew_products'),
+    firstOrder: firstOrder, first_order: firstOrder,
+    ghiChu: (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
+    note: (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
+    gps: state.gps ? (state.gps.lat+','+state.gps.lng) : '',
+    soHinh: Object.keys(state.photos).length, photos: state.photos
+  };
+  fraudPreSubmit(
+    (state.user && state.user.name) || payload.salesperson || '',
+    async function() { await sendData(payload, 'GT Mở mới thành công'); }
+  );
+}
+
+// ============ FORCE REFRESH STORES ============
+function forceRefreshStores() {
+  try { localStorage.removeItem(STORES_CACHE_KEY); } catch(e) {}
+  showLoading('Đang cập nhật danh sách...');
+  loadStores();
+  setTimeout(function() { hideLoading(); toast('✅ Đã cập nhật store mới nhất'); }, 3000);
 }
 
 // ── DEBUG LOGGER ──────────────────────────────────────────
