@@ -449,6 +449,13 @@ function loadStores() {
       const age = Date.now() - ts;
       console.log('[Stores] Cache loaded (' + Math.round(age/60000) + ' phút tuổi)');
       _storesReadyResolve(true); // data sẵn sàng ngay
+      // Re-render MT form ngay nếu đang mở (cache apply sau form render)
+      try {
+        var sc = document.querySelector('.screen.active');
+        if (sc && (sc.id === 'scMT' || sc.id === 'scMTOther') && typeof renderMTForm === 'function') {
+          renderMTForm(window._mtCurrentMode || 'normal');
+        }
+      } catch(e) {}
       if (age < STORES_CACHE_TTL) return; // cache còn mới → không cần fetch
     }
   } catch(e) {}
@@ -948,6 +955,7 @@ function collectSKUs(prefix, skuList) {
 
 // ============ MT FORM ============
 function startMT(mode) {
+  window._mtCurrentMode = mode; // lưu để re-render sau khi stores load
   state.photos = {};
   state.skuData = {};
   state.mtMode = mode;
