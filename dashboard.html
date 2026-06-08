@@ -386,6 +386,25 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <table><thead><tr><th>#</th><th>Nhân viên</th><th>Team</th><th class="num">Hôm nay</th><th class="num">Tuần này</th><th class="num">Tháng này</th><th>Trạng thái</th></tr></thead>
       <tbody id="tbOverview"></tbody></table>
     </div>
+
+    <!-- GT NEW STORE TABLE — điểm bán mới tháng này -->
+    <div class="sec">GT — Điểm bán mới (tháng này)</div>
+    <div class="tbl-card" style="border-left:3px solid var(--orange)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <h3 style="margin:0">➕ Điểm bán mới đang chào hàng</h3>
+        <span id="newStoreBadge" style="font-size:12px;font-family:var(--mono);color:var(--gray2)"></span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Nhân viên</th><th>Vùng</th>
+            <th>Tên điểm bán</th><th>Hình thức KD</th>
+            <th>Sản phẩm</th><th>Tiềm năng</th><th>Ngày</th>
+          </tr></thead>
+          <tbody id="tbNewStores"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- TAB MT (manager only) -->
@@ -1038,44 +1057,12 @@ function renderOverview(){
 
   const fraudCount=all.filter(r=>(r['fraud_flag']||'').toUpperCase()==='SUSPICIOUS'||(r['conflict_with']||'').trim()).length;
   const openNewMonth=gton.filter(isThisMonth).length;
-  // GT OpenNew by region
-  const gtonMonth=gton.filter(isThisMonth);
-  const onNorth=gtonMonth.filter(isNorth).length;
-  const onCentral=gtonMonth.filter(isCentral).length;
-  const onSouth=gtonMonth.filter(isSouth).length;
-  const gtonToday=gton.filter(isToday);
-  const onNorthTd=gtonToday.filter(isNorth).length;
-  const onCentralTd=gtonToday.filter(isCentral).length;
-  const onSouthTd=gtonToday.filter(isSouth).length;
   document.getElementById('sc-overview').innerHTML=`
     <div class="sc"><div class="sc-label">Tổng hôm nay</div><div class="sc-value">${allToday.length}</div><div class="sc-sub">MT ${allToday.filter(isMT).length} · GT ${allToday.filter(r=>!isMT(r)).length}</div></div>
     <div class="sc yellow"><div class="sc-label">Tuần này</div><div class="sc-value">${allWeek.length}</div><div class="sc-sub">${[...new Set(allWeek.map(nameKey))].length} nhân viên</div></div>
     <div class="sc blue"><div class="sc-label">Lũy kế tháng</div><div class="sc-value">${allMonth.length}</div><div class="sc-sub">MT ${[...mt,...mto].filter(isThisMonth).length} · GT ${[...gt,...gto,...gton].filter(isThisMonth).length}</div></div>
     <div class="sc green"><div class="sc-label">🏆 Mở mới TC</div><div class="sc-value">${openNewMonth}</div><div class="sc-sub">tháng này</div></div>
     <div class="sc ${fraudCount>0?'alert':'green'}"><div class="sc-label">Cảnh báo</div><div class="sc-value ${fraudCount>0?'red':''}">${fraudCount}</div><div class="sc-sub">thiết bị trùng</div></div>
-    <div class="sc" style="border-left:3px solid #4A9EBF">
-      <div class="sc-label">🆕 Mở mới theo vùng GT</div>
-      <div style="display:flex;gap:10px;align-items:flex-end;margin-top:6px">
-        <div style="text-align:center">
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#4A9EBF">${onNorth}</div>
-          <div style="font-size:10px;color:var(--gray2);margin-top:2px">North</div>
-          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onNorthTd}</div>
-        </div>
-        <div style="color:rgba(255,255,255,0.15);font-size:18px;padding-bottom:18px">|</div>
-        <div style="text-align:center">
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#FFE140">${onCentral}</div>
-          <div style="font-size:10px;color:var(--gray2);margin-top:2px">Central</div>
-          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onCentralTd}</div>
-        </div>
-        <div style="color:rgba(255,255,255,0.15);font-size:18px;padding-bottom:18px">|</div>
-        <div style="text-align:center">
-          <div style="font-size:22px;font-weight:700;font-family:var(--mono);color:#4caf82">${onSouth}</div>
-          <div style="font-size:10px;color:var(--gray2);margin-top:2px">South</div>
-          <div style="font-size:10px;color:var(--gray2)">hôm nay: ${onSouthTd}</div>
-        </div>
-      </div>
-      <div class="sc-sub" style="margin-top:6px">lũy kế tháng này</div>
-    </div>
   `;
 
   const filtered=all.filter(inRange);
@@ -1090,6 +1077,7 @@ function renderOverview(){
   mkChart('chartMtGt','doughnut',['MT','GT'],[{data:[mtM,gtM],backgroundColor:['rgba(200,16,46,.8)','rgba(74,158,191,.7)'],borderColor:['#C8102E','#4A9EBF'],borderWidth:2}],{plugins:{legend:{position:'bottom'}}});
 
   renderSalesActivityTable(mt, gt);
+  renderNewStoreTable();
 
   const staff={};
   all.forEach(r=>{ const n=nameKey(r),t=teamKey(r)||regionKey(r)||''; if(!staff[n]) staff[n]={team:t,today:0,week:0,month:0}; if(isToday(r)) staff[n].today++; if(isThisWeek(r)) staff[n].week++; if(isThisMonth(r)) staff[n].month++; });
@@ -1167,6 +1155,43 @@ function renderSalesActivityTable(mt, gt){
     });
   });
   document.getElementById('tbSalesActivity').innerHTML=rows||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
+}
+
+// ══════════════════════════════════════════════════════════
+// GT NEW STORE TABLE — điểm bán mới (GT_NewCustomer)
+// ══════════════════════════════════════════════════════════
+function renderNewStoreTable(){
+  const gtNew=(RAW.gt_new||[]).filter(isThisMonth);
+  const el=document.getElementById('tbNewStores');
+  const badge=document.getElementById('newStoreBadge');
+  if(!el) return;
+  if(badge) badge.textContent=gtNew.length+' điểm bán · tháng này';
+  if(!gtNew.length){
+    el.innerHTML='<tr><td colspan="8" class="empty">Chưa có điểm bán mới tháng này</td></tr>';
+    return;
+  }
+  // Sort mới nhất lên đầu
+  const sorted=[...gtNew].sort((a,b)=>String(b['Timestamp']||b['Ngày']||'').localeCompare(String(a['Timestamp']||a['Ngày']||'')));
+  el.innerHTML=sorted.map((r,i)=>{
+    const name=nameKey(r)||'—';
+    const reg=regionKey(r)||'—';
+    const store=r['Tên Điểm Bán Mới']||r['Tên Điểm Bán']||r['store_name']||r['storeName']||'—';
+    const biz=r['Hình Thức KD']||r['hinhThucKD']||r['biz_type']||'';
+    const prod=r['Sản Phẩm Chào Hàng']||r['sanPham']||r['products_pitched']||'';
+    const pot=r['Tiềm Năng']||r['tienNang']||r['potential']||'';
+    const date=r['Ngày']||r['date']||'';
+    const potColor=pot.toLowerCase().includes('cao')?'var(--green)':pot.toLowerCase().includes('tb')?'var(--orange)':'var(--gray2)';
+    return `<tr>
+      <td class="rank">${i+1}</td>
+      <td style="font-size:12px">${esc(name)}</td>
+      <td>${teamPill(reg)}</td>
+      <td style="font-weight:600;font-size:13px">${esc(store)}</td>
+      <td style="font-size:12px;color:var(--gray2)">${esc(biz)}</td>
+      <td style="font-size:11px;color:var(--blue)">${esc(prod)}</td>
+      <td style="font-size:12px;font-weight:600;color:${potColor}">${esc(pot)||'—'}</td>
+      <td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">${date}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ══════════════════════════════════════════════════════════
