@@ -468,6 +468,11 @@ function loadStores() {
         applyStoreData(json);
         try { localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() })); } catch(e) {}
         console.log('[Stores] ✅ Đã cập nhật từ server (' + json.generated_at + ')');
+        // Re-render màn hình hiện tại nếu đang ở MT/GT để danh sách chain cập nhật ngay
+        if (state.user) {
+          var curScreen = document.querySelector('.screen.active');
+          if (curScreen && (curScreen.id === 'scMT' || curScreen.id === 'scMTOther')) renderMTForm && renderMTForm();
+        }
         if (!hasCache) _storesReadyResolve(true);
       }
     })
@@ -478,10 +483,20 @@ function loadStores() {
 }
 
 function applyStoreData(data) {
+  // Nếu là format cũ {stores:[...]} → invalid, xóa cache và không apply
+  if (!data || (!data.MT_CHAINS && !data.GT_NORTH && !data.GT_SOUTH && !data.GT_CENTRAL)) {
+    if (data && data.stores) {
+      // Format cũ của GAS — xóa cache để force fetch lại
+      try { localStorage.removeItem(STORES_CACHE_KEY); } catch(e) {}
+      console.warn('[Stores] Cache format cũ ({stores:[]}), đã xóa — sẽ fetch lại từ server');
+    }
+    return;
+  }
   if (data.MT_CHAINS)  MT_CHAINS  = data.MT_CHAINS;
   if (data.GT_NORTH)   GT_NORTH   = data.GT_NORTH;
   if (data.GT_CENTRAL) GT_CENTRAL = data.GT_CENTRAL;
   if (data.GT_SOUTH)   GT_SOUTH   = data.GT_SOUTH;
+  console.log('[Stores] Applied — MT chains:', Object.keys(MT_CHAINS).length, '| GT-N:', Object.keys(GT_NORTH).length, '| GT-C:', Object.keys(GT_CENTRAL).length, '| GT-S:', Object.keys(GT_SOUTH).length);
 }
 
 
@@ -604,7 +619,7 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     if (sessionStorage.getItem('dgm_force_refreshed') === '1') {
       sessionStorage.removeItem('dgm_force_refreshed');
-      setTimeout(function(){ toast('✅ Đã tải lại dữ liệu mới nhất từ server'); }, 1200);
+      setTimeout(function(){ toast('✅ Đã tải lại danh sách store mới nhất'); }, 1200);
     }
   } catch(e) {}
 });
@@ -1716,22 +1731,11 @@ function renderGTOpenNewForm(region) {
   var content = document.getElementById('gtopennewContent');
   var bizTypes = ['Tiệm tạp hóa','Siêu thị mini / CVS','Nhà buôn (bán sỉ)','Sạp trong chợ','Nhà hàng / Khách sạn'];
   var products = ['Đậu sốt cà','Puree cà chua','Đậu trắng','Đậu gà','Cá ngừ','Cá trích','Cá thu','Bắp','Nước cốt dừa','Tương ớt Sriracha'];
-  // channel & region tự động từ user (không hiện UI — gửi ngầm trong payload)
-  var autoChannel = 'GT';
-  var autoRegion  = (state.user && (state.user._gtRegion || state.user.team)) || region || '';
   content.innerHTML = '<div class="card" style="border-top:3px solid #2e7d32">'
     + '<h3 style="color:#2e7d32">🏆 Thông tin điểm bán đã mở được</h3>'
-    // Nhân viên & khu vực (readonly, hiển thị để user xác nhận)
-    + '<div style="background:#f0faf2;border:1px solid #c8e6c9;border-radius:8px;padding:10px 12px;margin-bottom:14px;font-size:13px">'
-    + '👤 <strong>' + (state.user ? state.user.name : '') + '</strong>'
-    + ' &nbsp;|&nbsp; 📍 Kênh: <strong>' + autoChannel + '</strong>'
-    + ' &nbsp;|&nbsp; Vùng: <strong>' + autoRegion + '</strong>'
-    + '</div>'
     + '<div class="field required"><label>Ngày mở mới</label>' + dateFieldHTML('opennew_date') + '</div>'
     + '<div class="field required"><label>Tên điểm bán</label><input type="text" id="opennew_store" placeholder="Tên cửa hàng, sạp, đại lý..."></div>'
-    + '<div class="field required"><label>Tỉnh / Thành phố</label><input type="text" id="opennew_province" placeholder="VD: Hồ Chí Minh, Hà Nội, Đà Nẵng..."></div>'
-    + '<div class="field required"><label>Tên chợ / Khu vực</label><input type="text" id="opennew_market" placeholder="VD: Chợ Bình Điền, Chợ Đầu Mối, Phường 12..."></div>'
-    + '<div class="field"><label>Địa chỉ chi tiết</label><input type="text" id="opennew_addr" placeholder="Số nhà, đường, hẻm..."></div>'
+    + '<div class="field required"><label>Địa chỉ</label><input type="text" id="opennew_addr" placeholder="Địa chỉ cụ thể, số nhà, đường..."></div>'
     + '<div class="field required"><label>Hình thức kinh doanh</label>'
     + '<div class="chips" id="opennew_biztype">'
     + bizTypes.map(function(v){return '<span class="chip" onclick="selectChip(this,\'opennew_biztype\')">'+v+'</span>';}).join('')
@@ -1754,7 +1758,7 @@ function renderGTOpenNewForm(region) {
     + '<p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc ít nhất 1 hình (mặt tiền, hóa đơn...).</p>'
     + '<label style="display:block;width:100%;padding:14px;border:2px dashed #2e7d32;border-radius:10px;background:#e8f5e9;color:#2e7d32;font-size:14px;font-weight:600;cursor:pointer;text-align:center">'
     + '📁 Chọn hình từ thư viện'
-    + '<input type="file" id="opennew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,\'opennew\')">'
+    + '<input type="file" id="opennew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'opennew')">'
     + '</label>'
     + '<div class="photo-compress-bar" id="opennew_compress_bar"><div class="photo-compress-fill" id="opennew_compress_fill"></div></div>'
     + '<p style="font-size:11px;color:var(--text2);margin-top:4px" id="opennew_compress_msg"></p>'
@@ -1766,58 +1770,31 @@ function renderGTOpenNewForm(region) {
 }
 
 async function submitGTOpenNew() {
-  var store    = (function(){var _e=document.getElementById('opennew_store');return _e&&_e.value?_e.value.trim():'';})() || '';
-  var province = (function(){var _e=document.getElementById('opennew_province');return _e&&_e.value?_e.value.trim():'';})() || '';
-  var market   = (function(){var _e=document.getElementById('opennew_market');return _e&&_e.value?_e.value.trim():'';})() || '';
-  var addr     = (function(){var _e=document.getElementById('opennew_addr');return _e&&_e.value?_e.value.trim():'';})() || '';
-  if (!store)    { toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
-  if (!province) { toast('⚠️ Vui lòng nhập Tỉnh / Thành phố'); return; }
-  if (!market)   { toast('⚠️ Vui lòng nhập tên chợ / khu vực'); return; }
-  if (!getChips('opennew_biztype'))  { toast('⚠️ Vui lòng chọn hình thức kinh doanh'); return; }
+  var store = (function(){var _e=document.getElementById('opennew_store');return _e&&_e.value?_e.value.trim():'';})() || '';
+  var addr  = (function(){var _e=document.getElementById('opennew_addr');return _e&&_e.value?_e.value.trim():'';})() || '';
+  if (!store) { toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
+  if (!getChips('opennew_biztype')) { toast('⚠️ Vui lòng chọn hình thức kinh doanh'); return; }
   if (!getChips('opennew_products')) { toast('⚠️ Vui lòng chọn sản phẩm trong đơn đầu'); return; }
   var firstOrder = (function(){var _e=document.getElementById('opennew_firstorder');return _e&&_e.value?_e.value.trim():'';})() || '';
   if (!firstOrder) { toast('⚠️ Vui lòng nhập thông tin đơn đầu'); return; }
   var _onp = Object.keys(state.photos).filter(function(k){return k.startsWith('opennew_');});
   if (_onp.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
-  // channel & region tự động generate từ username (không cho user sửa)
-  var autoChannel = 'GT';
-  var autoRegion  = state.user._gtRegion || state.user.team || '';
+  var region = state.user._gtRegion || state.user.team;
   var payload = {
-    // ── Khớp với sheet GT_OpenNew headers ──────────────────────
-    type:        'GT_OpenNew',
-    date:        getDateValue('opennew_date'),
-    // Nhân Viên
+    type: 'GT_OpenNew', date: getDateValue('opennew_date'),
     salesperson: state.user.name, salesName: state.user.name, salesId: state.user.name,
-    // Khu Vực (auto từ username)
-    region:      autoRegion, team: autoRegion, khu_vuc: autoRegion,
-    // Kênh (auto từ username)
-    channel:     autoChannel,
-    // Tên Điểm Bán
-    store_name:  store, storeName: store, tenDiemBan: store,
-    // Tỉnh / TP  ← mới
-    province:    province, tinh_tp: province,
-    // Tên Chợ (GT)  ← mới
-    cho:         market, market: market, 'chợ / khu vực': market,
-    // Địa Chỉ
-    address:     addr,
-    // Hình Thức KD
-    hinhThucKD:  getChips('opennew_biztype'), biz_type: getChips('opennew_biztype'),
-    // Người Liên Hệ
+    channel: 'GT', team: state.user.team, region: region,
+    store_name: store, storeName: store, tenDiemBan: store,
+    address: addr, hinhThucKD: getChips('opennew_biztype'), biz_type: getChips('opennew_biztype'),
     contactName: (function(){var _e=document.getElementById('opennew_contact');return _e&&_e.value?_e.value.trim():'';})() || '',
-    contact_name:(function(){var _e=document.getElementById('opennew_contact');return _e&&_e.value?_e.value.trim():'';})() || '',
-    // SĐT
-    phone:       (function(){var _e=document.getElementById('opennew_phone');return _e&&_e.value?_e.value.trim():'';})() || '',
-    // Sản Phẩm Đơn Đầu
-    sanPham:     getChips('opennew_products'), products_pitched: getChips('opennew_products'),
-    // Đơn Đầu
-    firstOrder:  firstOrder, first_order: firstOrder,
-    // Ghi Chú
-    ghiChu:      (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
-    note:        (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
-    // GPS & hình
-    gps:         state.gps ? (state.gps.lat+','+state.gps.lng) : '',
-    soHinh:      Object.keys(state.photos).length,
-    photos:      state.photos
+    contact_name: (function(){var _e=document.getElementById('opennew_contact');return _e&&_e.value?_e.value.trim():'';})() || '',
+    phone: (function(){var _e=document.getElementById('opennew_phone');return _e&&_e.value?_e.value.trim():'';})() || '',
+    sanPham: getChips('opennew_products'), products_pitched: getChips('opennew_products'),
+    firstOrder: firstOrder, first_order: firstOrder,
+    ghiChu: (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
+    note: (function(){var _e=document.getElementById('opennew_note');return _e&&_e.value?_e.value.trim():'';})() || '',
+    gps: state.gps ? (state.gps.lat+','+state.gps.lng) : '',
+    soHinh: Object.keys(state.photos).length, photos: state.photos
   };
   fraudPreSubmit(
     (state.user && state.user.name) || payload.salesperson || '',
@@ -1828,7 +1805,7 @@ async function submitGTOpenNew() {
 // ============ FORCE REFRESH STORES ============
 function forceRefreshStores() {
   try { localStorage.removeItem(STORES_CACHE_KEY); } catch(e) {}
-  // Reload page với cache-bust để clear cả browser HTTP cache (quan trọng khi mở từ bookmark)
+  // Reload page với cache-bust để clear cả browser HTTP cache (khi mở từ bookmark)
   var url = location.href.split('?')[0] + '?_r=' + Date.now();
   try { sessionStorage.setItem('dgm_force_refreshed','1'); } catch(e) {}
   location.replace(url);
