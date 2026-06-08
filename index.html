@@ -483,13 +483,15 @@ function loadStores() {
 }
 
 function applyStoreData(data) {
-  // Nếu là format cũ {stores:[...]} → invalid, xóa cache và không apply
-  if (!data || (!data.MT_CHAINS && !data.GT_NORTH && !data.GT_SOUTH && !data.GT_CENTRAL)) {
-    if (data && data.stores) {
-      // Format cũ của GAS — xóa cache để force fetch lại
-      try { localStorage.removeItem(STORES_CACHE_KEY); } catch(e) {}
-      console.warn('[Stores] Cache format cũ ({stores:[]}), đã xóa — sẽ fetch lại từ server');
-    }
+  // Validate: phải có ít nhất 1 trong 4 fields với data thực
+  if (!data) return;
+  var hasMT = data.MT_CHAINS && Object.keys(data.MT_CHAINS).length > 0;
+  var hasGT = (data.GT_NORTH && Object.keys(data.GT_NORTH).length > 0) ||
+              (data.GT_CENTRAL && Object.keys(data.GT_CENTRAL).length > 0) ||
+              (data.GT_SOUTH && Object.keys(data.GT_SOUTH).length > 0);
+  if (!hasMT && !hasGT) {
+    // Empty hoặc format cũ — KHÔNG ghi đè data tốt đang có, chỉ log
+    console.warn('[Stores] Server trả về data rỗng/format cũ — giữ nguyên data hiện tại (MT:', Object.keys(MT_CHAINS).length, 'chains)');
     return;
   }
   if (data.MT_CHAINS)  MT_CHAINS  = data.MT_CHAINS;
