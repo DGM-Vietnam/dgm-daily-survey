@@ -969,16 +969,13 @@ function startMT(mode) {
   state.photos = {};
   state.skuData = {};
   state.mtMode = mode;
+  window._mtCurrentMode = mode;
   mtPhotoCount = 4; // reset photo count
   document.getElementById('mtSubtitle').textContent = state.user.name;
-  // Render form trước — nếu stores chưa ready thì chain list trống, sẽ được fill sau
-  renderMTForm(mode);
+  // goTo TRƯỚC để scMT active, rồi mới render — đảm bảo ssInit thấy DOM đúng
   goTo('scMT');
   initGPS();
-  // Nếu stores chưa có (first load không có cache), re-render khi sẵn sàng
-  if (Object.keys(MT_CHAINS).length === 0) {
-    storesReady.then(() => { renderMTForm(mode); });
-  }
+  renderMTForm(mode);
 }
 
 function renderMTForm(mode) {
