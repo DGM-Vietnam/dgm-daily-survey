@@ -419,7 +419,7 @@ let GT_CENTRAL = {};
 let GT_SOUTH   = {};
 
 const STORES_CACHE_KEY = 'dgm_stores_cache';
-const STORES_CACHE_VERSION = 'v4.3.2';
+const STORES_CACHE_VERSION = 'v4.3.3';
 // One-time cache wipe khi version mới deploy — xóa cache format cũ
 try {
   var _cv = localStorage.getItem('dgm_cache_ver');
@@ -486,18 +486,23 @@ function loadStores() {
         var _hasGT = (json.GT_NORTH && Object.keys(json.GT_NORTH).length > 0) ||
                      (json.GT_CENTRAL && Object.keys(json.GT_CENTRAL).length > 0) ||
                      (json.GT_SOUTH && Object.keys(json.GT_SOUTH).length > 0);
-        applyStoreData(json);
-        // Chỉ cache nếu data thực sự có nội dung — tránh lưu data rỗng vào cache
         if (_hasMT || _hasGT) {
+          // Data server tốt → apply + cache + re-render
+          applyStoreData(json);
           try { localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() })); } catch(e) {}
-          console.log('[Stores] ✅ Đã cập nhật từ server (' + json.generated_at + ')');
+          console.log('[Stores] ✅ Server data tốt — MT:', Object.keys(MT_CHAINS).length, 'chains. Cập nhật (' + json.generated_at + ')');
+          if (state.user) {
+            var curScreen = document.querySelector('.screen.active');
+            if (curScreen && (curScreen.id === 'scMT' || curScreen.id === 'scMTOther')) { renderMTForm && renderMTForm(window._mtCurrentMode||'daily'); }
+          }
         } else {
-          console.warn('[Stores] Server trả về data rỗng — không lưu cache');
-        }
-        // Re-render màn hình hiện tại nếu đang ở MT/GT để danh sách chain cập nhật ngay
-        if (state.user) {
-          var curScreen = document.querySelector('.screen.active');
-          if (curScreen && (curScreen.id === 'scMT' || curScreen.id === 'scMTOther')) renderMTForm && renderMTForm();
+          // Server trả về rỗng (GAS chưa deploy đúng) → KHÔNG apply, KHÔNG re-render
+          // Lưu FALLBACK vào cache để lần sau dùng ngay mà không fetch lại
+          console.warn('[Stores] Server MT_CHAINS={} — bỏ qua. Giữ FALLBACK (' + Object.keys(MT_CHAINS).length + ' chains)');
+          try {
+            var _saveData = { MT_CHAINS: MT_CHAINS, GT_NORTH: GT_NORTH, GT_CENTRAL: GT_CENTRAL, GT_SOUTH: GT_SOUTH, status:'ok', generated_at:'fallback' };
+            localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: _saveData, ts: Date.now() }));
+          } catch(e) {}
         }
         if (!hasCache) _storesReadyResolve(true);
       }
