@@ -419,6 +419,16 @@ let GT_CENTRAL = {};
 let GT_SOUTH   = {};
 
 const STORES_CACHE_KEY = 'dgm_stores_cache';
+const STORES_CACHE_VERSION = 'v4.3.1';
+// One-time cache wipe khi version mới deploy — xóa cache format cũ
+try {
+  var _cv = localStorage.getItem('dgm_cache_ver');
+  if (_cv !== STORES_CACHE_VERSION) {
+    localStorage.removeItem(STORES_CACHE_KEY);
+    localStorage.setItem('dgm_cache_ver', STORES_CACHE_VERSION);
+    console.log('[Stores] Cache cleared — new version', STORES_CACHE_VERSION);
+  }
+} catch(e) {}
 const STORES_CACHE_TTL = 6 * 60 * 60 * 1000; // 6 giờ
 
 // ── FALLBACK DATA (từ Google Sheet) — dùng khi chưa có cache/server ──
