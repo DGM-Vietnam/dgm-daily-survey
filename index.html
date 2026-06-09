@@ -419,7 +419,7 @@ let GT_CENTRAL = {};
 let GT_SOUTH   = {};
 
 const STORES_CACHE_KEY = 'dgm_stores_cache';
-const STORES_CACHE_VERSION = 'v4.3.1';
+const STORES_CACHE_VERSION = 'v4.3.2';
 // One-time cache wipe khi version mới deploy — xóa cache format cũ
 try {
   var _cv = localStorage.getItem('dgm_cache_ver');
@@ -482,9 +482,18 @@ function loadStores() {
     .then(r => r.ok ? r.json() : Promise.reject('HTTP ' + r.status))
     .then(json => {
       if (json.status === 'ok') {
+        var _hasMT = json.MT_CHAINS && Object.keys(json.MT_CHAINS).length > 0;
+        var _hasGT = (json.GT_NORTH && Object.keys(json.GT_NORTH).length > 0) ||
+                     (json.GT_CENTRAL && Object.keys(json.GT_CENTRAL).length > 0) ||
+                     (json.GT_SOUTH && Object.keys(json.GT_SOUTH).length > 0);
         applyStoreData(json);
-        try { localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() })); } catch(e) {}
-        console.log('[Stores] ✅ Đã cập nhật từ server (' + json.generated_at + ')');
+        // Chỉ cache nếu data thực sự có nội dung — tránh lưu data rỗng vào cache
+        if (_hasMT || _hasGT) {
+          try { localStorage.setItem(STORES_CACHE_KEY, JSON.stringify({ data: json, ts: Date.now() })); } catch(e) {}
+          console.log('[Stores] ✅ Đã cập nhật từ server (' + json.generated_at + ')');
+        } else {
+          console.warn('[Stores] Server trả về data rỗng — không lưu cache');
+        }
         // Re-render màn hình hiện tại nếu đang ở MT/GT để danh sách chain cập nhật ngay
         if (state.user) {
           var curScreen = document.querySelector('.screen.active');
@@ -507,8 +516,9 @@ function applyStoreData(data) {
               (data.GT_CENTRAL && Object.keys(data.GT_CENTRAL).length > 0) ||
               (data.GT_SOUTH && Object.keys(data.GT_SOUTH).length > 0);
   if (!hasMT && !hasGT) {
-    // Empty hoặc format cũ — KHÔNG ghi đè data tốt đang có, chỉ log
-    console.warn('[Stores] Server trả về data rỗng/format cũ — giữ nguyên data hiện tại (MT:', Object.keys(MT_CHAINS).length, 'chains)');
+    // Empty hoặc format cũ — xóa cache bad này + KHÔNG ghi đè data tốt đang có
+    try { localStorage.removeItem(STORES_CACHE_KEY); } catch(e) {}
+    console.warn('[Stores] Data rỗng/invalid — đã xóa cache, giữ nguyên data hiện tại (MT:', Object.keys(MT_CHAINS).length, 'chains)');
     return;
   }
   if (data.MT_CHAINS)  MT_CHAINS  = data.MT_CHAINS;
