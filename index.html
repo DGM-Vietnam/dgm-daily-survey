@@ -234,6 +234,7 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <div class="staff-list" id="staffList"></div>
     </div>
+    <button class="btn btn-secondary" id="btnLogoutDevice" onclick="logout()" style="display:none;padding:9px;font-size:12px;width:100%;margin-bottom:10px">🚪 Đăng xuất khỏi thiết bị này</button>
     <div class="card" style="border:1.5px solid #e0e0e0;background:#f5f5f5;padding:12px 14px">
       <h3 style="font-size:12px;color:var(--text2);margin-bottom:8px">🔄 Cập nhật danh sách</h3>
       <button class="btn btn-secondary" onclick="forceRefreshStores()" style="padding:10px;font-size:13px;width:100%">🔄 Cập nhật Store & Sản phẩm</button>
@@ -256,6 +257,28 @@ textarea{resize:vertical;min-height:80px}
       </div>
       <button class="btn btn-primary" onclick="selectManualUser()" style="padding:11px">Bắt đầu khảo sát →</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL: PIN LOGIN (v7) -->
+<div id="pinModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center;padding:20px">
+  <style>
+    @keyframes pinShake{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+    #pinInput{letter-spacing:14px;text-align:center;font-size:26px;font-weight:700;padding:14px;border:2px solid #ddd;border-radius:10px;width:100%;box-sizing:border-box}
+    #pinInput:focus{border-color:var(--primary);outline:none}
+  </style>
+  <div id="pinBox" style="background:#fff;border-radius:16px;max-width:340px;width:100%;padding:22px 20px;box-shadow:0 12px 40px rgba(0,0,0,.3)">
+    <div style="text-align:center;margin-bottom:6px;font-size:30px">🔐</div>
+    <h3 style="text-align:center;font-size:16px;font-weight:700;margin-bottom:2px">Nhập mã PIN</h3>
+    <p style="text-align:center;font-size:13px;color:#666;margin-bottom:16px"><strong id="pinName"></strong></p>
+    <input id="pinInput" type="tel" inputmode="numeric" maxlength="4" autocomplete="off"
+           placeholder="••••" onkeydown="_onPinKey(event)">
+    <p id="pinErr" style="color:#c0392b;font-size:12.5px;text-align:center;min-height:18px;margin-top:8px"></p>
+    <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#555;margin:6px 0 14px;cursor:pointer">
+      <input type="checkbox" id="pinRemember" checked style="width:16px;height:16px"> Ghi nhớ đăng nhập trên thiết bị này
+    </label>
+    <button class="btn btn-primary" style="width:100%;padding:12px" onclick="verifyPin()">Đăng nhập</button>
+    <button class="btn btn-secondary" style="width:100%;padding:10px;margin-top:8px" onclick="closePinGate()">Hủy</button>
   </div>
 </div>
 
@@ -330,7 +353,7 @@ textarea{resize:vertical;min-height:80px}
       <div class="success-detail" id="successDetail"></div>
       <p style="font-size:13px;color:var(--text2);margin-top:16px">Tự động về màn hình chính sau <span id="successCountdown">2</span>s...</p>
       <button class="btn btn-primary" style="margin-top:16px;max-width:300px" onclick="goTo('scType')">Khảo sát tiếp</button>
-      <button class="btn btn-secondary" style="margin-top:10px;max-width:300px" onclick="goTo('scLogin')">Đổi người dùng</button>
+      <button class="btn btn-secondary" style="margin-top:10px;max-width:300px" onclick="logout()">Đổi người dùng / Đăng xuất</button>
     </div>
   </div>
 </div>
@@ -420,6 +443,12 @@ let GT_SOUTH   = {};
 
 const STORES_CACHE_KEY = 'dgm_stores_cache';
 const STORES_CACHE_VERSION = 'v4.3.3';
+
+// === v7: Danh sách nhân viên + Đăng nhập PIN (đọc từ Google Sheet Sales_Team) ===
+const TEAM_CACHE_KEY = 'dgm_team_cache';
+const AUTH_KEY = 'dgm_auth';
+let LIVE_TEAM = null;   // danh sách hiển thị (đọc từ Sheet, đã lọc back office); null = dùng TEAM hardcode
+let _teamByName = {};   // map: tên nhân viên -> { pin, title, team, email }
 // One-time cache wipe khi version mới deploy — xóa cache format cũ
 try {
   var _cv = localStorage.getItem('dgm_cache_ver');
@@ -572,6 +601,8 @@ let state = {
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   renderStaffList();
+  loadTeam();          // v7: nạp danh sách + PIN từ Sheet (cache trước, refresh nền)
+  _refreshLogoutBtn(); // v7: hiện nút Đăng xuất nếu đã ghi nhớ đăng nhập
 
   // Khôi phục session sau refresh hoặc khi quay lại từ app khác
   try {
@@ -646,6 +677,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } catch(e) {}
 
+  // v7: Auto-login nếu đã ghi nhớ đăng nhập trên thiết bị này (và không có session đang chạy)
+  try {
+    var _hasSession = !!sessionStorage.getItem('dgm_session');
+    var _authRaw = localStorage.getItem(AUTH_KEY);
+    if (!_hasSession && _authRaw) {
+      var _au = JSON.parse(_authRaw);
+      if (_au && _au.name) proceedToApp(_au, false);
+    }
+  } catch(e) {}
+
   // Auto-sync offline queue khi load trang (nếu có mạng)
   if (navigator.onLine && state.scriptUrl) syncOffline();
   loadStores(); // v4.2: fetch storelist động — cache applied sync, server refresh in background
@@ -666,6 +707,7 @@ goTo = function(id) {
     // Không lưu session cho màn hình thành công/login để tránh restore sai
     if (id === 'scSuccess' || id === 'scLogin') {
       sessionStorage.removeItem('dgm_session');
+      if (id === 'scLogin') _refreshLogoutBtn();
       return;
     }
     sessionStorage.setItem('dgm_session', JSON.stringify({
@@ -733,7 +775,7 @@ function updateGPSDisplays() {
 function renderStaffList() {
   const list = document.getElementById('staffList');
   const badges = { 'MT':'badge-mt','GT North':'badge-gtn','GT Central':'badge-gtc','GT South':'badge-gts','MT/GT':'badge-mtgt' };
-  list.innerHTML = TEAM.map(s => `
+  list.innerHTML = (LIVE_TEAM || TEAM).map(s => `
     <button class="staff-btn" onclick='selectUser(${JSON.stringify(s)})'>
       <div class="staff-avatar">${s.name[0]}</div>
       <div class="staff-info">
@@ -744,13 +786,27 @@ function renderStaffList() {
     </button>`).join('');
 }
 
+// v7: Bấm tên → mở cổng PIN (nếu nhân viên có PIN trong Sheet). Không có PIN → vào thẳng.
 function selectUser(user) {
-  state.user = user;
+  openPinGate(user);
+}
+
+// v7: Vào app thật — gọi sau khi PIN đúng (hoặc nhân viên chưa đặt PIN)
+function proceedToApp(user, remember) {
+  const info = _teamByName[user.name] || {};
+  const u = {
+    name: user.name,
+    team: normalizeTeam(user.team || info.team || ''),
+    title: info.title || user.title || ''
+  };
+  state.user = u;
+  if (remember) { try { localStorage.setItem(AUTH_KEY, JSON.stringify(u)); } catch(e){} }
+  _refreshLogoutBtn();
   // Fraud: show early warning banner before navigating
-  showFraudBannerIfNeeded(user.name);
-  document.getElementById('typeTitle').textContent = `Xin chào, ${user.name.split(' ').pop()}!`;
-  document.getElementById('typeSubtitle').textContent = user.team;
-  renderTypeCards(user.team);
+  showFraudBannerIfNeeded(u.name);
+  document.getElementById('typeTitle').textContent = `Xin chào, ${u.name.split(' ').pop()}!`;
+  document.getElementById('typeSubtitle').textContent = u.team;
+  renderTypeCards(u.team);
   goTo('scType');
   initGPS();
 }
@@ -760,7 +816,105 @@ function selectManualUser() {
   const team = (document.getElementById('manualTeam')?document.getElementById('manualTeam').value:'');
   if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
   if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
-  selectUser({ name, team });
+  // Nhập thủ công (không có trong danh sách) → không yêu cầu PIN
+  proceedToApp({ name, team, title: '' }, true);
+}
+
+// ============================================================
+// v7: TEAM + LOGIN PIN — đọc từ Google Sheet (action=getTeam)
+// ============================================================
+function normalizeTeam(t){
+  t = String(t || '').trim();
+  const hasMT = /MT/i.test(t), hasGT = /GT/i.test(t);
+  if (hasMT && hasGT) return 'MT/GT';
+  return t;
+}
+
+function _ingestTeam(list){
+  _teamByName = {};
+  const visible = [];
+  (list || []).forEach(function(m){
+    const name = String(m.name || '').trim();
+    if (!name) return;
+    _teamByName[name] = {
+      pin:   String(m.pin   || '').trim(),
+      title: String(m.title || '').trim(),
+      team:  String(m.team  || '').trim(),
+      email: String(m.email || '').trim()
+    };
+    const t = String(m.team || '').toLowerCase();
+    const isBackOffice = t.includes('back') || t.includes('office') || t.includes('digital') || t.includes('marketing');
+    if (!isBackOffice) visible.push({ name: name, team: normalizeTeam(m.team) });
+  });
+  if (visible.length) { LIVE_TEAM = visible; renderStaffList(); }
+}
+
+function loadTeam(){
+  // 1) Dùng cache trước cho nhanh
+  try {
+    const c = localStorage.getItem(TEAM_CACHE_KEY);
+    if (c) { const j = JSON.parse(c); if (j && j.team) _ingestTeam(j.team); }
+  } catch(e){}
+  // 2) Refresh từ server ở nền
+  if (!state.scriptUrl) return;
+  const url = state.scriptUrl + '?action=getTeam&t=' + Date.now();
+  fetch(url).then(r => r.json()).then(res => {
+    if (res && res.ok && res.team) {
+      try { localStorage.setItem(TEAM_CACHE_KEY, JSON.stringify({ team: res.team, ts: Date.now() })); } catch(e){}
+      _ingestTeam(res.team);
+    }
+  }).catch(() => { /* offline: dùng cache/fallback TEAM */ });
+}
+
+let _pinUser = null;
+function openPinGate(user){
+  const info = _teamByName[user.name] || {};
+  const pin = String(info.pin || '').trim();
+  // Chưa đặt PIN trong Sheet → cho vào thẳng (rollout dần, sẽ ghi nhớ thiết bị)
+  if (!pin) { proceedToApp(user, true); return; }
+  _pinUser = user;
+  document.getElementById('pinName').textContent = user.name;
+  document.getElementById('pinInput').value = '';
+  document.getElementById('pinErr').textContent = '';
+  document.getElementById('pinRemember').checked = true;
+  document.getElementById('pinModal').style.display = 'flex';
+  setTimeout(() => { const el = document.getElementById('pinInput'); if (el) el.focus(); }, 120);
+}
+function closePinGate(){
+  document.getElementById('pinModal').style.display = 'none';
+  _pinUser = null;
+}
+function verifyPin(){
+  if (!_pinUser) return;
+  const entered = String(document.getElementById('pinInput').value || '').trim();
+  const correct = String((_teamByName[_pinUser.name] || {}).pin || '').trim();
+  if (entered && entered === correct) {
+    const remember = document.getElementById('pinRemember').checked;
+    const u = _pinUser;
+    closePinGate();
+    proceedToApp(u, remember);
+  } else {
+    document.getElementById('pinErr').textContent = '❌ Sai mã PIN, vui lòng thử lại.';
+    const box = document.getElementById('pinBox');
+    if (box) { box.style.animation = 'none'; void box.offsetWidth; box.style.animation = 'pinShake .35s'; }
+    const inp = document.getElementById('pinInput'); if (inp) { inp.value = ''; inp.focus(); }
+  }
+}
+function _onPinKey(ev){ if (ev && ev.key === 'Enter') verifyPin(); }
+
+function logout(){
+  try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+  try { sessionStorage.removeItem('dgm_session'); } catch(e){}
+  state.user = null;
+  _refreshLogoutBtn();
+  goTo('scLogin');
+  toast('Đã đăng xuất khỏi thiết bị này');
+}
+function _refreshLogoutBtn(){
+  try {
+    const b = document.getElementById('btnLogoutDevice');
+    if (b) b.style.display = localStorage.getItem(AUTH_KEY) ? 'block' : 'none';
+  } catch(e){}
 }
 
 // ============ TYPE SELECTION ============
