@@ -272,7 +272,7 @@ tr:hover td{background:rgba(255,255,255,.025);}
     </div>
     <div class="login-title">Đăng nhập</div>
     <div class="login-sub">Nhập thông tin để xem dashboard</div>
-    <label>Email (chỉ cần cho Manager)</label>
+    <label>Email (Manager / Trade)</label>
     <input type="email" id="loginEmail" placeholder="email@denis.com hoặc để trống">
     <label>Mật khẩu</label>
     <input type="password" id="pwInput" placeholder="••••" onkeydown="if(event.key==='Enter')doLogin()">
@@ -637,11 +637,14 @@ tr:hover td{background:rgba(255,255,255,.025);}
 // ══════════════════════════════════════════════════════════
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzYpHeVVTpLGXwzp0T6CRkjakkucSD3i27hkXMD5Af3mv7V5dsmG1Hyrng8aSx5NoH5vw/exec';
 
-// 2-role auth
+// 3-role auth (ĐỢT 2: thêm 'trade' — view 100% giống manager, chỉ khác credential)
 const AUTH = {
   manager: { email: 'quy.bui@denis.com', pass: '2026',       role: 'manager', label: '👑 Manager' },
+  trade:   { email: 'trade@denis.com',   pass: 'Trade@2026', role: 'trade',   label: '🎯 Trade Marketing' },
   sales:   { email: '',                  pass: 'Sales@2026',  role: 'sales',   label: '📊 Sales Team' }
 };
+// Helper: role nào được xem full view (manager-level)
+function isFullView(role){ return role === 'manager' || role === 'trade'; }
 
 const TEAM_COLORS = ['#C8102E','#FFE140','#4A9EBF','#4caf82','#f59e42','#b39ddb','#80deea','#f48fb1','#a5d6a7','#fff176','#90caf9','#ffcc80','#bcaaa4','#c5e1a5','#80cbc4','#ffe082','#ef9a9a','#ce93d8'];
 
@@ -659,6 +662,7 @@ function doLogin(){
 
   let role = null;
   if(email === AUTH.manager.email && pass === AUTH.manager.pass) role = 'manager';
+  else if(email === AUTH.trade.email && pass === AUTH.trade.pass) role = 'trade';
   else if(pass === AUTH.sales.pass) role = 'sales';
 
   if(!role){
@@ -682,14 +686,15 @@ function showApp(role){
   if(role==='manager'){
     badge.textContent=AUTH.manager.label;
     badge.className='login-role-badge role-manager';
-    // Show all tabs
-    document.querySelectorAll('.tab-manager').forEach(t=>t.style.display='');
+  } else if(role==='trade'){
+    badge.textContent=AUTH.trade.label;
+    badge.className='login-role-badge role-manager';
   } else {
     badge.textContent=AUTH.sales.label;
     badge.className='login-role-badge role-sales';
-    // Hide manager-only tabs
-    document.querySelectorAll('.tab-manager').forEach(t=>t.style.display='none');
   }
+  // Full view (manager + trade) thấy tất cả tab; sales bị ẩn tab-manager
+  document.querySelectorAll('.tab-manager').forEach(t=>t.style.display = isFullView(role) ? '' : 'none');
   initDateFilter();
   loadData();
 }
@@ -705,7 +710,7 @@ function doLogout(){
 
 (function(){
   const saved = sessionStorage.getItem('dgm_auth');
-  if(saved==='manager'||saved==='sales'){ CURRENT_ROLE=saved; showApp(saved); }
+  if(saved==='manager'||saved==='trade'||saved==='sales'){ CURRENT_ROLE=saved; showApp(saved); }
 })();
 
 // ══════════════════════════════════════════════════════════
@@ -842,7 +847,7 @@ async function loadData(){
 function renderAll(){
   if(!RAW) return;
   renderOverview();
-  if(CURRENT_ROLE==='manager'){ renderMT(); renderGT(); renderQuality(); renderStores(); }
+  if(isFullView(CURRENT_ROLE)){ renderMT(); renderGT(); renderQuality(); renderStores(); }
   renderCalendar(); renderStats(); renderStatDist();
 }
 
