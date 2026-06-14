@@ -946,6 +946,7 @@ function renderTypeCards(team) {
     html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
   }
   cards.innerHTML = html;
+  try{ if(window.DisplayMod) DisplayMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày
 }
 
 // ============ GT REGION PICKER (for MT/GT manager) ============
@@ -2582,6 +2583,273 @@ function confirmFraudSubmit() {
     </div>
   </div>
 </div>
+
+
+<!-- ===================== DGM DISPLAY MODULE (ĐỢT 2 — GT Trưng bày / Đăng ký) =====================
+     CÔ LẬP: namespace DisplayMod, overlay riêng, KHÔNG đụng submitGT/goTo/screen.
+     Chỉ phụ thuộc: state.user, GT_SOUTH/GT_CENTRAL/GT_NORTH (đã có), toast(), state.scriptUrl.
+     Đảo ngược: xoá khối <style id=dspm-style> + <script id=dspm-script> + 1 dòng trong renderTypeCards. -->
+<style id="dspm-style">
+.dspm-overlay{position:fixed;inset:0;background:#f4f5f8;z-index:3000;display:none;flex-direction:column}
+.dspm-overlay.show{display:flex}
+.dspm-head{background:#C8102E;color:#fff;padding:13px 14px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.dspm-head h2{font-size:16px;font-weight:700;flex:1;margin:0}
+.dspm-back{background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1}
+.dspm-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 14px 96px}
+.dspm-foot{position:absolute;bottom:0;left:0;right:0;padding:11px 14px;background:#fff;border-top:1px solid #e4e4e4;display:flex;gap:10px}
+.dspm-btn{flex:1;padding:13px;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer}
+.dspm-btn-primary{background:#C8102E;color:#fff}
+.dspm-btn-ghost{background:#eee;color:#555;flex:0 0 96px}
+.dspm-card{background:#fff;border:1px solid #e6e6e6;border-radius:12px;padding:13px;margin-bottom:12px}
+.dspm-label{font-size:11px;font-weight:700;color:#777;margin:11px 0 4px;text-transform:uppercase;letter-spacing:.3px}
+.dspm-label:first-child{margin-top:0}
+.dspm-input,.dspm-select{width:100%;padding:10px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;background:#fff;box-sizing:border-box;-webkit-appearance:none}
+.dspm-row{display:flex;gap:8px}.dspm-row>*{flex:1;min-width:0}
+.dspm-chk{display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid #e3e3e3;border-radius:8px;margin-bottom:6px;font-size:14px;cursor:pointer;background:#fff}
+.dspm-chk input{width:18px;height:18px;flex:0 0 18px}
+.dspm-cfg{border-left:3px solid #C8102E;background:#fff8f8}
+.dspm-cfg h4{margin:0 0 4px;font-size:14px;font-weight:700;color:#C8102E}
+.dspm-cfg .mk{font-size:11px;color:#999;margin-bottom:8px}
+.dspm-sku{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.dspm-sku select{flex:1;min-width:0}
+.dspm-sku input{width:62px;flex:0 0 62px;text-align:center}
+.dspm-sku button{background:#ffe0e0;border:none;color:#c00;width:32px;height:32px;border-radius:6px;cursor:pointer;flex:0 0 32px}
+.dspm-add{background:#eef0ff;border:1px dashed #99a;color:#446;padding:8px;border-radius:8px;width:100%;cursor:pointer;font-size:13px;font-weight:600;margin-top:4px}
+.dspm-empty{text-align:center;color:#999;padding:26px 12px;font-size:14px}
+.dspm-pill{display:inline-block;background:#C8102E;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;margin-left:6px}
+.dspm-rg{display:block;width:100%;padding:13px;margin-bottom:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;font-weight:600}
+</style>
+
+<script id="dspm-script">
+(function(){
+  "use strict";
+  var DisplayMod = {
+    _cfg:null, _products:[], _loaded:false, _loading:null,
+    _region:'', _campaign:'', _curMarket:'', _items:[]  // _items: [{market,outlet,frame_type,frame_qty,frame_seq,report_freq,date_start,date_install,date_acceptance,skus:[{product,facing}]}]
+  };
+  window.DisplayMod = DisplayMod;
+
+  // ---- helpers an toàn ----
+  function $id(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function tnow(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function tt(m){ try{ if(typeof toast==='function') toast(m); else alert(m); }catch(e){ alert(m); } }
+  function canEnroll(){
+    try{ var t=String((window.state&&state.user&&state.user.title)||'').toLowerCase();
+      return t.indexOf('rep')>=0 || t.indexOf('manager')>=0 || t==='' ; }catch(e){ return true; }
+  }
+  function userRegion(){
+    try{ var t=String((state.user&&state.user.team)||'').trim(); return t.indexOf('GT')===0 ? t : ''; }catch(e){ return ''; }
+  }
+  function regionData(region){
+    try{
+      if(region==='GT Central') return (typeof GT_CENTRAL!=='undefined')?GT_CENTRAL:{};
+      if(region==='GT North')   return (typeof GT_NORTH!=='undefined')?GT_NORTH:{};
+      return (typeof GT_SOUTH!=='undefined')?GT_SOUTH:{};
+    }catch(e){ return {}; }
+  }
+
+  // ---- thẻ trên màn hình chọn loại ----
+  DisplayMod.injectCard = function(team){
+    try{
+      if(!team || team.indexOf('GT')<0 && team!=='MT/GT') return;
+      if(!canEnroll()) return;
+      var host = document.querySelector('#typeCards .type-cards');
+      if(!host || host.querySelector('[data-dspm]')) return;
+      var c = document.createElement('div');
+      c.className='type-card'; c.setAttribute('data-dspm','1');
+      c.style.cssText='border-color:#C8102E;background:#fff5f5';
+      c.onclick=function(){ DisplayMod.openEnroll(); };
+      c.innerHTML='<div class="icon">🖼️</div><div class="title" style="color:#C8102E">Đăng ký Trưng bày</div><div class="desc">Chọn điểm tham gia chương trình</div>';
+      host.appendChild(c);
+    }catch(e){}
+  };
+
+  // ---- nạp config + products (1 lần) ----
+  function loadData(){
+    if(DisplayMod._loaded) return Promise.resolve();
+    if(DisplayMod._loading) return DisplayMod._loading;
+    var url = (state.scriptUrl||'');
+    DisplayMod._loading = Promise.all([
+      fetch(url+'?action=getInstoreConfig&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(url+'?action=getProducts&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;})
+    ]).then(function(res){
+      DisplayMod._cfg = (res[0]&&res[0].ok)?res[0]:{frame_types:['4 chân','6 chân','Khung sắt'],report_freqs:['Hàng tuần','2 tuần/lần','Hàng tháng']};
+      DisplayMod._products = (res[1]&&res[1].ok&&res[1].products)?res[1].products:[];
+      DisplayMod._loaded = true;
+    });
+    return DisplayMod._loading;
+  }
+
+  // ---- overlay ----
+  function ensureOverlay(){
+    var ov = $id('dspmOverlay');
+    if(ov) return ov;
+    ov = document.createElement('div');
+    ov.id='dspmOverlay'; ov.className='dspm-overlay';
+    ov.innerHTML =
+      '<div class="dspm-head"><button class="dspm-back" onclick="DisplayMod.close()">‹</button>'+
+      '<h2>Đăng ký Trưng bày</h2></div>'+
+      '<div class="dspm-body" id="dspmBody"></div>'+
+      '<div class="dspm-foot"><button class="dspm-btn dspm-btn-ghost" onclick="DisplayMod.close()">Huỷ</button>'+
+      '<button class="dspm-btn dspm-btn-primary" id="dspmSave" onclick="DisplayMod.save()">Lưu tất cả</button></div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  DisplayMod.openEnroll = function(){
+    ensureOverlay().classList.add('show');
+    $id('dspmBody').innerHTML='<div class="dspm-empty">Đang tải dữ liệu…</div>';
+    DisplayMod._items=[]; DisplayMod._curMarket=''; DisplayMod._campaign='';
+    loadData().then(function(){
+      var r = userRegion();
+      if(r){ DisplayMod._region=r; renderEnroll(); }
+      else { renderRegionPick(); }
+    }).catch(function(){ $id('dspmBody').innerHTML='<div class="dspm-empty">Không tải được dữ liệu. Thử lại sau.</div>'; });
+  };
+
+  function renderRegionPick(){
+    var regions=[['GT South','GT Miền Nam 🟢'],['GT Central','GT Miền Trung 🟡'],['GT North','GT Miền Bắc 🟣']];
+    var h='<div class="dspm-card"><div class="dspm-label">Chọn khu vực GT</div>'+
+      regions.map(function(r){return '<button class="dspm-rg" onclick="DisplayMod.pickRegion(\''+r[0]+'\')">'+r[1]+'</button>';}).join('')+'</div>';
+    $id('dspmBody').innerHTML=h;
+    $id('dspmSave').style.display='none';
+  }
+  DisplayMod.pickRegion=function(r){ DisplayMod._region=r; $id('dspmSave').style.display=''; renderEnroll(); };
+
+  function renderEnroll(){
+    var rd = regionData(DisplayMod._region);
+    var markets = Object.keys(rd).sort();
+    var h='';
+    h+='<div class="dspm-card">';
+    h+='<div class="dspm-label">Tên chương trình</div>';
+    h+='<input class="dspm-input" id="dspmCampaign" placeholder="VD: Trưng bày Tết 2026" value="'+esc(DisplayMod._campaign)+'" oninput="DisplayMod._campaign=this.value">';
+    h+='<div class="dspm-label">Khu vực</div><input class="dspm-input" value="'+esc(DisplayMod._region)+'" disabled>';
+    h+='<div class="dspm-label">Chọn chợ</div>';
+    h+='<select class="dspm-select" id="dspmMarket" onchange="DisplayMod.onMarket(this.value)"><option value="">— Chọn chợ —</option>'+
+        markets.map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('')+'</select>';
+    h+='<div id="dspmOutlets" style="margin-top:10px"></div>';
+    h+='</div>';
+    h+='<div class="dspm-label" style="padding-left:2px">Điểm đã chọn '+
+        '<span class="dspm-pill" id="dspmCount">'+DisplayMod._items.length+'</span></div>';
+    h+='<div id="dspmCfgList"></div>';
+    $id('dspmBody').innerHTML=h;
+    renderCfgList();
+  }
+
+  DisplayMod.onMarket=function(market){
+    DisplayMod._curMarket=market;
+    var box=$id('dspmOutlets'); if(!box) return;
+    if(!market){ box.innerHTML=''; return; }
+    var rd=regionData(DisplayMod._region);
+    var outlets=(rd[market]||[]).slice().sort();
+    if(!outlets.length){ box.innerHTML='<div class="dspm-empty">Chợ này chưa có điểm bán.</div>'; return; }
+    box.innerHTML='<div class="dspm-label">Tick điểm tham gia ('+outlets.length+')</div>'+
+      outlets.map(function(o){
+        var on=isPicked(market,o);
+        return '<label class="dspm-chk"><input type="checkbox" '+(on?'checked':'')+' onchange="DisplayMod.toggle(\''+esc(market).replace(/'/g,"\\'")+'\',\''+esc(o).replace(/'/g,"\\'")+'\',this.checked)"><span>'+esc(o)+'</span></label>';
+      }).join('');
+  };
+
+  function isPicked(market,outlet){ return DisplayMod._items.some(function(it){return it.market===market&&it.outlet===outlet;}); }
+
+  DisplayMod.toggle=function(market,outlet,on){
+    if(on){
+      if(!isPicked(market,outlet)) DisplayMod._items.push({market:market,outlet:outlet,frame_type:(DisplayMod._cfg.frame_types||[])[0]||'',frame_qty:1,frame_seq:'',report_freq:(DisplayMod._cfg.report_freqs||[])[0]||'',date_start:tnow(),date_install:'',date_acceptance:'',skus:[]});
+    } else {
+      DisplayMod._items=DisplayMod._items.filter(function(it){return !(it.market===market&&it.outlet===outlet);});
+    }
+    var c=$id('dspmCount'); if(c) c.textContent=DisplayMod._items.length;
+    renderCfgList();
+  };
+
+  function prodOptions(sel){
+    var ps=DisplayMod._products||[];
+    var opts='<option value="">— Chọn SP —</option>';
+    if(ps.length){ opts+=ps.map(function(p){var n=p.name_vi||p.name_en||p.id;return '<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}).join(''); }
+    return opts;
+  }
+
+  function renderCfgList(){
+    var box=$id('dspmCfgList'); if(!box) return;
+    if(!DisplayMod._items.length){ box.innerHTML='<div class="dspm-empty">Chưa chọn điểm nào. Chọn chợ rồi tick điểm bán phía trên.</div>'; return; }
+    var ft=DisplayMod._cfg.frame_types||['4 chân','6 chân','Khung sắt'];
+    var fr=DisplayMod._cfg.report_freqs||['Hàng tuần','2 tuần/lần','Hàng tháng'];
+    var hasProd=(DisplayMod._products||[]).length>0;
+    box.innerHTML=DisplayMod._items.map(function(it,i){
+      var skuHtml=(it.skus||[]).map(function(s,si){
+        if(hasProd){
+          return '<div class="dspm-sku"><select onchange="DisplayMod.setSku('+i+','+si+',\'product\',this.value)">'+prodOptions(s.product)+'</select>'+
+            '<input type="number" min="1" value="'+esc(s.facing||1)+'" onchange="DisplayMod.setSku('+i+','+si+',\'facing\',this.value)">'+
+            '<button onclick="DisplayMod.delSku('+i+','+si+')">×</button></div>';
+        }
+        return '<div class="dspm-sku"><input class="dspm-input" placeholder="Tên SP" value="'+esc(s.product||'')+'" onchange="DisplayMod.setSku('+i+','+si+',\'product\',this.value)">'+
+          '<input type="number" min="1" value="'+esc(s.facing||1)+'" onchange="DisplayMod.setSku('+i+','+si+',\'facing\',this.value)">'+
+          '<button onclick="DisplayMod.delSku('+i+','+si+')">×</button></div>';
+      }).join('');
+      return '<div class="dspm-card dspm-cfg">'+
+        '<h4>'+esc(it.outlet)+'</h4><div class="mk">'+esc(it.market)+'</div>'+
+        '<div class="dspm-row"><div><div class="dspm-label">Loại khung</div><select class="dspm-select" onchange="DisplayMod.setIt('+i+',\'frame_type\',this.value)">'+
+          ft.map(function(x){return '<option'+(it.frame_type===x?' selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select></div>'+
+        '<div><div class="dspm-label">Số khung</div><input class="dspm-input" type="number" min="1" value="'+esc(it.frame_qty)+'" onchange="DisplayMod.setIt('+i+',\'frame_qty\',this.value)"></div></div>'+
+        '<div class="dspm-row"><div><div class="dspm-label">STT khung</div><input class="dspm-input" value="'+esc(it.frame_seq)+'" onchange="DisplayMod.setIt('+i+',\'frame_seq\',this.value)"></div>'+
+        '<div><div class="dspm-label">Tần suất BC</div><select class="dspm-select" onchange="DisplayMod.setIt('+i+',\'report_freq\',this.value)">'+
+          fr.map(function(x){return '<option'+(it.report_freq===x?' selected':'')+'>'+esc(x)+'</option>';}).join('')+'</select></div></div>'+
+        '<div class="dspm-row"><div><div class="dspm-label">Bắt đầu</div><input class="dspm-input" type="date" value="'+esc(it.date_start)+'" onchange="DisplayMod.setIt('+i+',\'date_start\',this.value)"></div>'+
+        '<div><div class="dspm-label">Gắn xong</div><input class="dspm-input" type="date" value="'+esc(it.date_install)+'" onchange="DisplayMod.setIt('+i+',\'date_install\',this.value)"></div></div>'+
+        '<div class="dspm-label">Nghiệm thu</div><input class="dspm-input" type="date" value="'+esc(it.date_acceptance)+'" onchange="DisplayMod.setIt('+i+',\'date_acceptance\',this.value)">'+
+        '<div class="dspm-label">SKU + facing trưng bày</div>'+skuHtml+
+        '<button class="dspm-add" onclick="DisplayMod.addSku('+i+')">+ Thêm SKU</button>'+
+        '</div>';
+    }).join('');
+  }
+
+  DisplayMod.setIt=function(i,k,v){ if(DisplayMod._items[i]) DisplayMod._items[i][k]=v; };
+  DisplayMod.addSku=function(i){ if(!DisplayMod._items[i])return; DisplayMod._items[i].skus.push({product:'',facing:1}); renderCfgList(); };
+  DisplayMod.delSku=function(i,si){ if(DisplayMod._items[i]) DisplayMod._items[i].skus.splice(si,1); renderCfgList(); };
+  DisplayMod.setSku=function(i,si,k,v){ if(DisplayMod._items[i]&&DisplayMod._items[i].skus[si]) DisplayMod._items[i].skus[si][k]=(k==='facing'?(parseInt(v,10)||1):v); };
+
+  // ---- LƯU: cors GET theo chunk, đọc kết quả thật ----
+  DisplayMod.save=function(){
+    var items=DisplayMod._items;
+    if(!items.length){ tt('⚠️ Chưa chọn điểm nào'); return; }
+    for(var i=0;i<items.length;i++){
+      if(!items[i].frame_type){ tt('⚠️ '+items[i].outlet+': chọn loại khung'); return; }
+      if(!items[i].date_start){ tt('⚠️ '+items[i].outlet+': chọn ngày bắt đầu'); return; }
+    }
+    var campaign=DisplayMod._campaign||$id('dspmCampaign')&&$id('dspmCampaign').value||'';
+    var rep=(state.user&&state.user.name)||'';
+    var btn=$id('dspmSave'); btn.disabled=true; btn.textContent='Đang lưu…';
+
+    // chunk 6 điểm/lần để tránh URL dài
+    var chunks=[]; for(var c=0;c<items.length;c+=6) chunks.push(items.slice(c,c+6));
+    var total=0, failed=0;
+    (function next(idx){
+      if(idx>=chunks.length){
+        btn.disabled=false; btn.textContent='Lưu tất cả';
+        if(failed){ tt('⚠️ Lưu '+total+' điểm, '+failed+' lỗi. Kiểm tra mạng.'); }
+        else { tt('✅ Đã đăng ký '+total+' điểm trưng bày'); DisplayMod.close(); }
+        return;
+      }
+      var payload={type:'DISPLAY_ENROLL_BATCH',campaign_name:campaign,sales_rep:rep,region:DisplayMod._region,
+        items:chunks[idx].map(function(it){return {
+          campaign_name:campaign,sales_rep:rep,region:DisplayMod._region,market:it.market,outlet_name:it.outlet,
+          frame_seq:it.frame_seq,frame_type:it.frame_type,frame_qty:it.frame_qty,
+          sku_committed:(it.skus||[]).filter(function(s){return s.product;}),
+          date_start:it.date_start,date_install:it.date_install,date_acceptance:it.date_acceptance,report_freq:it.report_freq
+        };})};
+      var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+        .then(function(r){return r.json();})
+        .then(function(res){ if(res&&res.ok){ total+=(res.count||chunks[idx].length); } else { failed+=chunks[idx].length; } next(idx+1); })
+        .catch(function(){ failed+=chunks[idx].length; next(idx+1); });
+    })(0);
+  };
+
+  DisplayMod.close=function(){ var ov=$id('dspmOverlay'); if(ov) ov.classList.remove('show'); };
+})();
+</script>
+<!-- ===================== /DGM DISPLAY MODULE ===================== -->
 
 </body>
 </html>
