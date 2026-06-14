@@ -2618,6 +2618,21 @@ function confirmFraudSubmit() {
 .dspm-empty{text-align:center;color:#999;padding:26px 12px;font-size:14px}
 .dspm-pill{display:inline-block;background:#C8102E;color:#fff;font-size:11px;padding:1px 8px;border-radius:10px;margin-left:6px}
 .dspm-rg{display:block;width:100%;padding:13px;margin-bottom:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;font-weight:600}
+.dspm-enr{display:block;width:100%;text-align:left;padding:12px;margin-bottom:8px;border:1.5px solid #ddd;border-radius:10px;background:#fff;cursor:pointer}
+.dspm-enr b{font-size:14px;color:#222}.dspm-enr small{color:#888;font-size:12px}
+.dspm-ph{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.dspm-ph-slot{border:1.5px dashed #bbb;border-radius:10px;min-height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;background:#fafafa;overflow:hidden;cursor:pointer}
+.dspm-ph-slot.filled{border-style:solid;border-color:#1565c0}
+.dspm-ph-slot img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
+.dspm-ph-slot .cap{font-size:11px;color:#777;text-align:center;padding:4px;z-index:1}
+.dspm-ph-slot .x{position:absolute;top:4px;right:4px;z-index:2;background:rgba(0,0,0,.6);color:#fff;border:none;width:24px;height:24px;border-radius:50%;cursor:pointer}
+.dspm-ph-slot input{display:none}
+.dspm-seg{display:flex;gap:8px}
+.dspm-seg button{flex:1;padding:11px;border:1.5px solid #ddd;border-radius:8px;background:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.dspm-seg button.on-y{background:#e8f5e9;border-color:#2e7d32;color:#2e7d32}
+.dspm-seg button.on-n{background:#ffebee;border-color:#c62828;color:#c62828}
+.dspm-toggle{display:flex;align-items:center;gap:10px;padding:11px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:14px;font-weight:600}
+.dspm-toggle input{width:20px;height:20px}
 </style>
 
 <script id="dspm-script">
@@ -2653,15 +2668,26 @@ function confirmFraudSubmit() {
   DisplayMod.injectCard = function(team){
     try{
       if(!team || team.indexOf('GT')<0 && team!=='MT/GT') return;
-      if(!canEnroll()) return;
       var host = document.querySelector('#typeCards .type-cards');
-      if(!host || host.querySelector('[data-dspm]')) return;
-      var c = document.createElement('div');
-      c.className='type-card'; c.setAttribute('data-dspm','1');
-      c.style.cssText='border-color:#C8102E;background:#fff5f5';
-      c.onclick=function(){ DisplayMod.openEnroll(); };
-      c.innerHTML='<div class="icon">🖼️</div><div class="title" style="color:#C8102E">Đăng ký Trưng bày</div><div class="desc">Chọn điểm tham gia chương trình</div>';
-      host.appendChild(c);
+      if(!host) return;
+      // Thẻ ĐĂNG KÝ — chỉ Sales Rep / Manager
+      if(canEnroll() && !host.querySelector('[data-dspm="enroll"]')){
+        var c1 = document.createElement('div');
+        c1.className='type-card'; c1.setAttribute('data-dspm','enroll');
+        c1.style.cssText='border-color:#C8102E;background:#fff5f5';
+        c1.onclick=function(){ DisplayMod.openEnroll(); };
+        c1.innerHTML='<div class="icon">🖼️</div><div class="title" style="color:#C8102E">Đăng ký Trưng bày</div><div class="desc">Chọn điểm tham gia chương trình</div>';
+        host.appendChild(c1);
+      }
+      // Thẻ BÁO CÁO — mọi nhân viên GT (salesman + rep)
+      if(!host.querySelector('[data-dspm="report"]')){
+        var c2 = document.createElement('div');
+        c2.className='type-card'; c2.setAttribute('data-dspm','report');
+        c2.style.cssText='border-color:#1565c0;background:#f0f6ff';
+        c2.onclick=function(){ DisplayMod.openReport(); };
+        c2.innerHTML='<div class="icon">📋</div><div class="title" style="color:#1565c0">Báo cáo Trưng bày</div><div class="desc">Báo cáo định kỳ điểm trưng bày</div>';
+        host.appendChild(c2);
+      }
     }catch(e){}
   };
 
@@ -2699,6 +2725,8 @@ function confirmFraudSubmit() {
 
   DisplayMod.openEnroll = function(){
     ensureOverlay().classList.add('show');
+    $id('dspmOverlay').querySelector('.dspm-head h2').textContent='Đăng ký Trưng bày';
+    var sv=$id('dspmSave'); sv.style.display=''; sv.disabled=false; sv.textContent='Lưu tất cả'; sv.setAttribute('onclick','DisplayMod.save()');
     $id('dspmBody').innerHTML='<div class="dspm-empty">Đang tải dữ liệu…</div>';
     DisplayMod._items=[]; DisplayMod._curMarket=''; DisplayMod._campaign='';
     loadData().then(function(){
@@ -2845,6 +2873,178 @@ function confirmFraudSubmit() {
         .catch(function(){ failed+=chunks[idx].length; next(idx+1); });
     })(0);
   };
+
+  // ============ BÁO CÁO TRƯNG BÀY ============
+  DisplayMod._enrolls=[]; DisplayMod._rep=null; DisplayMod._photos={};
+
+  DisplayMod.openReport=function(){
+    ensureOverlay(); $id('dspmOverlay').classList.add('show');
+    $id('dspmOverlay').querySelector('.dspm-head h2').textContent='Báo cáo Trưng bày';
+    $id('dspmSave').style.display='none';
+    $id('dspmBody').innerHTML='<div class="dspm-empty">Đang tải chương trình…</div>';
+    DisplayMod._photos={}; DisplayMod._rep=null;
+    loadData().then(function(){
+      var r=userRegion();
+      if(r){ DisplayMod._region=r; loadEnrolls(); }
+      else { renderRegionPick2(); }
+    });
+  };
+  function renderRegionPick2(){
+    var regions=[['GT South','GT Miền Nam 🟢'],['GT Central','GT Miền Trung 🟡'],['GT North','GT Miền Bắc 🟣']];
+    $id('dspmBody').innerHTML='<div class="dspm-card"><div class="dspm-label">Chọn khu vực GT</div>'+
+      regions.map(function(r){return '<button class="dspm-rg" onclick="DisplayMod.pickRegion2(\''+r[0]+'\')">'+r[1]+'</button>';}).join('')+'</div>';
+  }
+  DisplayMod.pickRegion2=function(r){ DisplayMod._region=r; loadEnrolls(); };
+
+  function loadEnrolls(){
+    $id('dspmBody').innerHTML='<div class="dspm-empty">Đang tải chương trình…</div>';
+    fetch(state.scriptUrl+'?action=getDisplayEnrollments&status=active&region='+encodeURIComponent(DisplayMod._region)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();})
+      .then(function(res){ DisplayMod._enrolls=(res&&res.ok&&res.enrollments)?res.enrollments:[]; renderEnrollList(); })
+      .catch(function(){ $id('dspmBody').innerHTML='<div class="dspm-empty">Không tải được. Thử lại.</div>'; });
+  }
+  function renderEnrollList(){
+    var list=DisplayMod._enrolls;
+    if(!list.length){ $id('dspmBody').innerHTML='<div class="dspm-empty">Khu vực '+esc(DisplayMod._region)+' chưa có chương trình trưng bày active.</div>'; return; }
+    $id('dspmBody').innerHTML='<div class="dspm-label" style="padding-left:2px">Chọn điểm cần báo cáo ('+list.length+')</div>'+
+      list.map(function(e,i){
+        return '<button class="dspm-enr" onclick="DisplayMod.openReportForm('+i+')"><b>'+esc(e.outlet_name)+'</b><br><small>'+esc(e.market||'')+' · '+esc(e.frame_type||'')+' · '+esc(e.campaign_name||'(không tên CT)')+'</small></button>';
+      }).join('');
+  }
+
+  DisplayMod.openReportForm=function(i){
+    var e=DisplayMod._enrolls[i]; if(!e) return;
+    DisplayMod._rep={enroll:e, report_id:'RPT-'+tnow().replace(/-/g,'')+'-'+Date.now().toString().slice(-5)};
+    DisplayMod._photos={};
+    var committed=[]; try{ committed=JSON.parse(e.sku_committed||'[]'); }catch(_){ committed=[]; }
+    if(!Array.isArray(committed)) committed=[];
+    DisplayMod._rep.skus=committed.map(function(s){return {product:s.product||s.sku||'',facing:''};});
+    var slots=[['photo_1','Cổng chợ / khu vực'],['photo_2','Mặt tiền (thấy tên cửa hàng)'],['photo_3','Khung (nhìn xa)'],['photo_4','Khung (cận cảnh)']];
+    var h='';
+    h+='<div class="dspm-card"><div style="font-weight:700;color:#1565c0;font-size:15px">'+esc(e.outlet_name)+'</div>'+
+       '<div style="font-size:12px;color:#888;margin-top:2px">'+esc(e.market||'')+' · '+esc(e.frame_type||'')+' · '+esc(e.campaign_name||'')+'</div></div>';
+    h+='<div class="dspm-card"><div class="dspm-label">Ngày báo cáo</div><input class="dspm-input" type="date" id="dspmRDate" value="'+tnow()+'">';
+    h+='<div class="dspm-label">4 ảnh bắt buộc</div><div class="dspm-ph">'+
+       slots.map(function(s){return photoSlot(s[0],s[1]);}).join('')+'</div>';
+    h+='<div class="dspm-label">Ảnh bổ sung (tuỳ chọn)</div><div class="dspm-ph" id="dspmExtraWrap">'+photoSlot('extra_'+Date.now(),'+ Thêm ảnh',true)+'</div>';
+    h+='<div class="dspm-label">Khung dễ thấy từ ngoài?</div><div class="dspm-seg" id="dspmVis">'+
+       '<button data-v="YES" onclick="DisplayMod.setVis(\'YES\')">Đạt (YES)</button>'+
+       '<button data-v="NO" onclick="DisplayMod.setVis(\'NO\')">Không (NO)</button></div>';
+    h+='<div class="dspm-label">SKU thực tế + facing (so cam kết)</div><div id="dspmRSku"></div>'+
+       '<button class="dspm-add" onclick="DisplayMod.addRSku()">+ Thêm SKU</button>';
+    h+='<div class="dspm-label">Ghi chú</div><textarea class="dspm-input" id="dspmRNote" rows="2"></textarea>';
+    h+='<label class="dspm-toggle" style="margin-top:12px"><input type="checkbox" id="dspmFinal"><span>Đây là báo cáo KẾT THÚC chương trình</span></label>';
+    h+='</div>';
+    $id('dspmBody').innerHTML=h;
+    DisplayMod._vis='';
+    $id('dspmSave').style.display=''; $id('dspmSave').textContent='Gửi báo cáo'; $id('dspmSave').setAttribute('onclick','DisplayMod.submitReport()');
+    renderRSku();
+  };
+
+  function photoSlot(key,cap,isAdd){
+    var p=DisplayMod._photos[key];
+    return '<label class="dspm-ph-slot'+(p?' filled':'')+'" id="slot_'+key+'">'+
+      (p?'<img src="'+p+'"><button class="x" onclick="DisplayMod.delPhoto(event,\''+key+'\')">×</button>':'<div class="cap">'+esc(cap)+'</div>')+
+      '<input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')"></label>';
+  }
+  DisplayMod.pickPhoto=function(input,key,isAdd){
+    var f=input.files&&input.files[0]; if(!f) return;
+    compress(f,function(dataUrl){
+      DisplayMod._photos[key]=dataUrl;
+      var slot=$id('slot_'+key);
+      if(slot){ slot.classList.add('filled'); slot.innerHTML='<img src="'+dataUrl+'"><button class="x" onclick="DisplayMod.delPhoto(event,\''+key+'\')">×</button><input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
+      if(isAdd){ var w=$id('dspmExtraWrap'); if(w){ var nk='extra_'+Date.now(); w.insertAdjacentHTML('beforeend',photoSlot(nk,'+ Thêm ảnh',true)); } }
+    });
+  };
+  DisplayMod.delPhoto=function(ev,key){
+    ev.preventDefault(); ev.stopPropagation();
+    delete DisplayMod._photos[key];
+    var slot=$id('slot_'+key); var isAdd=key.indexOf('extra_')===0;
+    if(slot){ slot.classList.remove('filled'); slot.innerHTML='<div class="cap">'+(isAdd?'+ Thêm ảnh':'Ảnh')+'</div><input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
+  };
+  DisplayMod.setVis=function(v){
+    DisplayMod._vis=v;
+    var box=$id('dspmVis'); if(!box) return;
+    box.querySelectorAll('button').forEach(function(b){ b.className=''; if(b.getAttribute('data-v')===v) b.className=(v==='YES'?'on-y':'on-n'); });
+  };
+  function renderRSku(){
+    var box=$id('dspmRSku'); if(!box) return;
+    var hasProd=(DisplayMod._products||[]).length>0;
+    box.innerHTML=DisplayMod._rep.skus.map(function(s,si){
+      var ctrl=hasProd?
+        '<select onchange="DisplayMod.setRSku('+si+',\'product\',this.value)">'+prodOptions(s.product)+'</select>':
+        '<input class="dspm-input" placeholder="Tên SP" value="'+esc(s.product||'')+'" onchange="DisplayMod.setRSku('+si+',\'product\',this.value)">';
+      return '<div class="dspm-sku">'+ctrl+'<input type="number" min="0" placeholder="facing" value="'+esc(s.facing)+'" onchange="DisplayMod.setRSku('+si+',\'facing\',this.value)"><button onclick="DisplayMod.delRSku('+si+')">×</button></div>';
+    }).join('');
+  }
+  DisplayMod.addRSku=function(){ DisplayMod._rep.skus.push({product:'',facing:''}); renderRSku(); };
+  DisplayMod.delRSku=function(si){ DisplayMod._rep.skus.splice(si,1); renderRSku(); };
+  DisplayMod.setRSku=function(si,k,v){ if(DisplayMod._rep.skus[si]) DisplayMod._rep.skus[si][k]=(k==='facing'?(v===''?'':(parseInt(v,10)||0)):v); };
+
+  // nén ảnh bằng canvas (max 1280px, jpeg .72)
+  function compress(file,cb){
+    var rd=new FileReader();
+    rd.onload=function(e){
+      var img=new Image();
+      img.onload=function(){
+        var max=1280, w=img.width, h=img.height;
+        if(w>h&&w>max){ h=Math.round(h*max/w); w=max; } else if(h>=w&&h>max){ w=Math.round(w*max/h); h=max; }
+        var cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        try{ cb(cv.toDataURL('image/jpeg',0.72)); }catch(_){ cb(e.target.result); }
+      };
+      img.onerror=function(){ cb(e.target.result); };
+      img.src=e.target.result;
+    };
+    rd.readAsDataURL(file);
+  }
+
+  DisplayMod.submitReport=function(){
+    var rep=DisplayMod._rep; if(!rep) return;
+    var need=['photo_1','photo_2','photo_3','photo_4'];
+    for(var i=0;i<need.length;i++){ if(!DisplayMod._photos[need[i]]){ tt('⚠️ Thiếu '+(i+1)+'/4 ảnh bắt buộc'); return; } }
+    if(!DisplayMod._vis){ tt('⚠️ Chọn khung dễ thấy hay không'); return; }
+    var btn=$id('dspmSave'); btn.disabled=true; btn.textContent='Đang gửi…';
+    var e=rep.enroll;
+    var payload={type:'DISPLAY_REPORT', report_id:rep.report_id, enroll_id:e.enroll_id, outlet_name:e.outlet_name,
+      region:DisplayMod._region, salesman:(state.user&&state.user.name)||'', report_date:($id('dspmRDate')&&$id('dspmRDate').value)||tnow(),
+      visibility_pass:DisplayMod._vis, sku_actual:rep.skus.filter(function(s){return s.product;}),
+      notes:($id('dspmRNote')&&$id('dspmRNote').value)||'', is_final:($id('dspmFinal')&&$id('dspmFinal').checked)?true:false };
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    // 1) gửi report (cors GET đọc kết quả)
+    fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(!res||!res.ok){ throw new Error('report_failed'); }
+        // 2) upload ảnh nền (no-cors POST DISPLAY_PHOTO, server tự link file_id)
+        uploadReportPhotos(rep);
+        btn.disabled=false; btn.textContent='Gửi báo cáo'; btn.setAttribute('onclick','DisplayMod.submitReport()');
+        tt('✅ Đã gửi báo cáo (điểm: '+(res.score?res.score.total:'?')+'/3). Ảnh đang tải lên.');
+        DisplayMod.close();
+      })
+      .catch(function(){ btn.disabled=false; btn.textContent='Gửi báo cáo'; tt('⚠️ Gửi báo cáo lỗi. Kiểm tra mạng.'); });
+  };
+
+  function uploadReportPhotos(rep){
+    var keys=Object.keys(DisplayMod._photos);
+    var region=DisplayMod._region;
+    var campaign=(rep.enroll&&rep.enroll.campaign_name)||'(Khong ten CT)';
+    var salesman=(state.user&&state.user.name)||'NA';
+    var rdate=($id('dspmRDate')&&$id('dspmRDate').value)||tnow();
+    function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
+    var folderPath=[seg(campaign),seg(region),seg(salesman),seg(rdate)].join('/');
+    (function send(idx){
+      if(idx>=keys.length) return;
+      var key=keys[idx]; var b64=DisplayMod._photos[key]; if(b64.indexOf(',')>-1) b64=b64.split(',')[1];
+      var pkey=(key.indexOf('extra_')===0)?'extra':key;
+      var pl={type:'DISPLAY_PHOTO', report_id:rep.report_id, salesman:salesman,
+        region:region, campaign_name:campaign, report_date:rdate, folder_path:folderPath, photo_key:pkey, photo_b64:b64};
+      var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
+      var ctl=new AbortController(); var tm=setTimeout(function(){ctl.abort();},20000);
+      fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:ctl.signal})
+        .catch(function(){}).then(function(){ clearTimeout(tm); setTimeout(function(){ send(idx+1); },400); });
+    })(0);
+  }
 
   DisplayMod.close=function(){ var ov=$id('dspmOverlay'); if(ov) ov.classList.remove('show'); };
 })();
