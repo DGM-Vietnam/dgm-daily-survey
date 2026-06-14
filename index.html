@@ -2945,14 +2945,14 @@ function confirmFraudSubmit() {
     var p=DisplayMod._photos[key];
     return '<label class="dspm-ph-slot'+(p?' filled':'')+'" id="slot_'+key+'">'+
       (p?'<img src="'+p+'"><button class="x" onclick="DisplayMod.delPhoto(event,\''+key+'\')">×</button>':'<div class="cap">'+esc(cap)+'</div>')+
-      '<input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')"></label>';
+      '<input type="file" accept="image/*" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')"></label>';
   }
   DisplayMod.pickPhoto=function(input,key,isAdd){
     var f=input.files&&input.files[0]; if(!f) return;
     compress(f,function(dataUrl){
       DisplayMod._photos[key]=dataUrl;
       var slot=$id('slot_'+key);
-      if(slot){ slot.classList.add('filled'); slot.innerHTML='<img src="'+dataUrl+'"><button class="x" onclick="DisplayMod.delPhoto(event,\''+key+'\')">×</button><input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
+      if(slot){ slot.classList.add('filled'); slot.innerHTML='<img src="'+dataUrl+'"><button class="x" onclick="DisplayMod.delPhoto(event,\''+key+'\')">×</button><input type="file" accept="image/*" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
       if(isAdd){ var w=$id('dspmExtraWrap'); if(w){ var nk='extra_'+Date.now(); w.insertAdjacentHTML('beforeend',photoSlot(nk,'+ Thêm ảnh',true)); } }
     });
   };
@@ -2960,7 +2960,7 @@ function confirmFraudSubmit() {
     ev.preventDefault(); ev.stopPropagation();
     delete DisplayMod._photos[key];
     var slot=$id('slot_'+key); var isAdd=key.indexOf('extra_')===0;
-    if(slot){ slot.classList.remove('filled'); slot.innerHTML='<div class="cap">'+(isAdd?'+ Thêm ảnh':'Ảnh')+'</div><input type="file" accept="image/*" capture="environment" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
+    if(slot){ slot.classList.remove('filled'); slot.innerHTML='<div class="cap">'+(isAdd?'+ Thêm ảnh':'Ảnh')+'</div><input type="file" accept="image/*" onchange="DisplayMod.pickPhoto(this,\''+key+'\','+(isAdd?'true':'false')+')">'; }
   };
   DisplayMod.setVis=function(v){
     DisplayMod._vis=v;
@@ -3004,45 +3004,47 @@ function confirmFraudSubmit() {
     var need=['photo_1','photo_2','photo_3','photo_4'];
     for(var i=0;i<need.length;i++){ if(!DisplayMod._photos[need[i]]){ tt('⚠️ Thiếu '+(i+1)+'/4 ảnh bắt buộc'); return; } }
     if(!DisplayMod._vis){ tt('⚠️ Chọn khung dễ thấy hay không'); return; }
-    var btn=$id('dspmSave'); btn.disabled=true; btn.textContent='Đang gửi…';
     var e=rep.enroll;
+    var rdate=($id('dspmRDate')&&$id('dspmRDate').value)||tnow();
+    rep.report_date=rdate;
     var payload={type:'DISPLAY_REPORT', report_id:rep.report_id, enroll_id:e.enroll_id, outlet_name:e.outlet_name,
-      region:DisplayMod._region, salesman:(state.user&&state.user.name)||'', report_date:($id('dspmRDate')&&$id('dspmRDate').value)||tnow(),
-      visibility_pass:DisplayMod._vis, sku_actual:rep.skus.filter(function(s){return s.product;}),
+      region:DisplayMod._region, salesman:(state.user&&state.user.name)||'', report_date:rdate,
+      campaign_name:e.campaign_name||'', visibility_pass:DisplayMod._vis,
+      sku_actual:rep.skus.filter(function(s){return s.product;}),
       notes:($id('dspmRNote')&&$id('dspmRNote').value)||'', is_final:($id('dspmFinal')&&$id('dspmFinal').checked)?true:false };
+    var photos=DisplayMod._photos;            // giữ tham chiếu cho upload nền
+    // ĐÓNG NGAY — gửi lạc quan (cảm giác tức thì)
+    tt('📤 Đang gửi báo cáo…');
+    DisplayMod.close();
+    DisplayMod._rep=null; DisplayMod._photos={};
     var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    // 1) gửi report (cors GET đọc kết quả)
     fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
       .then(function(r){return r.json();})
       .then(function(res){
-        if(!res||!res.ok){ throw new Error('report_failed'); }
-        // 2) upload ảnh nền (no-cors POST DISPLAY_PHOTO, server tự link file_id)
-        uploadReportPhotos(rep);
-        btn.disabled=false; btn.textContent='Gửi báo cáo'; btn.setAttribute('onclick','DisplayMod.submitReport()');
-        tt('✅ Đã gửi báo cáo (điểm: '+(res.score?res.score.total:'?')+'/3). Ảnh đang tải lên.');
-        DisplayMod.close();
+        if(res&&res.ok){
+          uploadReportPhotosBg(rep, photos, payload);
+          tt('✅ Đã gửi (điểm '+(res.score?res.score.total:'?')+'/3). Ảnh đang tải lên.');
+        } else { tt('⚠️ Báo cáo lỗi, thử lại sau.'); }
       })
-      .catch(function(){ btn.disabled=false; btn.textContent='Gửi báo cáo'; tt('⚠️ Gửi báo cáo lỗi. Kiểm tra mạng.'); });
+      .catch(function(){ tt('⚠️ Mất mạng — báo cáo chưa gửi được. Thử lại.'); });
   };
 
-  function uploadReportPhotos(rep){
-    var keys=Object.keys(DisplayMod._photos);
-    var region=DisplayMod._region;
-    var campaign=(rep.enroll&&rep.enroll.campaign_name)||'(Khong ten CT)';
-    var salesman=(state.user&&state.user.name)||'NA';
-    var rdate=($id('dspmRDate')&&$id('dspmRDate').value)||tnow();
+  function uploadReportPhotosBg(rep, photos, payload){
+    var keys=Object.keys(photos||{});
+    var region=payload.region, campaign=payload.campaign_name||'(Khong ten CT)';
+    var salesman=payload.salesman||'NA', rdate=payload.report_date;
     function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
     var folderPath=[seg(campaign),seg(region),seg(salesman),seg(rdate)].join('/');
     (function send(idx){
-      if(idx>=keys.length) return;
-      var key=keys[idx]; var b64=DisplayMod._photos[key]; if(b64.indexOf(',')>-1) b64=b64.split(',')[1];
+      if(idx>=keys.length){ tt('✅ Đã tải xong '+keys.length+' ảnh'); return; }
+      var key=keys[idx]; var b64=photos[key]; if(b64.indexOf(',')>-1) b64=b64.split(',')[1];
       var pkey=(key.indexOf('extra_')===0)?'extra':key;
       var pl={type:'DISPLAY_PHOTO', report_id:rep.report_id, salesman:salesman,
         region:region, campaign_name:campaign, report_date:rdate, folder_path:folderPath, photo_key:pkey, photo_b64:b64};
       var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
       var ctl=new AbortController(); var tm=setTimeout(function(){ctl.abort();},20000);
       fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:ctl.signal})
-        .catch(function(){}).then(function(){ clearTimeout(tm); setTimeout(function(){ send(idx+1); },400); });
+        .catch(function(){}).then(function(){ clearTimeout(tm); setTimeout(function(){ send(idx+1); },300); });
     })(0);
   }
 
