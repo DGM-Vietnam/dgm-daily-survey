@@ -946,7 +946,7 @@ function renderTypeCards(team) {
     html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
   }
   cards.innerHTML = html;
-  try{ if(window.DisplayMod) DisplayMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày
+  try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày + Tặng quà
 }
 
 // ============ GT REGION PICKER (for MT/GT manager) ============
@@ -3052,6 +3052,247 @@ function confirmFraudSubmit() {
 })();
 </script>
 <!-- ===================== /DGM DISPLAY MODULE ===================== -->
+
+
+<!-- ===================== DGM GIFT MODULE (ĐỢT 2 — GT Tặng quà) =====================
+     CÔ LẬP: namespace GiftMod, overlay riêng (gftOverlay), dùng lại CSS .dspm-.
+     Phụ thuộc: state.user, GT_SOUTH/CENTRAL/NORTH, toast, state.scriptUrl, backend GIFT_LOG/GIFT_PHOTO. -->
+<script id="gft-script">
+(function(){
+  "use strict";
+  var G={ _cfg:null,_products:[],_inv:[],_loaded:false,_loading:null,
+    _region:'',_scenario:'',_photo:'',_gps:null,
+    _market:'',_outlet:'',_warned:false,_purch:[],_giftKey:'',_giftLabel:'',_giftQty:1,_trigger:'ncd_65ml' };
+  window.GiftMod=G;
+
+  function $id(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function tnow(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function tt(m){ try{ if(typeof toast==='function') toast(m); else alert(m);}catch(e){alert(m);} }
+  function userRegion(){ try{ var t=String((state.user&&state.user.team)||'').trim(); return t.indexOf('GT')===0?t:''; }catch(e){ return ''; } }
+  function regionData(region){ try{
+      if(region==='GT Central') return (typeof GT_CENTRAL!=='undefined')?GT_CENTRAL:{};
+      if(region==='GT North')   return (typeof GT_NORTH!=='undefined')?GT_NORTH:{};
+      return (typeof GT_SOUTH!=='undefined')?GT_SOUTH:{};
+    }catch(e){ return {}; } }
+  function gps(){ try{ if(state.gps) return state.gps.lat+','+state.gps.lng; }catch(e){} return (G._gps?G._gps:''); }
+
+  G.injectCard=function(team){
+    try{
+      if(!team || team.indexOf('GT')<0 && team!=='MT/GT') return;
+      var host=document.querySelector('#typeCards .type-cards'); if(!host) return;
+      if(host.querySelector('[data-gft]')) return;
+      var c=document.createElement('div');
+      c.className='type-card'; c.setAttribute('data-gft','1');
+      c.style.cssText='border-color:#ef6c00;background:#fff8f0';
+      c.onclick=function(){ G.open(); };
+      c.innerHTML='<div class="icon">🎁</div><div class="title" style="color:#ef6c00">Tặng quà</div><div class="desc">Mở mới / duy trì điểm bán</div>';
+      host.appendChild(c);
+    }catch(e){}
+  };
+
+  function loadData(){
+    if(G._loaded) return Promise.resolve();
+    if(G._loading) return G._loading;
+    var url=state.scriptUrl, name=(state.user&&state.user.name)||'';
+    G._loading=Promise.all([
+      fetch(url+'?action=getInstoreConfig&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(url+'?action=getProducts&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(url+'?action=getGiftInventory&salesman='+encodeURIComponent(name)+'&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;})
+    ]).then(function(res){
+      G._cfg=(res[0]&&res[0].ok)?res[0]:{gift_types:[],triggers:[{key:'ncd_65ml',label:'Mua nước cốt dừa 65ml'},{key:'new_outlet',label:'Điểm bán mới'}]};
+      G._products=(res[1]&&res[1].ok&&res[1].products)?res[1].products:[];
+      G._inv=(res[2]&&res[2].ok&&res[2].inventory)?res[2].inventory:[];
+      G._loaded=true;
+    });
+    return G._loading;
+  }
+  function remainOf(key){ for(var i=0;i<G._inv.length;i++){ if(G._inv[i].gift_type===key) return G._inv[i].remaining; } return null; }
+
+  function ensureOverlay(){
+    var ov=$id('gftOverlay'); if(ov) return ov;
+    ov=document.createElement('div'); ov.id='gftOverlay'; ov.className='dspm-overlay';
+    ov.innerHTML='<div class="dspm-head" style="background:#ef6c00"><button class="dspm-back" onclick="GiftMod.close()">‹</button><h2>Tặng quà</h2></div>'+
+      '<div class="dspm-body" id="gftBody"></div>'+
+      '<div class="dspm-foot" id="gftFoot" style="display:none"><button class="dspm-btn dspm-btn-ghost" onclick="GiftMod.close()">Huỷ</button>'+
+      '<button class="dspm-btn dspm-btn-primary" id="gftSave" style="background:#ef6c00" onclick="GiftMod.submit()">Lưu tặng quà</button></div>';
+    document.body.appendChild(ov);
+    return ov;
+  }
+
+  G.open=function(){
+    ensureOverlay().classList.add('show');
+    $id('gftBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
+    $id('gftFoot').style.display='none';
+    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._giftKey=''; G._giftLabel=''; G._giftQty=1; G._trigger='ncd_65ml';
+    try{ if(navigator.geolocation) navigator.geolocation.getCurrentPosition(function(p){ G._gps=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6); },function(){},{timeout:6000}); }catch(e){}
+    loadData().then(function(){
+      var r=userRegion();
+      if(r){ G._region=r; renderScenario(); } else renderRegionPick();
+    }).catch(function(){ $id('gftBody').innerHTML='<div class="dspm-empty">Không tải được dữ liệu.</div>'; });
+  };
+  function renderRegionPick(){
+    var rs=[['GT South','GT Miền Nam 🟢'],['GT Central','GT Miền Trung 🟡'],['GT North','GT Miền Bắc 🟣']];
+    $id('gftBody').innerHTML='<div class="dspm-card"><div class="dspm-label">Chọn khu vực GT</div>'+
+      rs.map(function(r){return '<button class="dspm-rg" onclick="GiftMod.pickRegion(\''+r[0]+'\')">'+r[1]+'</button>';}).join('')+'</div>';
+  }
+  G.pickRegion=function(r){ G._region=r; renderScenario(); };
+
+  function renderScenario(){
+    $id('gftBody').innerHTML='<div class="dspm-card"><div class="dspm-label">Khu vực: '+esc(G._region)+'</div>'+
+      '<div class="dspm-label">Chọn loại điểm bán</div>'+
+      '<button class="dspm-rg" style="border-color:#2e7d32" onclick="GiftMod.pickScenario(\'new\')">🆕 Điểm bán MỚI (chưa có trong danh sách)</button>'+
+      '<button class="dspm-rg" style="border-color:#1565c0" onclick="GiftMod.pickScenario(\'exist\')">📍 Điểm bán CÓ SẴN (chọn từ danh sách)</button></div>';
+    $id('gftFoot').style.display='none';
+  }
+  G.pickScenario=function(s){ G._scenario=s; G._trigger=(s==='new')?'new_outlet':'ncd_65ml'; (s==='new')?renderNewForm():renderExistForm(); $id('gftFoot').style.display=''; };
+
+  function giftBlock(){
+    var gts=(G._cfg.gift_types||[]);
+    var rem=remainOf(G._giftKey);
+    return '<div class="dspm-label">Loại quà tặng</div>'+
+      '<select class="dspm-select" onchange="GiftMod.setGift(this.value)"><option value="">— Chọn quà —</option>'+
+        gts.map(function(g){return '<option value="'+esc(g.key)+'"'+(G._giftKey===g.key?' selected':'')+'>'+esc(g.label)+'</option>';}).join('')+'</select>'+
+      (G._giftKey?('<div style="font-size:12px;margin-top:4px;color:'+(rem!=null&&rem<=0?'#c62828':'#2e7d32')+'">Tồn còn lại: '+(rem!=null?rem:'(chưa thiết lập)')+'</div>'):'')+
+      '<div class="dspm-row" style="margin-top:6px"><div><div class="dspm-label">Số lượng quà</div><input class="dspm-input" type="number" min="1" value="'+G._giftQty+'" onchange="GiftMod.setGiftQty(this.value)"></div>'+
+      '<div><div class="dspm-label">Lý do tặng</div><select class="dspm-select" onchange="GiftMod._trigger=this.value">'+
+        (G._cfg.triggers||[]).filter(function(t){return G._scenario==='new'?t.key==='new_outlet':t.key!=='new_outlet';}).map(function(t){return '<option value="'+esc(t.key)+'"'+(G._trigger===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('')+
+        '</select></div></div>';
+  }
+  function purchBlock(){
+    var hasP=(G._products||[]).length>0;
+    var rows=G._purch.map(function(s,i){
+      var ctrl=hasP?'<select onchange="GiftMod.setPurch('+i+',\'product\',this.value)">'+prodOpts(s.product)+'</select>':
+        '<input class="dspm-input" placeholder="Mã hàng" value="'+esc(s.product||'')+'" onchange="GiftMod.setPurch('+i+',\'product\',this.value)">';
+      return '<div class="dspm-sku">'+ctrl+'<input type="number" min="1" value="'+esc(s.qty||1)+'" onchange="GiftMod.setPurch('+i+',\'qty\',this.value)"><button onclick="GiftMod.delPurch('+i+')">×</button></div>';
+    }).join('');
+    return '<div class="dspm-label">Mã hàng đã mua (lý do tặng)</div>'+rows+'<button class="dspm-add" onclick="GiftMod.addPurch()">+ Thêm mã hàng</button>';
+  }
+  function prodOpts(sel){
+    var ps=G._products||[]; var o='<option value="">— Chọn SP —</option>';
+    o+=ps.map(function(p){var n=p.name_vi||p.name_en||p.id;return '<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}).join(''); return o;
+  }
+  function photoBlock(){
+    return '<div class="dspm-label">Ảnh chứng minh tặng (bắt buộc)</div><div class="dspm-ph">'+
+      '<label class="dspm-ph-slot'+(G._photo?' filled':'')+'" id="gftSlot" style="grid-column:span 2">'+
+      (G._photo?'<img src="'+G._photo+'"><button class="x" onclick="GiftMod.delPhoto(event)">×</button>':'<div class="cap">Chụp ảnh / chọn từ thư viện</div>')+
+      '<input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)"></label></div>';
+  }
+
+  function renderNewForm(){
+    $id('gftBody').innerHTML='<div class="dspm-card">'+
+      '<div style="font-weight:700;color:#2e7d32">🆕 Điểm bán mới · '+esc(G._region)+'</div>'+
+      '<div style="font-size:12px;color:#888;margin:2px 0 8px">Nhập xong sẽ tự thêm vào Storelist để chăm sóc tiếp.</div>'+
+      '<div class="dspm-label">Tên điểm bán *</div><input class="dspm-input" id="gftNName" placeholder="VD: Tạp hóa Cô Ba">'+
+      '<div class="dspm-row"><div><div class="dspm-label">Tỉnh/TP</div><input class="dspm-input" id="gftNProv"></div>'+
+      '<div><div class="dspm-label">Chợ / khu vực</div><input class="dspm-input" id="gftNMarket"></div></div>'+
+      giftBlock()+purchBlock()+photoBlock()+
+      '<div class="dspm-label">Ghi chú</div><textarea class="dspm-input" id="gftNote" rows="2"></textarea></div>';
+  }
+
+  function renderExistForm(){
+    var rd=regionData(G._region); var markets=Object.keys(rd).sort();
+    $id('gftBody').innerHTML='<div class="dspm-card">'+
+      '<div style="font-weight:700;color:#1565c0">📍 Điểm bán có sẵn · '+esc(G._region)+'</div>'+
+      '<div class="dspm-label">Chợ</div><select class="dspm-select" id="gftMarket" onchange="GiftMod.onMarket(this.value)"><option value="">— Chọn chợ —</option>'+
+        markets.map(function(m){return '<option value="'+esc(m)+'">'+esc(m)+'</option>';}).join('')+'</select>'+
+      '<div class="dspm-label">Điểm bán</div><select class="dspm-select" id="gftOutlet" onchange="GiftMod.onOutlet(this.value)"><option value="">— Chọn điểm —</option></select>'+
+      '<div id="gftWarn"></div>'+
+      giftBlock()+purchBlock()+photoBlock()+
+      '<div class="dspm-label">Ghi chú</div><textarea class="dspm-input" id="gftNote" rows="2"></textarea></div>';
+  }
+  G.onMarket=function(m){
+    G._market=m; G._outlet=''; G._warned=false;
+    var sel=$id('gftOutlet'); if(!sel) return;
+    var outlets=((regionData(G._region)[m])||[]).slice().sort();
+    sel.innerHTML='<option value="">— Chọn điểm —</option>'+outlets.map(function(o){return '<option value="'+esc(o)+'">'+esc(o)+'</option>';}).join('');
+    var w=$id('gftWarn'); if(w) w.innerHTML='';
+  };
+  G.onOutlet=function(o){
+    G._outlet=o; G._warned=false;
+    var w=$id('gftWarn'); if(w) w.innerHTML='';
+    if(!o) return;
+    fetch(state.scriptUrl+'?action=getGiftLog&outlet='+encodeURIComponent(o)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).then(function(res){
+        var logs=(res&&res.ok&&res.logs)?res.logs:[];
+        if(logs.length && w){
+          G._warned=true;
+          var last=logs[logs.length-1];
+          w.innerHTML='<div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:8px;padding:9px;margin:8px 0;font-size:13px;color:#e65100">⚠️ Điểm này ĐÃ được tặng quà '+logs.length+' lần (gần nhất: '+esc(last.gift_label_vi||last.gift_type||'')+' · '+esc(last.timestamp||'')+'). Cân nhắc trước khi tặng tiếp.</div>';
+        }
+      }).catch(function(){});
+  };
+
+  G.setGift=function(k){ G._giftKey=k; var g=(G._cfg.gift_types||[]).filter(function(x){return x.key===k;})[0]; G._giftLabel=g?g.label:''; (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
+  G.setGiftQty=function(v){ G._giftQty=parseInt(v,10)||1; };
+  G.addPurch=function(){ G._purch.push({product:'',qty:1}); (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
+  G.delPurch=function(i){ G._purch.splice(i,1); (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
+  G.setPurch=function(i,k,v){ if(G._purch[i]) G._purch[i][k]=(k==='qty'?(parseInt(v,10)||1):v); };
+  // giữ lại lựa chọn chợ/điểm khi re-render form existing
+  function restoreExist(){
+    if(G._scenario!=='exist') return;
+    var m=$id('gftMarket'); if(m&&G._market){ m.value=G._market; G.onMarket._skip=true; var sel=$id('gftOutlet'); var outlets=((regionData(G._region)[G._market])||[]).slice().sort(); if(sel){ sel.innerHTML='<option value="">— Chọn điểm —</option>'+outlets.map(function(o){return '<option value="'+esc(o)+'"'+(o===G._outlet?' selected':'')+'>'+esc(o)+'</option>';}).join(''); } }
+  }
+
+  G.pickPhoto=function(input){
+    var f=input.files&&input.files[0]; if(!f) return;
+    compress(f,function(d){ G._photo=d; var s=$id('gftSlot'); if(s){ s.classList.add('filled'); s.innerHTML='<img src="'+d+'"><button class="x" onclick="GiftMod.delPhoto(event)">×</button><input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)">'; } });
+  };
+  G.delPhoto=function(ev){ ev.preventDefault(); ev.stopPropagation(); G._photo=''; var s=$id('gftSlot'); if(s){ s.classList.remove('filled'); s.innerHTML='<div class="cap">Chụp ảnh / chọn từ thư viện</div><input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)">'; } };
+  function compress(file,cb){
+    var rd=new FileReader();
+    rd.onload=function(e){ var img=new Image(); img.onload=function(){ var max=1280,w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;} var cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); try{cb(cv.toDataURL('image/jpeg',0.72));}catch(_){cb(e.target.result);} }; img.onerror=function(){cb(e.target.result);}; img.src=e.target.result; };
+    rd.readAsDataURL(file);
+  }
+
+  G.submit=function(){
+    var name=(state.user&&state.user.name)||'';
+    var outletName, isNew, prov='', market='';
+    if(G._scenario==='new'){
+      outletName=($id('gftNName')&&$id('gftNName').value.trim())||''; isNew=true;
+      prov=($id('gftNProv')&&$id('gftNProv').value.trim())||''; market=($id('gftNMarket')&&$id('gftNMarket').value.trim())||'';
+      if(!outletName){ tt('⚠️ Nhập tên điểm bán'); return; }
+    } else {
+      outletName=G._outlet; isNew=false; market=G._market;
+      if(!outletName){ tt('⚠️ Chọn điểm bán'); return; }
+    }
+    if(!G._giftKey){ tt('⚠️ Chọn loại quà'); return; }
+    if(!G._photo){ tt('⚠️ Bắt buộc có ảnh'); return; }
+    var note=($id('gftNote')&&$id('gftNote').value)||'';
+    var giftId='GIFT-'+tnow().replace(/-/g,'')+'-'+Date.now().toString().slice(-5);
+    var photo=G._photo, region=G._region, date=tnow();
+    var payload={type:'GIFT_LOG', gift_log_id:giftId, salesman:name, region:region,
+      outlet_name:outletName, outlet_is_new:isNew, province:prov, market:market, sub_channel:'GT Outlet',
+      trigger_type:G._trigger, gift_type:G._giftKey, gift_label_vi:G._giftLabel, qty:G._giftQty,
+      purchased_sku:G._purch.filter(function(s){return s.product;}), gps:gps(),
+      warning_shown:G._warned, notes:note };
+    tt('📤 Đang lưu tặng quà…'); G.close();
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(res&&res.ok){
+          uploadGiftPhoto(giftId, name, region, date, photo);
+          tt('✅ Đã lưu tặng quà'+(res.store_appended?' + thêm điểm mới vào Storelist':''));
+        } else tt('⚠️ Lưu lỗi, thử lại.');
+      }).catch(function(){ tt('⚠️ Mất mạng — chưa lưu được.'); });
+  };
+
+  function uploadGiftPhoto(giftId,salesman,region,date,photo){
+    var b=photo; if(b.indexOf(',')>-1) b=b.split(',')[1];
+    function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
+    var folder=['Tặng quà',seg(region),seg(salesman),seg(date)].join('/');
+    var pl={type:'GIFT_PHOTO', gift_log_id:giftId, salesman:salesman, region:region, date:date, folder_path:folder, photo_b64:b};
+    var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
+    var ctl=new AbortController(); var tm=setTimeout(function(){ctl.abort();},20000);
+    fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:ctl.signal})
+      .catch(function(){}).then(function(){ clearTimeout(tm); tt('✅ Đã tải ảnh tặng quà'); });
+  }
+
+  G.close=function(){ var ov=$id('gftOverlay'); if(ov) ov.classList.remove('show'); };
+})();
+</script>
+<!-- ===================== /DGM GIFT MODULE ===================== -->
 
 </body>
 </html>
