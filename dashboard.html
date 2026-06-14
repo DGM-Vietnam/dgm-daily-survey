@@ -317,6 +317,7 @@ tr:hover td{background:rgba(255,255,255,.025);}
 
   <div class="tabs" id="tabsBar">
     <div class="tab active" onclick="switchTab('overview',this)">📊 Tổng quan</div>
+    <div class="tab" onclick="switchTab('display',this)">🖼️ Trưng bày</div>
     <div class="tab tab-manager" onclick="switchTab('mt',this)">🏬 MT Team</div>
     <div class="tab tab-manager" onclick="switchTab('gt',this)">🏪 GT Team</div>
     <div class="tab" onclick="switchTab('map',this)">🗺️ Bản đồ</div>
@@ -627,6 +628,49 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <table><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Vùng</th><th>Tên điểm bán</th><th>Hình thức KD</th><th>Tiềm năng</th></tr></thead>
       <tbody id="tbNewCustomers"></tbody></table>
     </div>
+  </div>
+  <style id="dsp-style">
+  #tab-display .tbl-card table th{font-size:12px}
+  .dsp-card{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:12px;margin-bottom:12px}
+  .dsp-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .dsp-h small{color:#888;font-size:12px}
+  .dsp-score{text-align:center;font-weight:800;color:#1565c0;font-size:18px;white-space:nowrap}
+  .dsp-score small{font-weight:600;color:#666;font-size:11px}
+  .dsp-b{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;display:inline-block}
+  .dsp-pass{background:#e8f5e9;color:#2e7d32}.dsp-fail{background:#ffebee;color:#c62828}.dsp-pend{background:#f0f0f0;color:#888}
+  .dsp-ph{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
+  .dsp-ph img{width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3}
+  .dsp-sku{font-size:12px;color:#555;background:#fafafa;border-radius:6px;padding:6px 8px;margin:6px 0}
+  .dsp-sku span{font-weight:700;color:#333}
+  .dsp-cms{margin:6px 0}
+  .dsp-cm{font-size:12px;background:#f6f8ff;border-radius:6px;padding:5px 8px;margin-bottom:4px}
+  .dsp-cm span{color:#aaa;font-size:11px}
+  .dsp-eval{margin-top:8px;border-top:1px dashed #e0e0e0;padding-top:8px}
+  .dsp-eval textarea{width:100%;border:1px solid #ddd;border-radius:6px;padding:7px;font-size:13px;box-sizing:border-box;resize:vertical;min-height:42px}
+  .dsp-eb{display:flex;gap:6px;margin-top:6px}
+  .dsp-eb button{flex:1;padding:8px;border:none;border-radius:6px;font-weight:700;font-size:13px;cursor:pointer}
+  .dsp-y{background:#2e7d32;color:#fff}.dsp-n{background:#c62828;color:#fff}.dsp-c{background:#eee;color:#555}
+  .dsp-flt{display:flex;gap:8px;margin-bottom:12px}
+  .dsp-flt select{padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px}
+  </style>
+  <!-- TAB TRƯNG BÀY (ĐỢT 2 — mọi role xem; chấm điểm chỉ trade/manager) -->
+  <div class="tab-content" id="tab-display">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="sec" style="margin:0">🖼️ Trưng bày — Tổng quan theo vùng GT</div>
+      <button onclick="loadDisplay(true)" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">↻ Làm mới</button>
+    </div>
+    <div class="tbl-card" style="margin-top:10px">
+      <table>
+        <thead><tr><th>Vùng</th><th class="num">Số chợ</th><th class="num">Số điểm</th><th class="num">4 chân</th><th class="num">6 chân</th><th class="num">Khung sắt</th><th class="num">Tổng khung</th><th class="num">TG TB (ngày)</th><th class="num">Báo cáo</th><th class="num">Đạt/Đã chấm</th></tr></thead>
+        <tbody id="dspSummary"><tr><td colspan="10" style="text-align:center;color:#888">Đang tải…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="sec">Báo cáo trưng bày <span id="dspRptCount"></span></div>
+    <div class="dsp-flt">
+      <select id="dspFilterRegion" onchange="renderDisplayReports()"><option value="">Tất cả vùng</option><option>GT South</option><option>GT Central</option><option>GT North</option></select>
+      <select id="dspFilterEval" onchange="renderDisplayReports()"><option value="">Tất cả trạng thái</option><option>Chưa chấm</option><option>Đạt</option><option>Không đạt</option></select>
+    </div>
+    <div id="dspReports"></div>
   </div>
 
 </div><!-- end #app -->
@@ -1750,6 +1794,107 @@ function switchTab(name, el){
   document.getElementById('tab-'+name).classList.add('active');
   if(name==='map'){ initUnifiedMap(); setTimeout(()=>{ MAP_UNIFIED&&MAP_UNIFIED.invalidateSize(); renderUnifiedMap(); },120); }
   if(name==='stats'){ renderStats(); renderStatDist(); }
+  if(name==='display'){ loadDisplay(); }
+}
+// ══════════════════════════════════════════════════════════
+// TAB TRƯNG BÀY (ĐỢT 2)
+// ══════════════════════════════════════════════════════════
+let DISP_ENR=[], DISP_RPT=[], DISP_LOADED=false;
+function dspEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function dspDays(a,b){ if(!a||!b) return null; var da=new Date(a),db=new Date(b); if(isNaN(da)||isNaN(db)) return null; return Math.round((db-da)/86400000); }
+function dspThumb(id){ return 'https://drive.google.com/thumbnail?id='+id+'&sz=w300'; }
+function dspEnrById(id){ for(var i=0;i<DISP_ENR.length;i++){ if(DISP_ENR[i].enroll_id===id) return DISP_ENR[i]; } return null; }
+function dspSkuStr(v){ try{ var a=(typeof v==='string')?JSON.parse(v):v; if(Array.isArray(a)) return a.map(function(s){return dspEsc(s.product||s.sku||'?')+'×'+(s.facing!=null?s.facing:s.qty);}).join(', '); if(a&&typeof a==='object') return Object.keys(a).map(function(k){return dspEsc(k)+'×'+a[k];}).join(', '); }catch(e){} return '—'; }
+
+async function loadDisplay(force){
+  if(DISP_LOADED && !force) return;
+  var sum=document.getElementById('dspSummary');
+  if(sum) sum.innerHTML='<tr><td colspan="10" style="text-align:center;color:#888">Đang tải…</td></tr>';
+  try{
+    var r=await Promise.all([
+      fetch(SCRIPT_URL+'?action=getDisplayEnrollments&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;}),
+      fetch(SCRIPT_URL+'?action=getDisplayReports&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;})
+    ]);
+    DISP_ENR=(r[0]&&r[0].ok&&r[0].enrollments)?r[0].enrollments:[];
+    DISP_RPT=(r[1]&&r[1].ok&&r[1].reports)?r[1].reports:[];
+    DISP_LOADED=true;
+    renderDisplaySummary(); renderDisplayReports();
+  }catch(e){ if(sum) sum.innerHTML='<tr><td colspan="10" style="text-align:center;color:#c00">Lỗi tải dữ liệu</td></tr>'; }
+}
+
+function renderDisplaySummary(){
+  var regions=['GT South','GT Central','GT North'];
+  var byR={}; regions.forEach(function(r){ byR[r]={markets:{},outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0}; });
+  DISP_ENR.forEach(function(e){
+    var b=byR[e.region]; if(!b) return;
+    b.outlets++; if(e.market) b.markets[e.market]=1;
+    var ft=String(e.frame_type||'').toLowerCase();
+    if(ft.indexOf('4')>=0) b.f4++; else if(ft.indexOf('6')>=0) b.f6++; else if(ft.indexOf('sắt')>=0||ft.indexOf('sat')>=0) b.fs++;
+    b.frames += parseInt(e.frame_qty,10)||0;
+    var d=dspDays(e.date_start,e.date_acceptance); if(d===null) d=dspDays(e.date_start,e.date_install);
+    if(d!==null && d>=0){ b.durSum+=d; b.durN++; }
+  });
+  DISP_RPT.forEach(function(rp){ var b=byR[rp.region]; if(!b) return; b.rpt++; if(rp.eval_result){ b.scored++; if(rp.eval_result==='Đạt') b.pass++; } });
+  var tot={mk:0,outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0}, rows='';
+  regions.forEach(function(r){
+    var b=byR[r], mk=Object.keys(b.markets).length, dur=b.durN?Math.round(b.durSum/b.durN):'—';
+    tot.mk+=mk; tot.outlets+=b.outlets; tot.f4+=b.f4; tot.f6+=b.f6; tot.fs+=b.fs; tot.frames+=b.frames; tot.durSum+=b.durSum; tot.durN+=b.durN; tot.rpt+=b.rpt; tot.pass+=b.pass; tot.scored+=b.scored;
+    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+mk+'</td><td class="num">'+b.outlets+'</td><td class="num">'+b.f4+'</td><td class="num">'+b.f6+'</td><td class="num">'+b.fs+'</td><td class="num">'+b.frames+'</td><td class="num">'+dur+'</td><td class="num">'+b.rpt+'</td><td class="num">'+b.pass+'/'+b.scored+'</td></tr>';
+  });
+  var tdur=tot.durN?Math.round(tot.durSum/tot.durN):'—';
+  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.mk+'</td><td class="num">'+tot.outlets+'</td><td class="num">'+tot.f4+'</td><td class="num">'+tot.f6+'</td><td class="num">'+tot.fs+'</td><td class="num">'+tot.frames+'</td><td class="num">'+tdur+'</td><td class="num">'+tot.rpt+'</td><td class="num">'+tot.pass+'/'+tot.scored+'</td></tr>';
+  var sum=document.getElementById('dspSummary'); if(sum) sum.innerHTML=DISP_ENR.length?rows:'<tr><td colspan="10" style="text-align:center;color:#888">Chưa có chương trình trưng bày</td></tr>';
+}
+
+function renderDisplayReports(){
+  var fr=(document.getElementById('dspFilterRegion')||{}).value||'';
+  var fe=(document.getElementById('dspFilterEval')||{}).value||'';
+  var full=(typeof isFullView==='function')?isFullView(CURRENT_ROLE):(CURRENT_ROLE==='manager');
+  var list=DISP_RPT.filter(function(rp){
+    if(fr && rp.region!==fr) return false;
+    if(fe==='Chưa chấm' && rp.eval_result) return false;
+    if((fe==='Đạt'||fe==='Không đạt') && rp.eval_result!==fe) return false;
+    return true;
+  });
+  list.sort(function(a,b){ return String(b.timestamp||'').localeCompare(String(a.timestamp||'')); });
+  var cnt=document.getElementById('dspRptCount'); if(cnt) cnt.textContent='('+list.length+')';
+  var box=document.getElementById('dspReports'); if(!box) return;
+  box.innerHTML=list.length?list.map(function(rp){return dspReportCard(rp,full);}).join(''):'<div style="text-align:center;color:#888;padding:24px">Chưa có báo cáo</div>';
+}
+
+function dspReportCard(rp, full){
+  var enr=dspEnrById(rp.enroll_id);
+  var photos=[rp.photo_1_id,rp.photo_2_id,rp.photo_3_id,rp.photo_4_id].filter(Boolean);
+  var ph=photos.map(function(id){ return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img src="'+dspThumb(id)+'" onerror="this.style.opacity=.25"></a>'; }).join('');
+  var comm=[]; try{ comm=rp.comments_arr||JSON.parse(rp.comments||'[]'); }catch(e){ comm=[]; }
+  if(!Array.isArray(comm)) comm=[];
+  var cms=comm.length?comm.map(function(c){ return '<div class="dsp-cm"><b>'+dspEsc(c.user||'?')+'</b> <span>'+dspEsc(c.time||'')+'</span><br>'+dspEsc(c.comment||'')+'</div>'; }).join(''):'<div style="color:#bbb;font-size:12px">Chưa có nhận xét</div>';
+  var badge=rp.eval_result==='Đạt'?'<span class="dsp-b dsp-pass">✓ Đạt</span>':(rp.eval_result==='Không đạt'?'<span class="dsp-b dsp-fail">✗ Không đạt</span>':'<span class="dsp-b dsp-pend">Chưa chấm</span>');
+  var ctrl='';
+  if(full){
+    ctrl='<div class="dsp-eval"><textarea id="cm_'+rp.report_id+'" placeholder="Nhận xét cho lần báo cáo này…"></textarea>'+
+      '<div class="dsp-eb"><button class="dsp-y" onclick="doEval(\''+rp.report_id+'\',\'Đạt\')">Đạt</button>'+
+      '<button class="dsp-n" onclick="doEval(\''+rp.report_id+'\',\'Không đạt\')">Không đạt</button>'+
+      '<button class="dsp-c" onclick="doEval(\''+rp.report_id+'\',\'\')">Chỉ lưu nhận xét</button></div></div>';
+  }
+  return '<div class="dsp-card">'+
+    '<div class="dsp-h"><div><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
+    '<div class="dsp-score">'+(rp.total_score||0)+'/3<br><small>'+(rp.visibility_pass==='YES'?'👁 Đạt':'👁 Không')+'</small></div></div>'+
+    (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
+    '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+
+    '<div class="dsp-cms">'+cms+'</div>'+ctrl+'</div>';
+}
+
+async function doEval(reportId, result){
+  var ta=document.getElementById('cm_'+reportId); var comment=ta?ta.value.trim():'';
+  if(!result && !comment){ alert('Nhập nhận xét hoặc chọn Đạt / Không đạt'); return; }
+  var who=(CURRENT_ROLE==='manager')?'Manager':'Trade Marketing';
+  var payload={type:'DISPLAY_EVAL',report_id:reportId,eval_result:result,eval_by:who,actor_role:CURRENT_ROLE,comment:comment};
+  var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  try{
+    var res=await fetch(SCRIPT_URL+'?data='+encodeURIComponent(b64)+'&_t='+Date.now()).then(function(x){return x.json();});
+    if(res&&res.ok){ loadDisplay(true); } else { alert('Lỗi chấm điểm'); }
+  }catch(e){ alert('Lỗi kết nối'); }
 }
 </script>
 </body>
