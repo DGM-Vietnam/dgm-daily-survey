@@ -632,7 +632,8 @@ tr:hover td{background:rgba(255,255,255,.025);}
   </div>
   <style id="dsp-style">
   #tab-display .tbl-card table th{font-size:12px}
-  .dsp-card{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:12px;margin-bottom:12px}
+  .dsp-card{background:#fff;border:1px solid #e6e6e6;border-radius:10px;padding:12px;margin-bottom:12px;color:#333}
+  .dsp-card b,.dsp-h b{color:#1a1a1a}
   .dsp-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
   .dsp-h small{color:#888;font-size:12px}
   .dsp-score{text-align:center;font-weight:800;color:#1565c0;font-size:18px;white-space:nowrap}
@@ -1836,6 +1837,11 @@ let DISP_ENR=[], DISP_RPT=[], DISP_LOADED=false;
 function dspEsc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
 function dspDays(a,b){ if(!a||!b) return null; var da=new Date(a),db=new Date(b); if(isNaN(da)||isNaN(db)) return null; return Math.round((db-da)/86400000); }
 function dspThumb(id){ return 'https://drive.google.com/thumbnail?id='+id+'&sz=w300'; }
+function dspImgFallback(img){
+  var t=parseInt(img.getAttribute('data-try')||'0',10), id=img.getAttribute('data-id');
+  if(t===0){ img.setAttribute('data-try','1'); img.src='https://lh3.googleusercontent.com/d/'+id+'=w300'; }
+  else { img.onerror=null; img.style.opacity=.3; img.style.background='#eee'; img.alt='Ảnh — mở trên Drive'; img.title='Bấm để xem trên Drive'; }
+}
 function dspEnrById(id){ for(var i=0;i<DISP_ENR.length;i++){ if(DISP_ENR[i].enroll_id===id) return DISP_ENR[i]; } return null; }
 function dspSkuStr(v){ try{ var a=(typeof v==='string')?JSON.parse(v):v; if(Array.isArray(a)) return a.map(function(s){return dspEsc(s.product||s.sku||'?')+'×'+(s.facing!=null?s.facing:s.qty);}).join(', '); if(a&&typeof a==='object') return Object.keys(a).map(function(k){return dspEsc(k)+'×'+a[k];}).join(', '); }catch(e){} return '—'; }
 
@@ -1936,7 +1942,7 @@ function dspEditEval(reportId){
 function dspReportCard(rp, full){
   var enr=dspEnrById(rp.enroll_id);
   var photos=[rp.photo_1_id,rp.photo_2_id,rp.photo_3_id,rp.photo_4_id].filter(Boolean);
-  var ph=photos.map(function(id){ return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img src="'+dspThumb(id)+'" onerror="this.style.opacity=.25"></a>'; }).join('');
+  var ph=photos.map(function(id){ return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img src="'+dspThumb(id)+'" data-id="'+id+'" data-try="0" onerror="dspImgFallback(this)"></a>'; }).join('');
   var comm=[]; try{ comm=rp.comments_arr||JSON.parse(rp.comments||'[]'); }catch(e){ comm=[]; }
   if(!Array.isArray(comm)) comm=[];
   var cms=comm.length?comm.map(function(c){ return '<div class="dsp-cm"><b>'+dspEsc(c.user||'?')+'</b> <span>'+dspEsc(c.time||'')+'</span><br>'+dspEsc(c.comment||'')+'</div>'; }).join(''):'<div style="color:#bbb;font-size:12px">Chưa có nhận xét</div>';
