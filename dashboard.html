@@ -318,6 +318,7 @@ tr:hover td{background:rgba(255,255,255,.025);}
   <div class="tabs" id="tabsBar">
     <div class="tab active" onclick="switchTab('overview',this)">📊 Tổng quan</div>
     <div class="tab" onclick="switchTab('display',this)">🖼️ Trưng bày</div>
+    <div class="tab tab-manager" onclick="switchTab('gift',this)">🎁 Tặng quà</div>
     <div class="tab tab-manager" onclick="switchTab('mt',this)">🏬 MT Team</div>
     <div class="tab tab-manager" onclick="switchTab('gt',this)">🏪 GT Team</div>
     <div class="tab" onclick="switchTab('map',this)">🗺️ Bản đồ</div>
@@ -661,9 +662,14 @@ tr:hover td{background:rgba(255,255,255,.025);}
     </div>
     <div class="tbl-card" style="margin-top:10px">
       <table>
-        <thead><tr><th>Vùng</th><th class="num">Số chợ</th><th class="num">Số điểm</th><th class="num">4 chân</th><th class="num">6 chân</th><th class="num">Khung sắt</th><th class="num">Tổng khung</th><th class="num">TG TB (ngày)</th><th class="num">Báo cáo</th><th class="num">Đạt/Đã chấm</th></tr></thead>
-        <tbody id="dspSummary"><tr><td colspan="10" style="text-align:center;color:#888">Đang tải…</td></tr></tbody>
+        <thead><tr><th>Vùng</th><th class="num">Số chợ</th><th class="num">Số điểm</th><th class="num">4 chân</th><th class="num">6 chân</th><th class="num">Khung sắt</th><th class="num">Tổng khung</th><th class="num">TG TB (ngày)</th><th class="num">Báo cáo</th><th class="num">Đạt/Đã chấm</th><th class="num">Điểm TB /6</th></tr></thead>
+        <tbody id="dspSummary"><tr><td colspan="11" style="text-align:center;color:#888">Đang tải…</td></tr></tbody>
       </table>
+    </div>
+    <div class="sec">Người phụ trách báo cáo</div>
+    <div class="tbl-card">
+      <table><thead><tr><th>Người báo cáo</th><th>Vùng</th><th class="num">Khung phụ trách</th><th class="num">Tổng lần báo cáo</th><th class="num">Điểm TB /6</th><th>Lần gần nhất</th></tr></thead>
+      <tbody id="dspCoverage"><tr><td colspan="6" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
     </div>
     <div class="sec">Báo cáo trưng bày <span id="dspRptCount"></span></div>
     <div class="dsp-flt">
@@ -671,6 +677,32 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <select id="dspFilterEval" onchange="renderDisplayReports()"><option value="">Tất cả trạng thái</option><option>Chưa chấm</option><option>Đạt</option><option>Không đạt</option></select>
     </div>
     <div id="dspReports"></div>
+  </div>
+  <!-- TAB TẶNG QUÀ (ĐỢT 2 — manager + trade) -->
+  <div class="tab-content" id="tab-gift">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="sec" style="margin:0">🎁 Tặng quà — Tổng quan theo vùng</div>
+      <button onclick="loadGift(true)" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer;font-size:13px">↻ Làm mới</button>
+    </div>
+    <div class="tbl-card" style="margin-top:10px">
+      <table><thead><tr><th>Vùng</th><th class="num">Lượt tặng</th><th class="num">Tổng quà (SL)</th><th class="num">Điểm mới mở</th><th class="num">Cảnh báo trùng</th></tr></thead>
+      <tbody id="gftSummary"><tr><td colspan="5" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
+    </div>
+    <div class="sec">Tồn quà theo nhân viên <small style="color:#888;font-weight:400">(còn lại / đầu kỳ)</small></div>
+    <div class="tbl-card">
+      <table><thead><tr><th>Nhân viên</th><th>Vùng</th><th class="num">Bình giữ nhiệt</th><th class="num">Tạp dề</th><th class="num">Sổ hóa đơn</th><th class="num">Sổ tay</th><th class="num">Bút viết</th><th class="num">Áo mưa</th></tr></thead>
+      <tbody id="gftInv"><tr><td colspan="8" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
+    </div>
+    <div class="sec">Lịch sử tặng quà <span id="gftLogCount"></span></div>
+    <div class="dsp-flt">
+      <select id="gftFRegion" onchange="renderGiftLog()"><option value="">Tất cả vùng</option><option>GT South</option><option>GT Central</option><option>GT North</option></select>
+      <select id="gftFTrigger" onchange="renderGiftLog()"><option value="">Tất cả lý do</option><option value="ncd_65ml">Mua NCD 65ml</option><option value="new_outlet">Điểm mới</option></select>
+      <select id="gftFWarn" onchange="renderGiftLog()"><option value="">Tất cả</option><option value="1">Chỉ cảnh báo trùng</option></select>
+    </div>
+    <div class="tbl-card">
+      <table><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Vùng</th><th>Điểm bán</th><th>Quà</th><th class="num">SL</th><th>Lý do</th><th>Mới?</th><th>⚠️</th><th>Ảnh</th></tr></thead>
+      <tbody id="gftLog"><tr><td colspan="10" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
+    </div>
   </div>
 
 </div><!-- end #app -->
@@ -1795,6 +1827,7 @@ function switchTab(name, el){
   if(name==='map'){ initUnifiedMap(); setTimeout(()=>{ MAP_UNIFIED&&MAP_UNIFIED.invalidateSize(); renderUnifiedMap(); },120); }
   if(name==='stats'){ renderStats(); renderStatDist(); }
   if(name==='display'){ loadDisplay(); }
+  if(name==='gift'){ loadGift(); }
 }
 // ══════════════════════════════════════════════════════════
 // TAB TRƯNG BÀY (ĐỢT 2)
@@ -1818,13 +1851,16 @@ async function loadDisplay(force){
     DISP_ENR=(r[0]&&r[0].ok&&r[0].enrollments)?r[0].enrollments:[];
     DISP_RPT=(r[1]&&r[1].ok&&r[1].reports)?r[1].reports:[];
     DISP_LOADED=true;
-    renderDisplaySummary(); renderDisplayReports();
+    renderDisplaySummary(); renderDisplayCoverage(); renderDisplayReports();
   }catch(e){ if(sum) sum.innerHTML='<tr><td colspan="10" style="text-align:center;color:#c00">Lỗi tải dữ liệu</td></tr>'; }
 }
 
+function dspEvalScore(rp){ var v=parseInt(rp.eval_score,10); return isNaN(v)?null:v; }
+function dspTotalCombined(rp){ var s=parseInt(rp.total_score,10)||0; var t=dspEvalScore(rp); return (t==null)?null:(s+t); }
+
 function renderDisplaySummary(){
   var regions=['GT South','GT Central','GT North'];
-  var byR={}; regions.forEach(function(r){ byR[r]={markets:{},outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0}; });
+  var byR={}; regions.forEach(function(r){ byR[r]={markets:{},outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0,combSum:0,combN:0}; });
   DISP_ENR.forEach(function(e){
     var b=byR[e.region]; if(!b) return;
     b.outlets++; if(e.market) b.markets[e.market]=1;
@@ -1834,16 +1870,35 @@ function renderDisplaySummary(){
     var d=dspDays(e.date_start,e.date_acceptance); if(d===null) d=dspDays(e.date_start,e.date_install);
     if(d!==null && d>=0){ b.durSum+=d; b.durN++; }
   });
-  DISP_RPT.forEach(function(rp){ var b=byR[rp.region]; if(!b) return; b.rpt++; if(rp.eval_result){ b.scored++; if(rp.eval_result==='Đạt') b.pass++; } });
-  var tot={mk:0,outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0}, rows='';
+  DISP_RPT.forEach(function(rp){ var b=byR[rp.region]; if(!b) return; b.rpt++; if(rp.eval_result){ b.scored++; if(rp.eval_result==='Đạt') b.pass++; } var c=dspTotalCombined(rp); if(c!=null){ b.combSum+=c; b.combN++; } });
+  var tot={mk:0,outlets:0,f4:0,f6:0,fs:0,frames:0,durSum:0,durN:0,rpt:0,pass:0,scored:0,combSum:0,combN:0}, rows='';
   regions.forEach(function(r){
-    var b=byR[r], mk=Object.keys(b.markets).length, dur=b.durN?Math.round(b.durSum/b.durN):'—';
-    tot.mk+=mk; tot.outlets+=b.outlets; tot.f4+=b.f4; tot.f6+=b.f6; tot.fs+=b.fs; tot.frames+=b.frames; tot.durSum+=b.durSum; tot.durN+=b.durN; tot.rpt+=b.rpt; tot.pass+=b.pass; tot.scored+=b.scored;
-    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+mk+'</td><td class="num">'+b.outlets+'</td><td class="num">'+b.f4+'</td><td class="num">'+b.f6+'</td><td class="num">'+b.fs+'</td><td class="num">'+b.frames+'</td><td class="num">'+dur+'</td><td class="num">'+b.rpt+'</td><td class="num">'+b.pass+'/'+b.scored+'</td></tr>';
+    var b=byR[r], mk=Object.keys(b.markets).length, dur=b.durN?Math.round(b.durSum/b.durN):'—', comb=b.combN?(b.combSum/b.combN).toFixed(1):'—';
+    tot.mk+=mk; tot.outlets+=b.outlets; tot.f4+=b.f4; tot.f6+=b.f6; tot.fs+=b.fs; tot.frames+=b.frames; tot.durSum+=b.durSum; tot.durN+=b.durN; tot.rpt+=b.rpt; tot.pass+=b.pass; tot.scored+=b.scored; tot.combSum+=b.combSum; tot.combN+=b.combN;
+    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+mk+'</td><td class="num">'+b.outlets+'</td><td class="num">'+b.f4+'</td><td class="num">'+b.f6+'</td><td class="num">'+b.fs+'</td><td class="num">'+b.frames+'</td><td class="num">'+dur+'</td><td class="num">'+b.rpt+'</td><td class="num">'+b.pass+'/'+b.scored+'</td><td class="num">'+comb+'</td></tr>';
   });
-  var tdur=tot.durN?Math.round(tot.durSum/tot.durN):'—';
-  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.mk+'</td><td class="num">'+tot.outlets+'</td><td class="num">'+tot.f4+'</td><td class="num">'+tot.f6+'</td><td class="num">'+tot.fs+'</td><td class="num">'+tot.frames+'</td><td class="num">'+tdur+'</td><td class="num">'+tot.rpt+'</td><td class="num">'+tot.pass+'/'+tot.scored+'</td></tr>';
-  var sum=document.getElementById('dspSummary'); if(sum) sum.innerHTML=DISP_ENR.length?rows:'<tr><td colspan="10" style="text-align:center;color:#888">Chưa có chương trình trưng bày</td></tr>';
+  var tdur=tot.durN?Math.round(tot.durSum/tot.durN):'—', tcomb=tot.combN?(tot.combSum/tot.combN).toFixed(1):'—';
+  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.mk+'</td><td class="num">'+tot.outlets+'</td><td class="num">'+tot.f4+'</td><td class="num">'+tot.f6+'</td><td class="num">'+tot.fs+'</td><td class="num">'+tot.frames+'</td><td class="num">'+tdur+'</td><td class="num">'+tot.rpt+'</td><td class="num">'+tot.pass+'/'+tot.scored+'</td><td class="num">'+tcomb+'</td></tr>';
+  var sum=document.getElementById('dspSummary'); if(sum) sum.innerHTML=DISP_ENR.length?rows:'<tr><td colspan="11" style="text-align:center;color:#888">Chưa có chương trình trưng bày</td></tr>';
+}
+
+function renderDisplayCoverage(){
+  // theo người báo cáo: số khung (enrollment) phụ trách, tổng lần báo cáo, điểm TB tổng, lần gần nhất
+  var by={};
+  DISP_RPT.forEach(function(rp){
+    var k=rp.salesman||'(?)';
+    if(!by[k]) by[k]={salesman:k,region:rp.region||'',enr:{},n:0,combSum:0,combN:0,last:''};
+    var b=by[k]; b.n++; if(rp.enroll_id) b.enr[rp.enroll_id]=1;
+    var c=dspTotalCombined(rp); if(c!=null){ b.combSum+=c; b.combN++; }
+    var t=rp.report_date||(rp.timestamp||'').slice(0,10); if(t>b.last) b.last=t;
+    if(!b.region && rp.region) b.region=rp.region;
+  });
+  var arr=Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return b.n-a.n;});
+  var rows=arr.map(function(b){
+    var comb=b.combN?(b.combSum/b.combN).toFixed(1):'—';
+    return '<tr><td>'+dspEsc(b.salesman)+'</td><td>'+dspEsc(b.region)+'</td><td class="num">'+Object.keys(b.enr).length+'</td><td class="num">'+b.n+'</td><td class="num">'+comb+'</td><td>'+dspEsc(b.last)+'</td></tr>';
+  }).join('');
+  var el=document.getElementById('dspCoverage'); if(el) el.innerHTML=arr.length?rows:'<tr><td colspan="6" style="text-align:center;color:#888">Chưa có báo cáo</td></tr>';
 }
 
 function renderDisplayReports(){
@@ -1862,6 +1917,22 @@ function renderDisplayReports(){
   box.innerHTML=list.length?list.map(function(rp){return dspReportCard(rp,full);}).join(''):'<div style="text-align:center;color:#888;padding:24px">Chưa có báo cáo</div>';
 }
 
+function dspEvalControls(rp){
+  var sc=parseInt(rp.total_score,10)||0;
+  var opts=[0,1,2,3].map(function(n){return '<option value="'+n+'"'+(n===sc?' selected':'')+'>'+n+'</option>';}).join('');
+  return '<div class="dsp-eval" id="ev_'+rp.report_id+'">'+
+    '<div style="font-size:12px;color:#666;margin-bottom:4px">Điểm Trade chấm (0–3): <select id="sc_'+rp.report_id+'" style="padding:4px 6px;border:1px solid #ddd;border-radius:5px">'+opts+'</select></div>'+
+    '<textarea id="cm_'+rp.report_id+'" placeholder="Nhận xét cho lần báo cáo này…"></textarea>'+
+    '<div class="dsp-eb"><button class="dsp-y" onclick="doEval(\''+rp.report_id+'\',\'Đạt\')">Đạt</button>'+
+    '<button class="dsp-n" onclick="doEval(\''+rp.report_id+'\',\'Không đạt\')">Không đạt</button>'+
+    '<button class="dsp-c" onclick="doEval(\''+rp.report_id+'\',\'\')">Chỉ lưu nhận xét</button></div></div>';
+}
+function dspEditEval(reportId){
+  var ph=document.getElementById('edit_'+reportId);
+  var rp=null; for(var i=0;i<DISP_RPT.length;i++){ if(DISP_RPT[i].report_id===reportId){ rp=DISP_RPT[i]; break; } }
+  if(ph&&rp) ph.innerHTML=dspEvalControls(rp);
+}
+
 function dspReportCard(rp, full){
   var enr=dspEnrById(rp.enroll_id);
   var photos=[rp.photo_1_id,rp.photo_2_id,rp.photo_3_id,rp.photo_4_id].filter(Boolean);
@@ -1869,17 +1940,21 @@ function dspReportCard(rp, full){
   var comm=[]; try{ comm=rp.comments_arr||JSON.parse(rp.comments||'[]'); }catch(e){ comm=[]; }
   if(!Array.isArray(comm)) comm=[];
   var cms=comm.length?comm.map(function(c){ return '<div class="dsp-cm"><b>'+dspEsc(c.user||'?')+'</b> <span>'+dspEsc(c.time||'')+'</span><br>'+dspEsc(c.comment||'')+'</div>'; }).join(''):'<div style="color:#bbb;font-size:12px">Chưa có nhận xét</div>';
+  var evaluated=!!rp.eval_result;
   var badge=rp.eval_result==='Đạt'?'<span class="dsp-b dsp-pass">✓ Đạt</span>':(rp.eval_result==='Không đạt'?'<span class="dsp-b dsp-fail">✗ Không đạt</span>':'<span class="dsp-b dsp-pend">Chưa chấm</span>');
+  var self=parseInt(rp.total_score,10)||0;
+  var tr=dspEvalScore(rp); var comb=dspTotalCombined(rp);
+  var scoreHtml='<div class="dsp-score"><div style="font-size:13px;line-height:1.5">Tự chấm <b>'+self+'</b>/3'+
+    '<br>Trade <b>'+(tr==null?'—':tr)+'</b>/3</div>'+
+    '<div style="margin-top:3px;font-size:18px">Σ '+(comb==null?'—':comb)+'/6</div></div>';
   var ctrl='';
   if(full){
-    ctrl='<div class="dsp-eval"><textarea id="cm_'+rp.report_id+'" placeholder="Nhận xét cho lần báo cáo này…"></textarea>'+
-      '<div class="dsp-eb"><button class="dsp-y" onclick="doEval(\''+rp.report_id+'\',\'Đạt\')">Đạt</button>'+
-      '<button class="dsp-n" onclick="doEval(\''+rp.report_id+'\',\'Không đạt\')">Không đạt</button>'+
-      '<button class="dsp-c" onclick="doEval(\''+rp.report_id+'\',\'\')">Chỉ lưu nhận xét</button></div></div>';
+    if(!evaluated){ ctrl=dspEvalControls(rp); }
+    else { ctrl='<div style="margin-top:8px;border-top:1px dashed #e0e0e0;padding-top:6px"><div style="font-size:12px;color:#888">Đã chấm bởi <b>'+dspEsc(rp.eval_by||'')+'</b> · '+dspEsc(rp.eval_at||'')+' <button onclick="dspEditEval(\''+rp.report_id+'\')" style="margin-left:8px;background:#eef;border:1px solid #ccd;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px">✎ Sửa đánh giá</button></div><div id="edit_'+rp.report_id+'"></div></div>'; }
   }
   return '<div class="dsp-card">'+
     '<div class="dsp-h"><div><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
-    '<div class="dsp-score">'+(rp.total_score||0)+'/3<br><small>'+(rp.visibility_pass==='YES'?'👁 Đạt':'👁 Không')+'</small></div></div>'+
+    scoreHtml+'</div>'+
     (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
     '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+
     '<div class="dsp-cms">'+cms+'</div>'+ctrl+'</div>';
@@ -1887,14 +1962,94 @@ function dspReportCard(rp, full){
 
 async function doEval(reportId, result){
   var ta=document.getElementById('cm_'+reportId); var comment=ta?ta.value.trim():'';
+  var sc=document.getElementById('sc_'+reportId); var score=sc?sc.value:'';
   if(!result && !comment){ alert('Nhập nhận xét hoặc chọn Đạt / Không đạt'); return; }
   var who=(CURRENT_ROLE==='manager')?'Manager':'Trade Marketing';
-  var payload={type:'DISPLAY_EVAL',report_id:reportId,eval_result:result,eval_by:who,actor_role:CURRENT_ROLE,comment:comment};
+  var payload={type:'DISPLAY_EVAL',report_id:reportId,eval_result:result,eval_score:result?score:'',eval_by:who,actor_role:CURRENT_ROLE,comment:comment};
   var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   try{
     var res=await fetch(SCRIPT_URL+'?data='+encodeURIComponent(b64)+'&_t='+Date.now()).then(function(x){return x.json();});
     if(res&&res.ok){ loadDisplay(true); } else { alert('Lỗi chấm điểm'); }
   }catch(e){ alert('Lỗi kết nối'); }
+}
+// ══════════════════════════════════════════════════════════
+// TAB TẶNG QUÀ (ĐỢT 2)
+// ══════════════════════════════════════════════════════════
+let GIFT_INV=[], GIFT_LOG=[], GIFT_LOADED=false;
+const GIFT_TYPES=[['binh_giu_nhiet','Bình giữ nhiệt'],['tap_de','Tạp dề'],['so_hoa_don','Sổ hóa đơn'],['so_tay','Sổ tay'],['but_viet','Bút viết'],['ao_mua','Áo mưa']];
+
+async function loadGift(force){
+  if(GIFT_LOADED && !force) return;
+  var inv=document.getElementById('gftInv'); if(inv) inv.innerHTML='<tr><td colspan="8" style="text-align:center;color:#888">Đang tải…</td></tr>';
+  try{
+    var r=await Promise.all([
+      fetch(SCRIPT_URL+'?action=getGiftInventory&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;}),
+      fetch(SCRIPT_URL+'?action=getGiftLog&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;})
+    ]);
+    GIFT_INV=(r[0]&&r[0].ok&&r[0].inventory)?r[0].inventory:[];
+    GIFT_LOG=(r[1]&&r[1].ok&&r[1].logs)?r[1].logs:[];
+    GIFT_LOADED=true;
+    renderGiftSummary(); renderGiftInv(); renderGiftLog();
+  }catch(e){ if(inv) inv.innerHTML='<tr><td colspan="8" style="text-align:center;color:#c00">Lỗi tải dữ liệu</td></tr>'; }
+}
+
+function renderGiftSummary(){
+  var regions=['GT South','GT Central','GT North'];
+  var by={}; regions.forEach(function(r){ by[r]={n:0,qty:0,nw:0,warn:0}; });
+  GIFT_LOG.forEach(function(g){
+    var b=by[g.region]; if(!b) return;
+    b.n++; b.qty+=parseInt(g.qty,10)||0;
+    if(String(g.outlet_is_new).toUpperCase()==='TRUE') b.nw++;
+    if(String(g.warning_shown).toUpperCase()==='TRUE') b.warn++;
+  });
+  var tot={n:0,qty:0,nw:0,warn:0}, rows='';
+  regions.forEach(function(r){ var b=by[r]; tot.n+=b.n;tot.qty+=b.qty;tot.nw+=b.nw;tot.warn+=b.warn;
+    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+b.n+'</td><td class="num">'+b.qty+'</td><td class="num">'+b.nw+'</td><td class="num">'+(b.warn?('<span style="color:#c62828;font-weight:700">'+b.warn+'</span>'):0)+'</td></tr>'; });
+  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.n+'</td><td class="num">'+tot.qty+'</td><td class="num">'+tot.nw+'</td><td class="num">'+tot.warn+'</td></tr>';
+  var el=document.getElementById('gftSummary'); if(el) el.innerHTML=GIFT_LOG.length?rows:'<tr><td colspan="5" style="text-align:center;color:#888">Chưa có lượt tặng nào</td></tr>';
+}
+
+function renderGiftInv(){
+  // pivot: salesman+region → {gift_type: {rem,open}}
+  var map={}; var order=[];
+  GIFT_INV.forEach(function(it){
+    var k=it.salesman+'||'+it.region;
+    if(!map[k]){ map[k]={salesman:it.salesman,region:it.region,g:{}}; order.push(k); }
+    map[k].g[it.gift_type]={rem:it.remaining,open:it.opening_qty};
+  });
+  var rows=order.map(function(k){
+    var m=map[k];
+    var cells=GIFT_TYPES.map(function(t){
+      var v=m.g[t[0]];
+      if(!v) return '<td class="num" style="color:#ccc">—</td>';
+      var col=(v.rem<=0)?'#c62828':(v.rem<=2?'#ef6c00':'#2e7d32');
+      return '<td class="num"><b style="color:'+col+'">'+v.rem+'</b><span style="color:#aaa">/'+v.open+'</span></td>';
+    }).join('');
+    return '<tr><td>'+dspEsc(m.salesman)+'</td><td>'+dspEsc(m.region)+'</td>'+cells+'</tr>';
+  }).join('');
+  var el=document.getElementById('gftInv'); if(el) el.innerHTML=order.length?rows:'<tr><td colspan="8" style="text-align:center;color:#888">Chưa thiết lập tồn quà (nhập tab Gift_Inventory)</td></tr>';
+}
+
+function renderGiftLog(){
+  var fr=(document.getElementById('gftFRegion')||{}).value||'';
+  var ft=(document.getElementById('gftFTrigger')||{}).value||'';
+  var fw=(document.getElementById('gftFWarn')||{}).value||'';
+  var trigLabel={ncd_65ml:'Mua NCD 65ml',new_outlet:'Điểm mới'};
+  var list=GIFT_LOG.filter(function(g){
+    if(fr && g.region!==fr) return false;
+    if(ft && g.trigger_type!==ft) return false;
+    if(fw==='1' && String(g.warning_shown).toUpperCase()!=='TRUE') return false;
+    return true;
+  });
+  list.sort(function(a,b){ return String(b.timestamp||'').localeCompare(String(a.timestamp||'')); });
+  var cnt=document.getElementById('gftLogCount'); if(cnt) cnt.textContent='('+list.length+')';
+  var rows=list.map(function(g){
+    var isNew=String(g.outlet_is_new).toUpperCase()==='TRUE';
+    var warn=String(g.warning_shown).toUpperCase()==='TRUE';
+    var ph=g.photo_id?'<a href="https://drive.google.com/file/d/'+g.photo_id+'/view" target="_blank" rel="noopener">🖼️</a>':'—';
+    return '<tr'+(warn?' style="background:#fff8f0"':'')+'><td>'+dspEsc((g.timestamp||'').slice(0,10))+'</td><td>'+dspEsc(g.salesman)+'</td><td>'+dspEsc(g.region)+'</td><td>'+dspEsc(g.outlet_name)+'</td><td>'+dspEsc(g.gift_label_vi||g.gift_type)+'</td><td class="num">'+dspEsc(g.qty)+'</td><td>'+dspEsc(trigLabel[g.trigger_type]||g.trigger_type)+'</td><td>'+(isNew?'🆕':'')+'</td><td>'+(warn?'<span style="color:#c62828">⚠️</span>':'')+'</td><td>'+ph+'</td></tr>';
+  }).join('');
+  var el=document.getElementById('gftLog'); if(el) el.innerHTML=list.length?rows:'<tr><td colspan="10" style="text-align:center;color:#888">Chưa có lượt tặng</td></tr>';
 }
 </script>
 </body>
