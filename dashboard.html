@@ -691,7 +691,7 @@ tr:hover td{background:rgba(255,255,255,.025);}
     </div>
     <div class="sec">Tồn quà theo nhân viên <small style="color:#888;font-weight:400">(còn lại / đầu kỳ)</small></div>
     <div class="tbl-card">
-      <table><thead><tr><th>Nhân viên</th><th>Vùng</th><th class="num">Bình giữ nhiệt</th><th class="num">Tạp dề</th><th class="num">Sổ hóa đơn</th><th class="num">Sổ tay</th><th class="num">Bút viết</th><th class="num">Áo mưa</th></tr></thead>
+      <table><thead id="gftInvHead"><tr><th>Nhân viên</th><th>Vùng</th><th class="num">Bình giữ nhiệt</th><th class="num">Tạp dề</th><th class="num">Sổ hóa đơn</th><th class="num">Sổ tay</th><th class="num">Bút viết</th><th class="num">Áo mưa</th></tr></thead>
       <tbody id="gftInv"><tr><td colspan="8" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
     </div>
     <div class="sec">Lịch sử tặng quà <span id="gftLogCount"></span></div>
@@ -1982,7 +1982,7 @@ async function doEval(reportId, result){
 // TAB TẶNG QUÀ (ĐỢT 2)
 // ══════════════════════════════════════════════════════════
 let GIFT_INV=[], GIFT_LOG=[], GIFT_LOADED=false;
-const GIFT_TYPES=[['binh_giu_nhiet','Bình giữ nhiệt'],['tap_de','Tạp dề'],['so_hoa_don','Sổ hóa đơn'],['so_tay','Sổ tay'],['but_viet','Bút viết'],['ao_mua','Áo mưa']];
+let GIFT_TYPES=[['binh_giu_nhiet','Bình giữ nhiệt'],['tap_de','Tạp dề'],['so_hoa_don','Sổ hóa đơn'],['so_tay','Sổ tay'],['but_viet','Bút viết'],['ao_mua','Áo mưa']];
 
 async function loadGift(force){
   if(GIFT_LOADED && !force) return;
@@ -1990,13 +1990,21 @@ async function loadGift(force){
   try{
     var r=await Promise.all([
       fetch(SCRIPT_URL+'?action=getGiftInventory&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;}),
-      fetch(SCRIPT_URL+'?action=getGiftLog&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;})
+      fetch(SCRIPT_URL+'?action=getGiftLog&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;}),
+      fetch(SCRIPT_URL+'?action=getInstoreConfig&_t='+Date.now()).then(function(x){return x.json();}).catch(function(){return null;})
     ]);
     GIFT_INV=(r[0]&&r[0].ok&&r[0].inventory)?r[0].inventory:[];
     GIFT_LOG=(r[1]&&r[1].ok&&r[1].logs)?r[1].logs:[];
+    var gt=(r[2]&&r[2].ok&&r[2].gift_types)?r[2].gift_types:null;
+    if(gt&&gt.length) GIFT_TYPES=gt.map(function(g){return [g.key,g.label];});
     GIFT_LOADED=true;
-    renderGiftSummary(); renderGiftInv(); renderGiftLog();
+    renderGiftSummary(); renderGiftInvHead(); renderGiftInv(); renderGiftLog();
   }catch(e){ if(inv) inv.innerHTML='<tr><td colspan="8" style="text-align:center;color:#c00">Lỗi tải dữ liệu</td></tr>'; }
+}
+
+function renderGiftInvHead(){
+  var el=document.getElementById('gftInvHead'); if(!el) return;
+  el.innerHTML='<tr><th>Nhân viên</th><th>Vùng</th>'+GIFT_TYPES.map(function(t){return '<th class="num">'+dspEsc(t[1])+'</th>';}).join('')+'</tr>';
 }
 
 function renderGiftSummary(){
@@ -2033,7 +2041,7 @@ function renderGiftInv(){
     }).join('');
     return '<tr><td>'+dspEsc(m.salesman)+'</td><td>'+dspEsc(m.region)+'</td>'+cells+'</tr>';
   }).join('');
-  var el=document.getElementById('gftInv'); if(el) el.innerHTML=order.length?rows:'<tr><td colspan="8" style="text-align:center;color:#888">Chưa thiết lập tồn quà (nhập tab Gift_Inventory)</td></tr>';
+  var el=document.getElementById('gftInv'); if(el) el.innerHTML=order.length?rows:'<tr><td colspan="'+(2+GIFT_TYPES.length)+'" style="text-align:center;color:#888">Chưa thiết lập tồn quà (nhập tab Gift_Inventory)</td></tr>';
 }
 
 function renderGiftLog(){

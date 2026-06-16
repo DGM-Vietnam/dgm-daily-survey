@@ -3062,7 +3062,7 @@ function confirmFraudSubmit() {
   "use strict";
   var G={ _cfg:null,_products:[],_inv:[],_loaded:false,_loading:null,
     _region:'',_scenario:'',_photo:'',_gps:null,
-    _market:'',_outlet:'',_warned:false,_purch:[],_giftKey:'',_giftLabel:'',_giftQty:1,_trigger:'ncd_65ml' };
+    _market:'',_outlet:'',_warned:false,_purch:[],_giftKey:'',_giftLabel:'',_giftQty:1,_trigger:'ncd_65ml',_triggerOther:'' };
   window.GiftMod=G;
 
   function $id(id){ return document.getElementById(id); }
@@ -3124,7 +3124,7 @@ function confirmFraudSubmit() {
     ensureOverlay().classList.add('show');
     $id('gftBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
     $id('gftFoot').style.display='none';
-    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._giftKey=''; G._giftLabel=''; G._giftQty=1; G._trigger='ncd_65ml';
+    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._giftKey=''; G._giftLabel=''; G._giftQty=1; G._trigger='ncd_65ml'; G._triggerOther='';
     try{ if(navigator.geolocation) navigator.geolocation.getCurrentPosition(function(p){ G._gps=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6); },function(){},{timeout:6000}); }catch(e){}
     loadData().then(function(){
       var r=userRegion();
@@ -3146,6 +3146,7 @@ function confirmFraudSubmit() {
     $id('gftFoot').style.display='none';
   }
   G.pickScenario=function(s){ G._scenario=s; G._trigger=(s==='new')?'new_outlet':'ncd_65ml'; (s==='new')?renderNewForm():renderExistForm(); $id('gftFoot').style.display=''; };
+  G.setTrigger=function(v){ G._trigger=v; var w=$id('gftOtherWrap'); if(w){ w.style.display=(v==='other')?'block':'none'; var t=$id('gftOtherTxt'); if(v==='other'&&t) t.focus(); } };
 
   function giftBlock(){
     var gts=(G._cfg.gift_types||[]);
@@ -3155,9 +3156,10 @@ function confirmFraudSubmit() {
         gts.map(function(g){return '<option value="'+esc(g.key)+'"'+(G._giftKey===g.key?' selected':'')+'>'+esc(g.label)+'</option>';}).join('')+'</select>'+
       (G._giftKey?('<div style="font-size:12px;margin-top:4px;color:'+(rem!=null&&rem<=0?'#c62828':'#2e7d32')+'">Tồn còn lại: '+(rem!=null?rem:'(chưa thiết lập)')+'</div>'):'')+
       '<div class="dspm-row" style="margin-top:6px"><div><div class="dspm-label">Số lượng quà</div><input class="dspm-input" type="number" min="1" value="'+G._giftQty+'" onchange="GiftMod.setGiftQty(this.value)"></div>'+
-      '<div><div class="dspm-label">Lý do tặng</div><select class="dspm-select" onchange="GiftMod._trigger=this.value">'+
-        (G._cfg.triggers||[]).filter(function(t){return G._scenario==='new'?t.key==='new_outlet':t.key!=='new_outlet';}).map(function(t){return '<option value="'+esc(t.key)+'"'+(G._trigger===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('')+
-        '</select></div></div>';
+      '<div><div class="dspm-label">Lý do tặng</div><select class="dspm-select" onchange="GiftMod.setTrigger(this.value)">'+
+        (G._cfg.triggers||[]).filter(function(t){ if(t.key==='new_outlet') return G._scenario==='new'; if(t.key==='ncd_65ml') return G._scenario!=='new'; return true; }).map(function(t){return '<option value="'+esc(t.key)+'"'+(G._trigger===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('')+
+        '</select></div></div>'+
+      '<div id="gftOtherWrap" style="margin-top:6px;display:'+(G._trigger==='other'?'block':'none')+'"><div class="dspm-label">Lý do khác (tự nhập)</div><input class="dspm-input" id="gftOtherTxt" placeholder="Nhập lý do tặng…" value="'+esc(G._triggerOther||'')+'" oninput="GiftMod._triggerOther=this.value"></div>';
   }
   function purchBlock(){
     var hasP=(G._products||[]).length>0;
@@ -3263,7 +3265,7 @@ function confirmFraudSubmit() {
     var photo=G._photo, region=G._region, date=tnow();
     var payload={type:'GIFT_LOG', gift_log_id:giftId, salesman:name, region:region,
       outlet_name:outletName, outlet_is_new:isNew, province:prov, market:market, sub_channel:'GT Outlet',
-      trigger_type:G._trigger, gift_type:G._giftKey, gift_label_vi:G._giftLabel, qty:G._giftQty,
+      trigger_type:(G._trigger==='other'?((G._triggerOther||'').trim()||'Khác'):G._trigger), gift_type:G._giftKey, gift_label_vi:G._giftLabel, qty:G._giftQty,
       purchased_sku:G._purch.filter(function(s){return s.product;}), gps:gps(),
       warning_shown:G._warned, notes:note };
     tt('📤 Đang lưu tặng quà…'); G.close();
