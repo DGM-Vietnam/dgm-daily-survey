@@ -1949,6 +1949,8 @@ function dspReportCard(rp, full){
   var evaluated=!!rp.eval_result;
   var badge=rp.eval_result==='Đạt'?'<span class="dsp-b dsp-pass">✓ Đạt</span>':(rp.eval_result==='Không đạt'?'<span class="dsp-b dsp-fail">✗ Không đạt</span>':'<span class="dsp-b dsp-pend">Chưa chấm</span>');
   var self=parseInt(rp.total_score,10)||0;
+  var framesInfo='';
+  if(rp.frame_seq_reported!=null && String(rp.frame_seq_reported)!==''){ var es=enr?(enr.frame_seq||''):''; framesInfo=' · khung #'+dspEsc(rp.frame_seq_reported)+((es&&String(es)!==String(rp.frame_seq_reported))?(' <span style="color:#c62828">(ĐK #'+dspEsc(es)+')</span>'):''); }
   var tr=dspEvalScore(rp); var comb=dspTotalCombined(rp);
   var scoreHtml='<div class="dsp-score"><div style="font-size:13px;line-height:1.5">Tự chấm <b>'+self+'</b>/3'+
     '<br>Trade <b>'+(tr==null?'—':tr)+'</b>/3</div>'+
@@ -1959,7 +1961,7 @@ function dspReportCard(rp, full){
     else { ctrl='<div style="margin-top:8px;border-top:1px dashed #e0e0e0;padding-top:6px"><div style="font-size:12px;color:#888">Đã chấm bởi <b>'+dspEsc(rp.eval_by||'')+'</b> · '+dspEsc(rp.eval_at||'')+' <button onclick="dspEditEval(\''+rp.report_id+'\')" style="margin-left:8px;background:#eef;border:1px solid #ccd;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px">✎ Sửa đánh giá</button></div><div id="edit_'+rp.report_id+'"></div></div>'; }
   }
   return '<div class="dsp-card">'+
-    '<div class="dsp-h"><div><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
+    '<div class="dsp-h"><div><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+framesInfo+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
     scoreHtml+'</div>'+
     (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
     '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+

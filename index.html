@@ -843,9 +843,7 @@ function _ingestTeam(list){
       email: String(m.email || '').trim()
     };
     const t = String(m.team || '').toLowerCase();
-    const ti = String(m.title || '').toLowerCase();
-    const isInventory = ti.includes('inventory') || ti.includes('kho');     // ĐỢT 3: quản kho vẫn được đăng nhập
-    const isBackOffice = !isInventory && (t.includes('back') || t.includes('office') || t.includes('digital') || t.includes('marketing'));
+    const isBackOffice = t.includes('back') || t.includes('office') || t.includes('digital') || t.includes('marketing');
     if (!isBackOffice) visible.push({ name: name, team: normalizeTeam(m.team) });
   });
   if (visible.length) { LIVE_TEAM = visible; renderStaffList(); }
@@ -945,16 +943,10 @@ function renderTypeCards(team) {
       <div class="type-card" onclick="showGTRegionPicker('other')"><div class="icon">📝</div><div class="title">GT Khác</div><div class="desc">Công việc GT khác</div></div>
     </div>`;
   } else {
-    var _ti = String((window.state&&state.user&&state.user.title)||'').toLowerCase();
-    if (_ti.includes('inventory') || _ti.includes('kho')) {
-      html += `<div class="type-cards"></div>`;   // ĐỢT 3: host trống để InvMod chèn thẻ Quản kho
-    } else {
-      html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
-    }
+    html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
   }
   cards.innerHTML = html;
-  try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày + Tặng quà
-  try{ if(window.InvMod) InvMod.injectCard(team); }catch(e){} // ĐỢT 3: thẻ Quản kho quà tặng (title=Inventory)
+  try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){} // ĐỢT 2
 }
 
 // ============ GT REGION PICKER (for MT/GT manager) ============
@@ -2931,16 +2923,17 @@ function confirmFraudSubmit() {
     var h='';
     h+='<div class="dspm-card"><div style="font-weight:700;color:#1565c0;font-size:15px">'+esc(e.outlet_name)+'</div>'+
        '<div style="font-size:12px;color:#888;margin-top:2px">'+esc(e.market||'')+' · '+esc(e.frame_type||'')+' · '+esc(e.campaign_name||'')+'</div></div>';
-    h+='<div class="dspm-card"><div class="dspm-label">Ngày báo cáo</div><input class="dspm-input" type="date" id="dspmRDate" value="'+tnow()+'">';
-    h+='<div class="dspm-label">4 ảnh bắt buộc</div><div class="dspm-ph">'+
+    h+='<div class="dspm-card"><div class="dspm-label">Ngày báo cáo *</div><input class="dspm-input" type="date" id="dspmRDate" value="'+tnow()+'">';
+    h+='<div class="dspm-label">Số thứ tự khung *</div><input class="dspm-input" type="text" id="dspmFrames" value="'+esc(e.frame_seq||'')+'" placeholder="STT đánh trên khung (vd: 1, K01...)">';
+    h+='<div class="dspm-label">4 ảnh bắt buộc *</div><div class="dspm-ph">'+
        slots.map(function(s){return photoSlot(s[0],s[1]);}).join('')+'</div>';
     h+='<div class="dspm-label">Ảnh bổ sung (tuỳ chọn)</div><div class="dspm-ph" id="dspmExtraWrap">'+photoSlot('extra_'+Date.now(),'+ Thêm ảnh',true)+'</div>';
-    h+='<div class="dspm-label">Khung dễ thấy từ ngoài?</div><div class="dspm-seg" id="dspmVis">'+
+    h+='<div class="dspm-label">Khung dễ thấy từ ngoài? *</div><div class="dspm-seg" id="dspmVis">'+
        '<button data-v="YES" onclick="DisplayMod.setVis(\'YES\')">Đạt (YES)</button>'+
        '<button data-v="NO" onclick="DisplayMod.setVis(\'NO\')">Không (NO)</button></div>';
-    h+='<div class="dspm-label">SKU thực tế + facing (so cam kết)</div><div id="dspmRSku"></div>'+
+    h+='<div class="dspm-label">SKU thực tế + facing (bắt buộc) *</div><div id="dspmRSku"></div>'+
        '<button class="dspm-add" onclick="DisplayMod.addRSku()">+ Thêm SKU</button>';
-    h+='<div class="dspm-label">Ghi chú</div><textarea class="dspm-input" id="dspmRNote" rows="2"></textarea>';
+    h+='<div class="dspm-label">Ghi chú (tuỳ chọn)</div><textarea class="dspm-input" id="dspmRNote" rows="2"></textarea>';
     h+='<label class="dspm-toggle" style="margin-top:12px"><input type="checkbox" id="dspmFinal"><span>Đây là báo cáo KẾT THÚC chương trình</span></label>';
     h+='</div>';
     $id('dspmBody').innerHTML=h;
@@ -3011,14 +3004,23 @@ function confirmFraudSubmit() {
     var rep=DisplayMod._rep; if(!rep) return;
     var need=['photo_1','photo_2','photo_3','photo_4'];
     for(var i=0;i<need.length;i++){ if(!DisplayMod._photos[need[i]]){ tt('⚠️ Thiếu '+(i+1)+'/4 ảnh bắt buộc'); return; } }
+    var rdate=($id('dspmRDate')&&$id('dspmRDate').value)||'';
+    if(!rdate){ tt('⚠️ Chọn ngày báo cáo'); return; }
+    var framesEl=$id('dspmFrames'); var framesV=framesEl?String(framesEl.value).trim():'';
+    if(framesV===''){ tt('⚠️ Nhập số thứ tự khung'); return; }
     if(!DisplayMod._vis){ tt('⚠️ Chọn khung dễ thấy hay không'); return; }
+    var skus=DisplayMod._rep.skus||[];
+    var partial=skus.some(function(s){ var hp=!!(s.product&&String(s.product).trim()); var hf=(s.facing!==''&&s.facing!=null); return hp!==hf; });
+    if(partial){ tt('⚠️ Mỗi dòng SKU cần đủ tên SP và facing'); return; }
+    var skuFilled=skus.filter(function(s){ return s.product&&String(s.product).trim()&&s.facing!==''&&s.facing!=null; });
+    if(!skuFilled.length){ tt('⚠️ Nhập ít nhất 1 SKU + facing thực tế'); return; }
     var e=rep.enroll;
-    var rdate=($id('dspmRDate')&&$id('dspmRDate').value)||tnow();
     rep.report_date=rdate;
     var payload={type:'DISPLAY_REPORT', report_id:rep.report_id, enroll_id:e.enroll_id, outlet_name:e.outlet_name,
       region:DisplayMod._region, salesman:(state.user&&state.user.name)||'', report_date:rdate,
       campaign_name:e.campaign_name||'', visibility_pass:DisplayMod._vis,
-      sku_actual:rep.skus.filter(function(s){return s.product;}),
+      frame_seq_reported:framesV,
+      sku_actual:skuFilled,
       notes:($id('dspmRNote')&&$id('dspmRNote').value)||'', is_final:($id('dspmFinal')&&$id('dspmFinal').checked)?true:false };
     var photos=DisplayMod._photos;            // giữ tham chiếu cho upload nền
     // ĐÓNG NGAY — gửi lạc quan (cảm giác tức thì)
@@ -3303,320 +3305,6 @@ function confirmFraudSubmit() {
 })();
 </script>
 <!-- ===================== /DGM GIFT MODULE ===================== -->
-
-<!-- ===================== DGM INVENTORY MODULE (Quản kho quà tặng & POSM) =====================
-     CÔ LẬP: namespace InvMod, overlay riêng (invOverlay), dùng lại CSS .dspm-.
-     Hiển thị cho user có Title = "Inventory" (hoặc Sales Manager).
-     Phụ thuộc: state.user{name,team,title}, state.scriptUrl, toast,
-                backend getWarehouse / getIssueLog / getInvRecipients / WAREHOUSE_MASTER / WAREHOUSE_STOCKIN / GIFT_ISSUE.
-
-     >>> CÁCH GẮN (1 dòng): trong renderTypeCards(), ngay sau dòng
-         try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){}
-         thêm:
-         try{ if(window.InvMod) InvMod.injectCard(team); }catch(e){}
-     ============================================================================================ -->
-<script id="inv-script">
-(function(){
-  "use strict";
-  var I = { _wh:[], _recips:[], _loaded:false, _tab:'stock',
-            _total:0, _low:0, _editKey:'' };
-  window.InvMod = I;
-
-  function $id(id){ return document.getElementById(id); }
-  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
-  function tt(m){ try{ if(typeof toast==='function') toast(m); else alert(m);}catch(e){alert(m);} }
-  function fmtVND(n){ n=parseFloat(n||0)||0; return n.toLocaleString('vi-VN')+'đ'; }
-  function me(){ try{ return (state.user&&state.user.name)||''; }catch(e){ return ''; } }
-  function myTitle(){ try{ return String((state.user&&state.user.title)||'').toLowerCase(); }catch(e){ return ''; } }
-  function canUse(){ var t=myTitle(); return t.indexOf('inventory')>=0 || t.indexOf('kho')>=0 || t.indexOf('manager')>=0; }
-
-  // ---- gắn thẻ vào menu ----
-  I.injectCard = function(team){
-    try{
-      if(!canUse()) return;
-      var wrap = $id('typeCards'); if(!wrap) return;
-      var host = wrap.querySelector('.type-cards');
-      if(!host){ host=document.createElement('div'); host.className='type-cards'; wrap.appendChild(host); }
-      if(host.querySelector('[data-inv]')) return;
-      var c=document.createElement('div');
-      c.className='type-card'; c.setAttribute('data-inv','1');
-      c.style.cssText='border-color:#4E342E;background:#efebe9';
-      c.onclick=function(){ I.open(); };
-      c.innerHTML='<div class="icon">📦</div><div class="title" style="color:#4E342E">Quản kho quà tặng</div><div class="desc">Tồn kho công ty · Xuất hàng · POSM</div>';
-      host.appendChild(c);
-    }catch(e){}
-  };
-
-  // ---- tải dữ liệu ----
-  function load(force){
-    var url=state.scriptUrl;
-    return Promise.all([
-      fetch(url+'?action=getWarehouse&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
-      (I._recips.length&&!force)?Promise.resolve(null):fetch(url+'?action=getInvRecipients&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;})
-    ]).then(function(res){
-      if(res[0]&&res[0].ok){ I._wh=res[0].items||[]; I._total=res[0].total_value||0; I._low=res[0].low_count||0; }
-      if(res[1]&&res[1].ok){ I._recips=res[1].recipients||[]; }
-      I._loaded=true;
-    });
-  }
-
-  // ---- overlay ----
-  function ensureOverlay(){
-    var ov=$id('invOverlay'); if(ov) return ov;
-    ov=document.createElement('div'); ov.id='invOverlay'; ov.className='dspm-overlay';
-    ov.innerHTML=
-      '<div class="dspm-head" style="background:#4E342E"><button class="dspm-back" onclick="InvMod.close()">‹</button><h2>Quản kho quà tặng &amp; POSM</h2></div>'+
-      '<div style="display:flex;border-bottom:1px solid #e0d7d2;background:#fff;position:sticky;top:0;z-index:2" id="invTabs">'+
-        tabBtn('stock','📦 Tồn kho')+tabBtn('issue','📤 Xuất hàng')+tabBtn('master','➕ Master')+tabBtn('log','🕘 Lịch sử')+
-      '</div>'+
-      '<div class="dspm-body" id="invBody"></div>';
-    document.body.appendChild(ov);
-    return ov;
-  }
-  function tabBtn(k,label){
-    return '<button data-tab="'+k+'" onclick="InvMod.tab(\''+k+'\')" '+
-      'style="flex:1;padding:11px 4px;border:none;background:transparent;font-size:12.5px;font-weight:700;cursor:pointer;color:#8d6e63;border-bottom:3px solid transparent">'+label+'</button>';
-  }
-  function paintTabs(){
-    var t=$id('invTabs'); if(!t) return;
-    Array.prototype.forEach.call(t.querySelectorAll('button'),function(b){
-      var on=b.getAttribute('data-tab')===I._tab;
-      b.style.color=on?'#4E342E':'#8d6e63';
-      b.style.borderBottomColor=on?'#4E342E':'transparent';
-    });
-  }
-
-  I.open=function(){
-    if(!canUse()){ tt('Tài khoản này không có quyền quản kho'); return; }
-    ensureOverlay().classList.add('show');
-    I._tab='stock';
-    $id('invBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
-    load(false).then(function(){ render(); }).catch(function(){ $id('invBody').innerHTML='<div class="dspm-empty">Không tải được dữ liệu.</div>'; });
-  };
-  I.close=function(){ var ov=$id('invOverlay'); if(ov) ov.classList.remove('show'); };
-  I.tab=function(k){ I._tab=k; render(); };
-
-  function render(){
-    paintTabs();
-    if(I._tab==='stock') return renderStock();
-    if(I._tab==='issue') return renderIssue();
-    if(I._tab==='master') return renderMaster();
-    if(I._tab==='log') return renderLog();
-  }
-
-  // ===== TAB 1: TỒN KHO =====
-  function renderStock(){
-    var rows=I._wh.slice().sort(function(a,b){ return (a.low===b.low)?0:(a.low?-1:1); });
-    var html=''+
-      '<div class="dspm-card" style="background:#4E342E;color:#fff">'+
-        '<div style="font-size:12px;opacity:.85">Tổng giá trị tồn kho</div>'+
-        '<div style="font-size:22px;font-weight:800">'+fmtVND(I._total)+'</div>'+
-        '<div style="font-size:12px;margin-top:4px">'+I._wh.length+' loại · '+
-          (I._low>0?('<span style="color:#ffcc80">⚠ '+I._low+' loại dưới ngưỡng</span>'):'<span style="color:#a5d6a7">đủ tồn</span>')+'</div>'+
-      '</div>';
-    if(!rows.length){ html+='<div class="dspm-empty">Chưa có dữ liệu. Sang tab Master để thêm mã quà.</div>'; $id('invBody').innerHTML=html; return; }
-    html+='<div class="dspm-card">';
-    rows.forEach(function(r){
-      var color=r.low?'#c62828':'#2e7d32';
-      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #f0e9e6">'+
-        '<div style="min-width:0"><div style="font-weight:700;font-size:14px">'+esc(r.gift_label_vi)+(r.low?' <span style="color:#c62828">⚠</span>':'')+'</div>'+
-          '<div style="font-size:11.5px;color:#8d6e63">'+fmtVND(r.unit_value)+'/cái · đã xuất '+r.issued+(r.notes?(' · '+esc(r.notes)):'')+'</div></div>'+
-        '<div style="text-align:right;white-space:nowrap"><div style="font-weight:800;font-size:17px;color:'+color+'">'+r.on_hand+'</div>'+
-          '<div style="font-size:10.5px;color:#8d6e63">'+fmtVND(r.value_on_hand)+'</div></div>'+
-      '</div>';
-    });
-    html+='</div>';
-    $id('invBody').innerHTML=html;
-  }
-
-  // ===== TAB 2: XUẤT HÀNG =====
-  function renderIssue(){
-    if(!I._dest) I._dest='sales';
-    var gifts=I._wh.slice();
-    var reasons=['Giao cho team/NV','Sự kiện / activation','Sampling','Trưng bày / POSM','Bù hao hụt','Khác'];
-    var html='<div class="dspm-card">'+
-      '<div class="dspm-label">Hình thức xuất</div>'+
-      '<div style="display:flex;gap:8px;margin-bottom:10px">'+destBtn('sales','🧑‍💼 Giao NV Sales')+destBtn('central','🏢 Nội bộ / Trade / Sự kiện')+'</div>'+
-      '<div class="dspm-label">Loại quà / POSM</div>'+
-      '<select class="dspm-select" id="iss_gift" onchange="InvMod._remainHint()"><option value="">— Chọn —</option>'+
-        gifts.map(function(r){return '<option value="'+esc(r.gift_type)+'" data-rem="'+r.on_hand+'" data-label="'+esc(r.gift_label_vi)+'">'+esc(r.gift_label_vi)+' (tồn '+r.on_hand+')</option>';}).join('')+
-      '</select>'+
-      '<div id="iss_remain" style="font-size:12px;margin-top:4px;color:#8d6e63"></div>'+
-      '<div class="dspm-row" style="margin-top:8px">'+
-        '<div><div class="dspm-label">Số lượng xuất</div><input class="dspm-input" id="iss_qty" type="number" min="1" value="1"></div>'+
-        '<div><div class="dspm-label">Vùng / nơi nhận</div><select class="dspm-select" id="iss_region">'+
-          ['','GT South','GT Central','GT North','MT','B2B/HoReCa','Văn phòng'].map(function(v){return '<option value="'+v+'">'+(v||'—')+'</option>';}).join('')+'</select></div>'+
-      '</div>'+
-      '<div id="iss_rcp_sales" style="display:'+(I._dest==='sales'?'block':'none')+'">'+
-        '<div class="dspm-label" style="margin-top:8px">NV / team Sales nhận (cộng tồn để phát ở cửa hàng)</div>'+
-        '<select class="dspm-select" id="iss_to"><option value="">— Chọn người nhận —</option>'+
-          I._recips.map(function(p){return '<option value="'+esc(p.name)+'" data-team="'+esc(p.team)+'">'+esc(p.name)+(p.team?(' · '+esc(p.team)):'')+'</option>';}).join('')+
-        '</select>'+
-      '</div>'+
-      '<div id="iss_rcp_central" style="display:'+(I._dest==='central'?'block':'none')+'">'+
-        '<div class="dspm-label" style="margin-top:8px">Giao cho / mục đích (chỉ ghi nhận — KHÔNG cộng tồn NV Sales)</div>'+
-        '<input class="dspm-input" id="iss_to_central" placeholder="VD: Trade Marketing / Manager / Sự kiện...">'+
-        '<div style="margin-top:6px">'+['Trade Marketing','Manager','Sự kiện / Activation','HoReCa / B2B'].map(function(v){return '<span onclick="InvMod._pickCentral(\''+v+'\')" style="display:inline-block;border:1px solid #4E342E;color:#4E342E;border-radius:14px;padding:3px 10px;font-size:12px;margin:0 6px 6px 0;cursor:pointer">'+v+'</span>';}).join('')+'</div>'+
-      '</div>'+
-      '<div class="dspm-label" style="margin-top:8px">Lý do xuất</div>'+
-      '<select class="dspm-select" id="iss_reason">'+reasons.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select>'+
-      '<input class="dspm-input" id="iss_note" placeholder="Ghi chú thêm (tuỳ chọn)" style="margin-top:8px">'+
-      '<div id="iss_hint" style="font-size:11.5px;color:#8d6e63;margin-top:10px"></div>'+
-      '<button class="dspm-btn dspm-btn-primary" style="background:#4E342E;width:100%;margin-top:12px" onclick="InvMod.submitIssue()">📤 Xuất hàng &amp; trừ kho</button>'+
-    '</div>';
-    $id('invBody').innerHTML=html;
-    paintDest(); updateIssHint();
-    var sel=$id('iss_to'); if(sel) sel.onchange=function(){ var o=sel.options[sel.selectedIndex]; var tm=o&&o.getAttribute('data-team')||''; var rg=$id('iss_region'); if(rg&&tm){ for(var i=0;i<rg.options.length;i++){ if(rg.options[i].value===tm){ rg.selectedIndex=i; break; } } } };
-  }
-  function destBtn(k,label){ return '<button data-dest="'+k+'" onclick="InvMod.setDest(\''+k+'\')" style="flex:1;padding:9px 4px;border:1.5px solid #4E342E;border-radius:8px;background:#fff;color:#4E342E;font-size:12.5px;font-weight:700;cursor:pointer">'+label+'</button>'; }
-  function paintDest(){ var w=$id('invBody'); if(!w) return; Array.prototype.forEach.call(w.querySelectorAll('[data-dest]'),function(b){ var on=b.getAttribute('data-dest')===I._dest; b.style.background=on?'#4E342E':'#fff'; b.style.color=on?'#fff':'#4E342E'; }); }
-  function updateIssHint(){ var el=$id('iss_hint'); if(!el) return; el.innerHTML=(I._dest==='central')?'🏢 Nội bộ/Trade: chỉ trừ tồn kho công ty &amp; ghi nhận. <b>Không</b> cộng tồn NV Sales — team sales không thấy.':'🧑‍💼 Giao NV Sales: trừ kho công ty &amp; cộng thẳng vào tồn quà của NV → họ phát &amp; báo cáo như thường.'; }
-  I.setDest=function(k){ I._dest=k; var a=$id('iss_rcp_sales'),b=$id('iss_rcp_central'); if(a)a.style.display=(k==='sales')?'block':'none'; if(b)b.style.display=(k==='central')?'block':'none'; paintDest(); updateIssHint(); };
-  I._pickCentral=function(v){ var t=$id('iss_to_central'); if(t) t.value=v; };
-  I._remainHint=function(){
-    var s=$id('iss_gift'); var el=$id('iss_remain'); if(!s||!el) return;
-    var o=s.options[s.selectedIndex]; var rem=o?parseInt(o.getAttribute('data-rem')||'0',10):0;
-    el.innerHTML = s.value ? ('Tồn kho công ty: <b style="color:'+(rem<=0?'#c62828':'#2e7d32')+'">'+rem+'</b>') : '';
-  };
-  I.submitIssue=function(){
-    var g=$id('iss_gift'); var key=g?g.value:''; if(!key){ tt('⚠️ Chọn loại quà'); return; }
-    var label=g.options[g.selectedIndex].getAttribute('data-label')||'';
-    var qty=parseFloat(($id('iss_qty')||{}).value||'0')||0; if(qty<=0){ tt('⚠️ Số lượng > 0'); return; }
-    var dest=I._dest||'sales';
-    var to = dest==='central' ? ((($id('iss_to_central')||{}).value)||'').trim() : (($id('iss_to')||{}).value||'');
-    if(!to){ tt(dest==='central'?'⚠️ Nhập nơi nhận / mục đích':'⚠️ Chọn người nhận'); return; }
-    var region=($id('iss_region')||{}).value||'';
-    var reason=($id('iss_reason')||{}).value||'';
-    var note=($id('iss_note')||{}).value||'';
-    var rem=parseInt((g.options[g.selectedIndex].getAttribute('data-rem')||'0'),10);
-    var force=false;
-    if(qty>rem){ if(!confirm('Số lượng xuất ('+qty+') vượt tồn kho công ty ('+rem+'). Vẫn xuất (tồn sẽ âm)?')) return; force=true; }
-    send({ type:'GIFT_ISSUE', gift_type:key, gift_label_vi:label, qty:qty, dest_type:dest,
-           to_salesman:to, to_region:region, reason:reason, issued_by:me(), notes:note, force:force })
-    .then(function(res){
-      if(res&&res.ok){ tt('✅ Đã xuất '+qty+' '+label+(dest==='central'?(' (nội bộ) → '+to):(' → '+to))+'. Tồn kho còn '+res.company_remaining); reloadThen('stock'); }
-      else if(res&&res.error==='over_stock'){ tt('⚠️ Vượt tồn ('+res.remaining+'). Bấm lại để xác nhận.'); }
-      else tt('⚠️ Lưu lỗi, thử lại.');
-    }).catch(function(){ tt('⚠️ Mất mạng — chưa lưu được.'); });
-  };
-
-  // ===== TAB 3: MASTER (thêm/sửa + nhập thêm) =====
-  function renderMaster(){
-    var e=I._wh.filter(function(r){return r.gift_type===I._editKey;})[0]||null;
-    var html='<div class="dspm-card">'+
-      '<div class="dspm-label" style="font-weight:800;color:#4E342E">'+(e?'Sửa: '+esc(e.gift_label_vi):'Thêm mã quà / POSM mới')+'</div>'+
-      '<div class="dspm-label" style="margin-top:6px">Tên quà / POSM *</div>'+
-      '<input class="dspm-input" id="m_label" value="'+(e?esc(e.gift_label_vi):'')+'" placeholder="VD: Bình giữ nhiệt Ayam / Kệ POSM cốt dừa">'+
-      '<div class="dspm-row" style="margin-top:8px">'+
-        '<div><div class="dspm-label">Giá trị (VND/cái)</div><input class="dspm-input" id="m_value" type="number" min="0" value="'+(e?e.unit_value:'')+'"></div>'+
-        '<div><div class="dspm-label">'+(e?'Tồn hiện tại':'Tồn ban đầu')+'</div><input class="dspm-input" id="m_open" type="number" min="0" value="'+(e?e.opening_qty:'')+'"></div>'+
-      '</div>'+
-      '<div class="dspm-row" style="margin-top:8px">'+
-        '<div><div class="dspm-label">Ngưỡng cảnh báo</div><input class="dspm-input" id="m_min" type="number" min="0" value="'+(e?e.min_qty:'')+'"></div>'+
-        '<div><div class="dspm-label">Ghi chú (brand…)</div><input class="dspm-input" id="m_note" value="'+(e?esc(e.notes):'')+'"></div>'+
-      '</div>'+
-      '<input type="hidden" id="m_key" value="'+(e?esc(e.gift_type):'')+'">'+
-      '<button class="dspm-btn dspm-btn-primary" style="background:#4E342E;width:100%;margin-top:12px" onclick="InvMod.submitMaster()">💾 '+(e?'Cập nhật':'Thêm vào kho')+'</button>'+
-      (e?'<button class="dspm-btn dspm-btn-ghost" style="width:100%;margin-top:8px" onclick="InvMod.newMaster()">+ Thêm mã mới</button>':'')+
-    '</div>';
-    // danh sách để sửa nhanh
-    if(I._wh.length){
-      html+='<div class="dspm-card"><div class="dspm-label" style="font-weight:700">Danh mục hiện có (chạm để sửa)</div>';
-      I._wh.forEach(function(r){
-        html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f0e9e6">'+
-          '<div onclick="InvMod.edit(\''+esc(r.gift_type)+'\')" style="cursor:pointer;flex:1"><b>'+esc(r.gift_label_vi)+'</b> '+
-            '<span style="font-size:11px;color:#8d6e63">tồn '+r.on_hand+' · '+fmtVND(r.unit_value)+'</span></div>'+
-          '<button onclick="InvMod.stockIn(\''+esc(r.gift_type)+'\',\''+esc(r.gift_label_vi)+'\')" '+
-            'style="border:1px solid #4E342E;background:#fff;color:#4E342E;border-radius:8px;padding:4px 10px;font-size:12px;font-weight:700;cursor:pointer">+ Nhập</button>'+
-        '</div>';
-      });
-      html+='</div>';
-    }
-    $id('invBody').innerHTML=html;
-  }
-  I.edit=function(k){ I._editKey=k; renderMaster(); };
-  I.newMaster=function(){ I._editKey=''; renderMaster(); };
-  I.submitMaster=function(){
-    var label=($id('m_label')||{}).value; if(!label||!label.trim()){ tt('⚠️ Nhập tên quà'); return; }
-    send({ type:'WAREHOUSE_MASTER', gift_type:($id('m_key')||{}).value||'', gift_label_vi:label.trim(),
-           unit_value:($id('m_value')||{}).value||'', opening_qty:($id('m_open')||{}).value||'',
-           min_qty:($id('m_min')||{}).value||'', notes:($id('m_note')||{}).value||'' })
-    .then(function(res){ if(res&&res.ok){ tt('✅ Đã lưu master'); I._editKey=''; reloadThen('master'); } else tt('⚠️ Lưu lỗi'); })
-    .catch(function(){ tt('⚠️ Mất mạng'); });
-  };
-  I.stockIn=function(key,label){
-    var q=prompt('Nhập thêm bao nhiêu "'+label+'" vào kho công ty?','0');
-    if(q===null) return; var n=parseFloat(q)||0; if(n<=0){ tt('⚠️ Số lượng > 0'); return; }
-    send({ type:'WAREHOUSE_STOCKIN', gift_type:key, qty:n })
-    .then(function(res){ if(res&&res.ok){ tt('✅ Đã nhập +'+n+'. Tồn mới '+res.opening_qty); reloadThen('master'); } else tt('⚠️ Lỗi'); })
-    .catch(function(){ tt('⚠️ Mất mạng'); });
-  };
-
-  // ===== TAB 4: LỊCH SỬ =====
-  function renderLog(){
-    $id('invBody').innerHTML='<div class="dspm-empty">Đang tải lịch sử…</div>';
-    fetch(state.scriptUrl+'?action=getIssueLog&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();})
-    .then(function(res){
-      var logs=(res&&res.ok&&res.logs)?res.logs:[];
-      if(!logs.length){ $id('invBody').innerHTML='<div class="dspm-empty">Chưa có lượt xuất nào.</div>'; return; }
-      var html='<div class="dspm-card">';
-      logs.forEach(function(l){
-        var central=String(l.dest_type||'').toLowerCase()==='central';
-        var dtag=central?'🏢 ':'🧑‍💼 ';
-        var stag=central?' · 🏢 nội bộ (không cộng tồn NV)':(l.synced_inv==='TRUE'?' · ✓ đã cộng tồn NV':'');
-        html+='<div style="padding:9px 0;border-bottom:1px solid #f0e9e6">'+
-          '<div style="display:flex;justify-content:space-between"><b style="font-size:13.5px">'+esc(l.gift_label_vi||l.gift_type)+'</b>'+
-            '<span style="font-weight:800;color:#4E342E">−'+esc(l.qty)+'</span></div>'+
-          '<div style="font-size:11.5px;color:#8d6e63">→ '+dtag+esc(l.to_salesman||'')+(l.to_region?(' ('+esc(l.to_region)+')'):'')+' · '+esc(l.reason||'')+'</div>'+
-          '<div style="font-size:10.5px;color:#a1887f">'+esc(l.issued_at||'')+(l.issued_by?(' · bởi '+esc(l.issued_by)):'')+stag+'</div>'+
-        '</div>';
-      });
-      html+='</div>';
-      $id('invBody').innerHTML=html;
-    }).catch(function(){ $id('invBody').innerHTML='<div class="dspm-empty">Không tải được lịch sử.</div>'; });
-  }
-
-  // ===== gửi backend (GET ?data=base64, như GIFT_LOG) =====
-  function send(payload){
-    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-    return fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();});
-  }
-  function reloadThen(tab){ load(true).then(function(){ I._tab=tab||I._tab; render(); }); }
-})();
-</script>
-<!-- ===================== /DGM INVENTORY MODULE ===================== -->
-
-
-<!-- ===== DGM OVERLAY POSITION PERSIST (giữ vị trí khi refresh) ===== -->
-<script id="overlay-persist">
-(function(){
-  "use strict";
-  var MODS={display:'DisplayMod',gift:'GiftMod',inv:'InvMod'};
-  function save(mod,M){ try{ sessionStorage.setItem('dgm_overlay', JSON.stringify({mod:mod, tab:(M&&M._tab)||null})); }catch(e){} }
-  function clr(){ try{ sessionStorage.removeItem('dgm_overlay'); }catch(e){} }
-  // Bọc open/close/tab để nhớ overlay đang mở (không sửa logic gốc của module)
-  Object.keys(MODS).forEach(function(mod){
-    var M=window[MODS[mod]]; if(!M) return;
-    if(typeof M.open==='function'){ var _o=M.open; M.open=function(){ var r=_o.apply(M,arguments); save(mod,M); return r; }; }
-    if(typeof M.close==='function'){ var _c=M.close; M.close=function(){ clr(); return _c.apply(M,arguments); }; }
-    if(typeof M.tab==='function'){ var _t=M.tab; M.tab=function(k){ var r=_t.apply(M,arguments); save(mod,M); return r; }; }
-  });
-  // Khôi phục overlay SAU khi session phục hồi màn hình nền
-  function restore(){
-    try{
-      if(!sessionStorage.getItem('dgm_session')){ clr(); return; }   // chưa đăng nhập → bỏ
-      var raw=sessionStorage.getItem('dgm_overlay'); if(!raw) return;
-      var o=JSON.parse(raw); if(!o||!o.mod) return;
-      var M=window[MODS[o.mod]]; if(!M||typeof M.open!=='function') return;
-      M.open();
-      if(o.tab && typeof M.tab==='function'){ setTimeout(function(){ try{M.tab(o.tab);}catch(e){} },60); }
-    }catch(e){}
-  }
-  if(document.readyState==='complete'){ setTimeout(restore,90); }
-  else window.addEventListener('load', function(){ setTimeout(restore,90); });
-})();
-</script>
-<!-- ===== /DGM OVERLAY POSITION PERSIST ===== -->
 
 </body>
 </html>
