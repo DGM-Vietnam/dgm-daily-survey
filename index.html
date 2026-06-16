@@ -843,7 +843,9 @@ function _ingestTeam(list){
       email: String(m.email || '').trim()
     };
     const t = String(m.team || '').toLowerCase();
-    const isBackOffice = t.includes('back') || t.includes('office') || t.includes('digital') || t.includes('marketing');
+    const ti = String(m.title || '').toLowerCase();
+    const isInventory = ti.includes('inventory') || ti.includes('kho');     // ĐỢT 3: quản kho vẫn được đăng nhập
+    const isBackOffice = !isInventory && (t.includes('back') || t.includes('office') || t.includes('digital') || t.includes('marketing'));
     if (!isBackOffice) visible.push({ name: name, team: normalizeTeam(m.team) });
   });
   if (visible.length) { LIVE_TEAM = visible; renderStaffList(); }
@@ -943,7 +945,12 @@ function renderTypeCards(team) {
       <div class="type-card" onclick="showGTRegionPicker('other')"><div class="icon">📝</div><div class="title">GT Khác</div><div class="desc">Công việc GT khác</div></div>
     </div>`;
   } else {
-    html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
+    var _ti = String((window.state&&state.user&&state.user.title)||'').toLowerCase();
+    if (_ti.includes('inventory') || _ti.includes('kho')) {
+      html += `<div class="type-cards"></div>`;   // ĐỢT 3: host trống để InvMod chèn thẻ Quản kho
+    } else {
+      html += `<div style="padding:20px;text-align:center;color:var(--text2)"><div style="font-size:40px">👁️</div><p style="margin-top:12px">Tài khoản Back Office / Marketing chỉ xem dashboard.<br>Dùng Looker Studio để xem báo cáo.</p></div>`;
+    }
   }
   cards.innerHTML = html;
   try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày + Tặng quà
