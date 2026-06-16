@@ -3431,9 +3431,12 @@ function confirmFraudSubmit() {
 
   // ===== TAB 2: XUẤT HÀNG =====
   function renderIssue(){
-    var gifts=I._wh.filter(function(r){ return r.on_hand>0 || true; });
+    if(!I._dest) I._dest='sales';
+    var gifts=I._wh.slice();
     var reasons=['Giao cho team/NV','Sự kiện / activation','Sampling','Trưng bày / POSM','Bù hao hụt','Khác'];
     var html='<div class="dspm-card">'+
+      '<div class="dspm-label">Hình thức xuất</div>'+
+      '<div style="display:flex;gap:8px;margin-bottom:10px">'+destBtn('sales','🧑‍💼 Giao NV Sales')+destBtn('central','🏢 Nội bộ / Trade / Sự kiện')+'</div>'+
       '<div class="dspm-label">Loại quà / POSM</div>'+
       '<select class="dspm-select" id="iss_gift" onchange="InvMod._remainHint()"><option value="">— Chọn —</option>'+
         gifts.map(function(r){return '<option value="'+esc(r.gift_type)+'" data-rem="'+r.on_hand+'" data-label="'+esc(r.gift_label_vi)+'">'+esc(r.gift_label_vi)+' (tồn '+r.on_hand+')</option>';}).join('')+
@@ -3441,23 +3444,35 @@ function confirmFraudSubmit() {
       '<div id="iss_remain" style="font-size:12px;margin-top:4px;color:#8d6e63"></div>'+
       '<div class="dspm-row" style="margin-top:8px">'+
         '<div><div class="dspm-label">Số lượng xuất</div><input class="dspm-input" id="iss_qty" type="number" min="1" value="1"></div>'+
-        '<div><div class="dspm-label">Vùng nhận</div><select class="dspm-select" id="iss_region">'+
-          ['','GT South','GT Central','GT North','MT','B2B/HoReCa'].map(function(v){return '<option value="'+v+'">'+(v||'—')+'</option>';}).join('')+'</select></div>'+
+        '<div><div class="dspm-label">Vùng / nơi nhận</div><select class="dspm-select" id="iss_region">'+
+          ['','GT South','GT Central','GT North','MT','B2B/HoReCa','Văn phòng'].map(function(v){return '<option value="'+v+'">'+(v||'—')+'</option>';}).join('')+'</select></div>'+
       '</div>'+
-      '<div class="dspm-label" style="margin-top:8px">Người / team nhận</div>'+
-      '<select class="dspm-select" id="iss_to"><option value="">— Chọn người nhận —</option>'+
-        I._recips.map(function(p){return '<option value="'+esc(p.name)+'" data-team="'+esc(p.team)+'">'+esc(p.name)+(p.team?(' · '+esc(p.team)):'')+'</option>';}).join('')+
-      '</select>'+
+      '<div id="iss_rcp_sales" style="display:'+(I._dest==='sales'?'block':'none')+'">'+
+        '<div class="dspm-label" style="margin-top:8px">NV / team Sales nhận (cộng tồn để phát ở cửa hàng)</div>'+
+        '<select class="dspm-select" id="iss_to"><option value="">— Chọn người nhận —</option>'+
+          I._recips.map(function(p){return '<option value="'+esc(p.name)+'" data-team="'+esc(p.team)+'">'+esc(p.name)+(p.team?(' · '+esc(p.team)):'')+'</option>';}).join('')+
+        '</select>'+
+      '</div>'+
+      '<div id="iss_rcp_central" style="display:'+(I._dest==='central'?'block':'none')+'">'+
+        '<div class="dspm-label" style="margin-top:8px">Giao cho / mục đích (chỉ ghi nhận — KHÔNG cộng tồn NV Sales)</div>'+
+        '<input class="dspm-input" id="iss_to_central" placeholder="VD: Trade Marketing / Manager / Sự kiện...">'+
+        '<div style="margin-top:6px">'+['Trade Marketing','Manager','Sự kiện / Activation','HoReCa / B2B'].map(function(v){return '<span onclick="InvMod._pickCentral(\''+v+'\')" style="display:inline-block;border:1px solid #4E342E;color:#4E342E;border-radius:14px;padding:3px 10px;font-size:12px;margin:0 6px 6px 0;cursor:pointer">'+v+'</span>';}).join('')+'</div>'+
+      '</div>'+
       '<div class="dspm-label" style="margin-top:8px">Lý do xuất</div>'+
       '<select class="dspm-select" id="iss_reason">'+reasons.map(function(v){return '<option>'+v+'</option>';}).join('')+'</select>'+
       '<input class="dspm-input" id="iss_note" placeholder="Ghi chú thêm (tuỳ chọn)" style="margin-top:8px">'+
-      '<div style="font-size:11.5px;color:#8d6e63;margin-top:10px">Khi lưu: trừ tồn kho công ty &amp; cộng thẳng vào tồn quà của người nhận → họ phát quà &amp; báo cáo như bình thường.</div>'+
+      '<div id="iss_hint" style="font-size:11.5px;color:#8d6e63;margin-top:10px"></div>'+
       '<button class="dspm-btn dspm-btn-primary" style="background:#4E342E;width:100%;margin-top:12px" onclick="InvMod.submitIssue()">📤 Xuất hàng &amp; trừ kho</button>'+
     '</div>';
     $id('invBody').innerHTML=html;
-    // auto set region theo người nhận
+    paintDest(); updateIssHint();
     var sel=$id('iss_to'); if(sel) sel.onchange=function(){ var o=sel.options[sel.selectedIndex]; var tm=o&&o.getAttribute('data-team')||''; var rg=$id('iss_region'); if(rg&&tm){ for(var i=0;i<rg.options.length;i++){ if(rg.options[i].value===tm){ rg.selectedIndex=i; break; } } } };
   }
+  function destBtn(k,label){ return '<button data-dest="'+k+'" onclick="InvMod.setDest(\''+k+'\')" style="flex:1;padding:9px 4px;border:1.5px solid #4E342E;border-radius:8px;background:#fff;color:#4E342E;font-size:12.5px;font-weight:700;cursor:pointer">'+label+'</button>'; }
+  function paintDest(){ var w=$id('invBody'); if(!w) return; Array.prototype.forEach.call(w.querySelectorAll('[data-dest]'),function(b){ var on=b.getAttribute('data-dest')===I._dest; b.style.background=on?'#4E342E':'#fff'; b.style.color=on?'#fff':'#4E342E'; }); }
+  function updateIssHint(){ var el=$id('iss_hint'); if(!el) return; el.innerHTML=(I._dest==='central')?'🏢 Nội bộ/Trade: chỉ trừ tồn kho công ty &amp; ghi nhận. <b>Không</b> cộng tồn NV Sales — team sales không thấy.':'🧑‍💼 Giao NV Sales: trừ kho công ty &amp; cộng thẳng vào tồn quà của NV → họ phát &amp; báo cáo như thường.'; }
+  I.setDest=function(k){ I._dest=k; var a=$id('iss_rcp_sales'),b=$id('iss_rcp_central'); if(a)a.style.display=(k==='sales')?'block':'none'; if(b)b.style.display=(k==='central')?'block':'none'; paintDest(); updateIssHint(); };
+  I._pickCentral=function(v){ var t=$id('iss_to_central'); if(t) t.value=v; };
   I._remainHint=function(){
     var s=$id('iss_gift'); var el=$id('iss_remain'); if(!s||!el) return;
     var o=s.options[s.selectedIndex]; var rem=o?parseInt(o.getAttribute('data-rem')||'0',10):0;
@@ -3467,17 +3482,19 @@ function confirmFraudSubmit() {
     var g=$id('iss_gift'); var key=g?g.value:''; if(!key){ tt('⚠️ Chọn loại quà'); return; }
     var label=g.options[g.selectedIndex].getAttribute('data-label')||'';
     var qty=parseFloat(($id('iss_qty')||{}).value||'0')||0; if(qty<=0){ tt('⚠️ Số lượng > 0'); return; }
-    var to=($id('iss_to')||{}).value||''; if(!to){ tt('⚠️ Chọn người nhận'); return; }
+    var dest=I._dest||'sales';
+    var to = dest==='central' ? ((($id('iss_to_central')||{}).value)||'').trim() : (($id('iss_to')||{}).value||'');
+    if(!to){ tt(dest==='central'?'⚠️ Nhập nơi nhận / mục đích':'⚠️ Chọn người nhận'); return; }
     var region=($id('iss_region')||{}).value||'';
     var reason=($id('iss_reason')||{}).value||'';
     var note=($id('iss_note')||{}).value||'';
     var rem=parseInt((g.options[g.selectedIndex].getAttribute('data-rem')||'0'),10);
     var force=false;
     if(qty>rem){ if(!confirm('Số lượng xuất ('+qty+') vượt tồn kho công ty ('+rem+'). Vẫn xuất (tồn sẽ âm)?')) return; force=true; }
-    send({ type:'GIFT_ISSUE', gift_type:key, gift_label_vi:label, qty:qty,
+    send({ type:'GIFT_ISSUE', gift_type:key, gift_label_vi:label, qty:qty, dest_type:dest,
            to_salesman:to, to_region:region, reason:reason, issued_by:me(), notes:note, force:force })
     .then(function(res){
-      if(res&&res.ok){ tt('✅ Đã xuất '+qty+' '+label+' → '+to+'. Tồn kho còn '+res.company_remaining); reloadThen('stock'); }
+      if(res&&res.ok){ tt('✅ Đã xuất '+qty+' '+label+(dest==='central'?(' (nội bộ) → '+to):(' → '+to))+'. Tồn kho còn '+res.company_remaining); reloadThen('stock'); }
       else if(res&&res.error==='over_stock'){ tt('⚠️ Vượt tồn ('+res.remaining+'). Bấm lại để xác nhận.'); }
       else tt('⚠️ Lưu lỗi, thử lại.');
     }).catch(function(){ tt('⚠️ Mất mạng — chưa lưu được.'); });
@@ -3544,11 +3561,14 @@ function confirmFraudSubmit() {
       if(!logs.length){ $id('invBody').innerHTML='<div class="dspm-empty">Chưa có lượt xuất nào.</div>'; return; }
       var html='<div class="dspm-card">';
       logs.forEach(function(l){
+        var central=String(l.dest_type||'').toLowerCase()==='central';
+        var dtag=central?'🏢 ':'🧑‍💼 ';
+        var stag=central?' · 🏢 nội bộ (không cộng tồn NV)':(l.synced_inv==='TRUE'?' · ✓ đã cộng tồn NV':'');
         html+='<div style="padding:9px 0;border-bottom:1px solid #f0e9e6">'+
           '<div style="display:flex;justify-content:space-between"><b style="font-size:13.5px">'+esc(l.gift_label_vi||l.gift_type)+'</b>'+
             '<span style="font-weight:800;color:#4E342E">−'+esc(l.qty)+'</span></div>'+
-          '<div style="font-size:11.5px;color:#8d6e63">→ '+esc(l.to_salesman||'')+(l.to_region?(' ('+esc(l.to_region)+')'):'')+' · '+esc(l.reason||'')+'</div>'+
-          '<div style="font-size:10.5px;color:#a1887f">'+esc(l.issued_at||'')+(l.issued_by?(' · bởi '+esc(l.issued_by)):'')+(l.synced_inv==='TRUE'?' · ✓ đã cộng tồn':'')+'</div>'+
+          '<div style="font-size:11.5px;color:#8d6e63">→ '+dtag+esc(l.to_salesman||'')+(l.to_region?(' ('+esc(l.to_region)+')'):'')+' · '+esc(l.reason||'')+'</div>'+
+          '<div style="font-size:10.5px;color:#a1887f">'+esc(l.issued_at||'')+(l.issued_by?(' · bởi '+esc(l.issued_by)):'')+stag+'</div>'+
         '</div>';
       });
       html+='</div>';
@@ -3566,6 +3586,37 @@ function confirmFraudSubmit() {
 </script>
 <!-- ===================== /DGM INVENTORY MODULE ===================== -->
 
+
+<!-- ===== DGM OVERLAY POSITION PERSIST (giữ vị trí khi refresh) ===== -->
+<script id="overlay-persist">
+(function(){
+  "use strict";
+  var MODS={display:'DisplayMod',gift:'GiftMod',inv:'InvMod'};
+  function save(mod,M){ try{ sessionStorage.setItem('dgm_overlay', JSON.stringify({mod:mod, tab:(M&&M._tab)||null})); }catch(e){} }
+  function clr(){ try{ sessionStorage.removeItem('dgm_overlay'); }catch(e){} }
+  // Bọc open/close/tab để nhớ overlay đang mở (không sửa logic gốc của module)
+  Object.keys(MODS).forEach(function(mod){
+    var M=window[MODS[mod]]; if(!M) return;
+    if(typeof M.open==='function'){ var _o=M.open; M.open=function(){ var r=_o.apply(M,arguments); save(mod,M); return r; }; }
+    if(typeof M.close==='function'){ var _c=M.close; M.close=function(){ clr(); return _c.apply(M,arguments); }; }
+    if(typeof M.tab==='function'){ var _t=M.tab; M.tab=function(k){ var r=_t.apply(M,arguments); save(mod,M); return r; }; }
+  });
+  // Khôi phục overlay SAU khi session phục hồi màn hình nền
+  function restore(){
+    try{
+      if(!sessionStorage.getItem('dgm_session')){ clr(); return; }   // chưa đăng nhập → bỏ
+      var raw=sessionStorage.getItem('dgm_overlay'); if(!raw) return;
+      var o=JSON.parse(raw); if(!o||!o.mod) return;
+      var M=window[MODS[o.mod]]; if(!M||typeof M.open!=='function') return;
+      M.open();
+      if(o.tab && typeof M.tab==='function'){ setTimeout(function(){ try{M.tab(o.tab);}catch(e){} },60); }
+    }catch(e){}
+  }
+  if(document.readyState==='complete'){ setTimeout(restore,90); }
+  else window.addEventListener('load', function(){ setTimeout(restore,90); });
+})();
+</script>
+<!-- ===== /DGM OVERLAY POSITION PERSIST ===== -->
 
 </body>
 </html>
