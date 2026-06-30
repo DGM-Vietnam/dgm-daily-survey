@@ -174,20 +174,6 @@ tr:hover td{background:rgba(255,255,255,.025);}
 .sat-zero{color:var(--gray2);}
 .sat-group-header td{background:rgba(255,255,255,.03);font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.06em;padding:6px 12px;}
 
-/* KPI TABLE — group header colors */
-.kpi-group-header{text-align:center !important;border-bottom:none !important;padding-bottom:4px !important;font-size:9px !important;letter-spacing:.08em;}
-.kpi-sub-header{font-size:9px !important;padding-top:4px !important;border-top:1px solid var(--border);}
-.kpi-group-chain{border-left:2px solid rgba(74,158,191,.4);color:var(--blue) !important;}
-.kpi-group-store{border-left:2px solid rgba(200,16,46,.35);color:#ff8f8f !important;}
-.kpi-group-new{border-left:2px solid rgba(255,225,64,.35);color:var(--yellow) !important;}
-.kpi-group-other{border-left:2px solid rgba(154,149,144,.3);color:var(--gray2) !important;}
-.kpi-group-open{border-left:2px solid rgba(76,175,130,.4);color:var(--green) !important;}
-.sales-activity-table td.kpi-chain{border-left:2px solid rgba(74,158,191,.15);}
-.sales-activity-table td.kpi-store{border-left:2px solid rgba(200,16,46,.12);}
-.sales-activity-table td.kpi-new{border-left:2px solid rgba(255,225,64,.12);}
-.sales-activity-table td.kpi-other{border-left:2px solid rgba(154,149,144,.12);}
-.sales-activity-table td.kpi-open{border-left:2px solid rgba(76,175,130,.15);}
-
 /* THỐNG KÊ TAB */
 .stat-filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
 .stat-filter-bar label{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.05em;}
@@ -382,33 +368,16 @@ tr:hover td{background:rgba(255,255,255,.025);}
     </div>
     <div class="sec">Hoạt động theo Sales — hôm nay &amp; lũy kế tháng</div>
     <div class="tbl-card">
-      <h3>Tổng hợp KPI theo kênh · vùng · nhân viên</h3>
+      <h3>Tổng hợp theo kênh · vùng · nhân viên</h3>
       <div style="overflow-x:auto;">
-        <table class="sales-activity-table" id="kpiTable">
-          <thead>
-            <tr>
-              <th rowspan="2" style="vertical-align:middle">Nhân viên</th>
-              <th rowspan="2" style="vertical-align:middle">Kênh</th>
-              <th rowspan="2" style="vertical-align:middle">Vùng</th>
-              <th colspan="2" class="sat-num kpi-group-header kpi-group-chain">Chợ / Chain</th>
-              <th colspan="2" class="sat-num kpi-group-header kpi-group-store">Điểm bán</th>
-              <th colspan="2" class="sat-num kpi-group-header kpi-group-new">Tiếp cận mới</th>
-              <th colspan="2" class="sat-num kpi-group-header kpi-group-other">Việc khác</th>
-              <th colspan="2" class="sat-num kpi-group-header kpi-group-open">Mở mới TC</th>
-            </tr>
-            <tr>
-              <th class="sat-num kpi-sub-header kpi-group-chain">Hôm nay</th>
-              <th class="sat-num kpi-sub-header kpi-group-chain">Tháng</th>
-              <th class="sat-num kpi-sub-header kpi-group-store">Hôm nay</th>
-              <th class="sat-num kpi-sub-header kpi-group-store">Tháng</th>
-              <th class="sat-num kpi-sub-header kpi-group-new">Hôm nay</th>
-              <th class="sat-num kpi-sub-header kpi-group-new">Tháng</th>
-              <th class="sat-num kpi-sub-header kpi-group-other">Hôm nay</th>
-              <th class="sat-num kpi-sub-header kpi-group-other">Tháng</th>
-              <th class="sat-num kpi-sub-header kpi-group-open">Hôm nay</th>
-              <th class="sat-num kpi-sub-header kpi-group-open">Tháng</th>
-            </tr>
-          </thead>
+        <table class="sales-activity-table">
+          <thead><tr>
+            <th>Nhân viên</th><th>Kênh</th><th>Vùng / Chain</th>
+            <th class="sat-num">Chợ/Chain hôm nay</th>
+            <th class="sat-num">Điểm bán hôm nay</th>
+            <th class="sat-num">Chợ/Chain tháng</th>
+            <th class="sat-num">Điểm bán tháng</th>
+          </tr></thead>
           <tbody id="tbSalesActivity"></tbody>
         </table>
       </div>
@@ -673,6 +642,7 @@ tr:hover td{background:rgba(255,255,255,.025);}
   .dsp-pass{background:#e8f5e9;color:#2e7d32}.dsp-fail{background:#ffebee;color:#c62828}.dsp-pend{background:#f0f0f0;color:#888}
   .dsp-ph{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
   .dsp-ph img{width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3}
+  .gft-thumb{width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,.05);cursor:pointer;vertical-align:middle;}
   .dsp-sku{font-size:12px;color:#555;background:#fafafa;border-radius:6px;padding:6px 8px;margin:6px 0}
   .dsp-sku span{font-weight:700;color:#333}
   .dsp-cms{margin:6px 0}
@@ -1190,7 +1160,7 @@ function renderOverview(){
   const mtM=[...mt,...mto].filter(isThisMonth).length, gtM=[...gt,...gtn,...gto,...gton].filter(isThisMonth).length;
   mkChart('chartMtGt','doughnut',['MT','GT'],[{data:[mtM,gtM],backgroundColor:['rgba(200,16,46,.8)','rgba(74,158,191,.7)'],borderColor:['#C8102E','#4A9EBF'],borderWidth:2}],{plugins:{legend:{position:'bottom'}}});
 
-  renderSalesActivityTable(mt, gt, gtn, mto, gto, gton);
+  renderSalesActivityTable(mt, gt);
   renderNewStoreTable();
 
   const staff={};
@@ -1203,174 +1173,72 @@ function renderOverview(){
 }
 
 // ══════════════════════════════════════════════════════════
-// KPI SALES ACTIVITY TABLE — v2 (5 metrics × 2 periods)
-// Cols: Chain | Điểm bán | Tiếp cận mới | Việc khác | Mở mới TC
-//       × Hôm nay / Tháng
-// Sources:
-//   Chain/Điểm bán  ← MT_Daily (Chain, Điểm Bán) + GT_Daily (Chợ/Khu Vực, Số Điểm Bán)
-//   Tiếp cận mới    ← GT_NewCustomer (1 record = 1 điểm bán mới chào hàng)
-//   Việc khác       ← MT_Other + GT_Other (count records)
-//   Mở mới TC       ← GT_OpenNew (count records)
+// SALES ACTIVITY TABLE
 // ══════════════════════════════════════════════════════════
-function renderSalesActivityTable(mt, gt, gtn, mto, gto, gton){
-  // Helper: khởi tạo stat object cho 1 nhân viên
-  function mkStat(channel, region){
-    return {
-      channel, region,
-      // Chain / chợ (unique tên)
-      todayChains:new Set(), monthChains:new Set(),
-      // Điểm bán (MT: unique tên | GT: sum Số Điểm Bán)
-      todayStoresMT:new Set(), monthStoresMT:new Set(),
-      todayStoresGT:0, monthStoresGT:0,
-      // Tiếp cận mới — GT_NewCustomer (count record)
-      todayNew:0, monthNew:0,
-      // Việc khác — MT_Other + GT_Other (count record)
-      todayOther:0, monthOther:0,
-      // Mở mới thành công — GT_OpenNew (count record)
-      todayOpen:0, monthOpen:0
-    };
-  }
-
-  const stats={};
-
-  // ── 1. MT Daily: chain + điểm bán ──────────────────────────
+function renderSalesActivityTable(mt, gt){
+  const today=todayYMD(), stats={};
   mt.forEach(r=>{
     const n=nameKey(r);
-    if(!stats[n]) stats[n]=mkStat('MT','MT');
+    if(!stats[n]) stats[n]={channel:'MT',region:'MT',todayChains:new Set(),todayStores:new Set(),monthChains:new Set(),monthStores:new Set()};
     const chain=r['Chain']||'', store=r['Điểm Bán']||'';
-    if(isThisMonth(r)){
-      if(chain) stats[n].monthChains.add(chain);
-      if(store) stats[n].monthStoresMT.add(store);
-    }
-    if(isToday(r)){
-      if(chain) stats[n].todayChains.add(chain);
-      if(store) stats[n].todayStoresMT.add(store);
-    }
+    if(isThisMonth(r)){ if(chain) stats[n].monthChains.add(chain); if(store) stats[n].monthStores.add(store); }
+    if(isToday(r)){ if(chain) stats[n].todayChains.add(chain); if(store) stats[n].todayStores.add(store); }
   });
-
-  // ── 2. MT Other: việc khác ─────────────────────────────────
-  mto.forEach(r=>{
-    const n=nameKey(r);
-    if(!stats[n]) stats[n]=mkStat('MT','MT');
-    if(isThisMonth(r)) stats[n].monthOther++;
-    if(isToday(r))     stats[n].todayOther++;
-  });
-
-  // ── 3. GT Daily: chợ + điểm bán ────────────────────────────
   gt.forEach(r=>{
     const n=nameKey(r);
     const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]=mkStat('GT',reg);
-    else if(stats[n].channel==='MT') return; // MT nhân viên không double-count
-    const cho=r['Chợ / Khu Vực']||'';
-    const soDP=parseInt(r['Số Điểm Bán']||1)||1;
+    if(!stats[n]) stats[n]={channel:'GT',region:reg,todayChains:new Set(),todayStores:new Set(),monthChains:new Set(),monthStores:new Set()};
+    else if(stats[n].channel==='MT') return;
+    // GT: chợ = 'Chợ / Khu Vực', điểm bán đếm theo Số Điểm Bán
+    const cho=r['Chợ / Khu Vực']||'', soDP=parseInt(r['Số Điểm Bán']||1)||1;
     if(isThisMonth(r)){
       if(cho) stats[n].monthChains.add(cho);
-      stats[n].monthStoresGT+=soDP;
+      // Mỗi submission GT = soDP điểm bán (dùng key unique per submission)
+      stats[n].monthStores.add(getDS(r)+'|'+r['Timestamp']+'|'+soDP);
     }
     if(isToday(r)){
       if(cho) stats[n].todayChains.add(cho);
-      stats[n].todayStoresGT+=soDP;
+      stats[n].todayStores.add(today+'|'+r['Timestamp']+'|'+soDP);
     }
   });
 
-  // ── 4. GT NewCustomer: tiếp cận mới ───────────────────────
-  // 1 record = 1 lần chào hàng tại 1 điểm bán mới (chưa là KH)
-  gtn.forEach(r=>{
-    const n=nameKey(r);
-    const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]=mkStat('GT',reg);
-    if(isThisMonth(r)) stats[n].monthNew++;
-    if(isToday(r))     stats[n].todayNew++;
-  });
-
-  // ── 5. GT Other: việc khác ─────────────────────────────────
-  gto.forEach(r=>{
-    const n=nameKey(r);
-    const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]=mkStat('GT',reg);
-    if(isThisMonth(r)) stats[n].monthOther++;
-    if(isToday(r))     stats[n].todayOther++;
-  });
-
-  // ── 6. GT OpenNew: mở mới thành công ──────────────────────
-  gton.forEach(r=>{
-    const n=nameKey(r);
-    const reg=isNorth(r)?'GT North':isCentral(r)?'GT Central':isSouth(r)?'GT South':'GT';
-    if(!stats[n]) stats[n]=mkStat('GT',reg);
-    if(isThisMonth(r)) stats[n].monthOpen++;
-    if(isToday(r))     stats[n].todayOpen++;
-  });
-
-  // ── Render ─────────────────────────────────────────────────
-  // Helper render 1 cell pair (hôm nay | tháng) với màu nhóm
-  function cellPair(todVal, moVal, colorClass, highlight){
-    const tCls=todVal===0?'sat-zero':'';
-    const mCls=moVal===0?'sat-zero':'';
-    const todStr=todVal===0?'—':String(todVal);
-    const moStr =moVal===0?'—':String(moVal);
-    const moBold=highlight?`<strong style="color:var(--white)">${moStr}</strong>`:moStr;
-    return `<td class="sat-num kpi-${colorClass} ${tCls}">${todStr}</td>`+
-           `<td class="sat-num kpi-${colorClass} ${mCls}">${moBold}</td>`;
-  }
+  // Tính số điểm bán GT thực (sum Số Điểm Bán, không phải size set)
+  const calcGTStores=(recs)=>{
+    return recs.reduce((s,r)=>s+(parseInt(r['Số Điểm Bán']||1)||1),0);
+  };
 
   const groups={};
-  Object.entries(stats).forEach(([n,d])=>{
-    const k=d.channel==='MT'?'MT':d.region;
-    if(!groups[k]) groups[k]=[];
-    groups[k].push({n,d});
-  });
-
+  Object.entries(stats).forEach(([n,d])=>{ const k=d.channel==='MT'?'MT':d.region; if(!groups[k]) groups[k]=[]; groups[k].push({n,d}); });
   let rows='';
-  const COLSPAN=13; // 3 fixed + 10 metric cols
   ['MT','GT North','GT Central','GT South'].forEach(grp=>{
-    const members=groups[grp];
-    if(!members||!members.length) return;
-    const label=grp==='MT'?'🏬 MT — Modern Trade'
-               :grp==='GT North'?'🔵 GT Miền Bắc'
-               :grp==='GT Central'?'🟡 GT Miền Trung'
-               :'🟢 GT Miền Nam';
-    rows+=`<tr class="sat-group-header"><td colspan="${COLSPAN}">${label}</td></tr>`;
-
-    // Sort: tháng điểm bán cao nhất lên trước
-    members.sort((a,b)=>{
-      const aS=a.d.channel==='MT'?a.d.monthStoresMT.size:a.d.monthStoresGT;
-      const bS=b.d.channel==='MT'?b.d.monthStoresMT.size:b.d.monthStoresGT;
-      return bS-aS;
-    });
-
+    const members=groups[grp]; if(!members||!members.length) return;
+    const label=grp==='MT'?'🏬 MT — Modern Trade':grp==='GT North'?'🔵 GT Miền Bắc':grp==='GT Central'?'🟡 GT Miền Trung':'🟢 GT Miền Nam';
+    rows+=`<tr class="sat-group-header"><td colspan="7">${label}</td></tr>`;
+    members.sort((a,b)=>b.d.monthChains.size-a.d.monthChains.size);
     members.forEach(({n,d})=>{
       const isGT=d.channel==='GT';
-
-      // Chain
+      // GT: điểm bán = sum Số Điểm Bán
+      let todSt, moSt;
+      if(isGT){
+        const memberGT=gt.filter(r=>nameKey(r)===n);
+        todSt=calcGTStores(memberGT.filter(isToday));
+        moSt=calcGTStores(memberGT.filter(isThisMonth));
+      } else {
+        todSt=d.todayStores.size; moSt=d.monthStores.size;
+      }
       const todCh=d.todayChains.size, moCh=d.monthChains.size;
-      // Điểm bán
-      const todSt=isGT?d.todayStoresGT:d.todayStoresMT.size;
-      const moSt =isGT?d.monthStoresGT:d.monthStoresMT.size;
-      // Tiếp cận mới (chỉ GT)
-      const todNew=d.todayNew, moNew=d.monthNew;
-      // Việc khác
-      const todOth=d.todayOther, moOth=d.monthOther;
-      // Mở mới (chỉ GT)
-      const todOpn=d.todayOpen, moOpn=d.monthOpen;
-
-      const pillLabel=isGT?d.region:'mt';
-
       rows+=`<tr>
-        <td style="font-weight:500">${esc(n)}</td>
-        <td>${teamPill(pillLabel)}</td>
+        <td>${esc(n)}</td>
+        <td>${teamPill(d.channel==='MT'?'mt':d.region)}</td>
         <td style="font-size:11px;color:var(--gray2)">${d.region==='MT'?'Modern Trade':d.region}</td>
-        ${cellPair(todCh, moCh, 'chain', false)}
-        ${cellPair(todSt, moSt, 'store', true)}
-        ${isGT ? cellPair(todNew, moNew, 'new', false) : '<td class="sat-num kpi-new sat-zero" colspan="2" style="text-align:center;font-size:10px;color:rgba(255,255,255,.15)">—</td>'}
-        ${cellPair(todOth, moOth, 'other', false)}
-        ${isGT ? cellPair(todOpn, moOpn, 'open', false) : '<td class="sat-num kpi-open sat-zero" colspan="2" style="text-align:center;font-size:10px;color:rgba(255,255,255,.15)">—</td>'}
+        <td class="sat-num ${todCh===0?'sat-zero':''}">${todCh||'—'}</td>
+        <td class="sat-num ${todSt===0?'sat-zero':''}">${todSt||'—'}</td>
+        <td class="sat-num ${moCh===0?'sat-zero':''}">${moCh||'—'}</td>
+        <td class="sat-num ${moSt===0?'sat-zero':''}">${moSt||'—'}</td>
       </tr>`;
     });
   });
-
-  document.getElementById('tbSalesActivity').innerHTML=
-    rows||`<tr><td colspan="${COLSPAN}" class="empty">Không có dữ liệu</td></tr>`;
+  document.getElementById('tbSalesActivity').innerHTML=rows||'<tr><td colspan="7" class="empty">Không có dữ liệu</td></tr>';
 }
 
 // ══════════════════════════════════════════════════════════
@@ -2195,7 +2063,7 @@ function renderGiftLog(){
   var rows=list.map(function(g){
     var isNew=String(g.outlet_is_new).toUpperCase()==='TRUE';
     var warn=String(g.warning_shown).toUpperCase()==='TRUE';
-    var ph=g.photo_id?'<a href="https://drive.google.com/file/d/'+g.photo_id+'/view" target="_blank" rel="noopener">🖼️</a>':'—';
+    var ph=g.photo_id?'<a href="https://drive.google.com/file/d/'+g.photo_id+'/view" target="_blank" rel="noopener"><img class="gft-thumb" src="'+dspThumb(g.photo_id)+'" data-id="'+g.photo_id+'" data-try="0" onerror="dspImgFallback(this)"></a>':'—';
     return '<tr'+(warn?' style="background:#fff8f0"':'')+'><td>'+dspEsc((g.timestamp||'').slice(0,10))+'</td><td>'+dspEsc(g.salesman)+'</td><td>'+dspEsc(g.region)+'</td><td>'+dspEsc(g.outlet_name)+'</td><td>'+dspEsc(g.gift_label_vi||g.gift_type)+'</td><td class="num">'+dspEsc(g.qty)+'</td><td>'+dspEsc(trigLabel[g.trigger_type]||g.trigger_type)+'</td><td>'+(isNew?'🆕':'')+'</td><td>'+(warn?'<span style="color:#c62828">⚠️</span>':'')+'</td><td>'+ph+'</td></tr>';
   }).join('');
   var el=document.getElementById('gftLog'); if(el) el.innerHTML=list.length?rows:'<tr><td colspan="10" style="text-align:center;color:#888">Chưa có lượt tặng</td></tr>';
