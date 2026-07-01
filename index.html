@@ -3620,7 +3620,7 @@ function confirmFraudSubmit() {
 <!-- ===== /DGM OVERLAY POSITION PERSIST ===== -->
 
 
-<!-- ===== 💰 MKT BUDGET MODULE (thêm mới, cô lập) ===== -->
+<!-- ===== 💰 MKT BUDGET MODULE ===== -->
 <!-- ============================================================
      💰 NGÂN SÁCH MKT (Trade Spend) — MODULE APP  (v1)
      CÔ LẬP: namespace MktBudgetMod, overlay riêng #mbudOverlay,
@@ -3689,7 +3689,17 @@ function confirmFraudSubmit() {
   /* ---------- helpers ---------- */
   function $id(id){ return document.getElementById(id); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-  function tt(m){ try{ if(typeof toast==='function'){toast(m);return;} }catch(e){} alert(m); }
+  function tt(m){
+    try{ if(typeof toast==='function'){ toast(m); return; } }catch(e){}
+    try{
+      var b=document.getElementById('mbudToast');
+      if(!b){ b=document.createElement('div'); b.id='mbudToast';
+        b.style.cssText='position:fixed;left:50%;top:16px;transform:translateX(-50%);background:#4a148c;color:#fff;padding:12px 18px;border-radius:12px;z-index:99999;font-size:14px;font-weight:700;box-shadow:0 4px 18px rgba(0,0,0,.35);max-width:90%;text-align:center';
+        document.body.appendChild(b); }
+      b.textContent=m; b.style.display='block';
+      clearTimeout(b._t); b._t=setTimeout(function(){ b.style.display='none'; },3000);
+    }catch(e){ try{ alert(m); }catch(e2){} }
+  }
   function tnow(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function num(v){ if(v==null||v==='')return 0; var n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
   function vnd(n){ n=Math.round(num(n)); var s=(n<0?'-':'')+String(Math.abs(n)); return s.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
@@ -3725,6 +3735,17 @@ function confirmFraudSubmit() {
   function bucketSummary(ch,src){ return M.summaryByBucket[bkey(ch,src)]||{annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0}; }
   function touchOpen(){ try{ localStorage.setItem('mbud_open_ts', String(Date.now())); }catch(e){} }
   function clearOpen(){ try{ localStorage.removeItem('mbud_open_ts'); }catch(e){} }
+  var POSITION_TYPES=['shelf','endcap','island','offshelf','billboard'];
+  function isPositionType(t){ return POSITION_TYPES.indexOf(t)>=0; }
+  function ensurePositionCost(d){
+    if(isPositionType(d.activity_type)){
+      var has=d.costs.some(function(c){return c.item==='position';});
+      if(!has) d.costs.unshift({item:'position',label:labelOf(M.cfg.cost_items,'position'),amount:''});
+    }
+  }
+  function isManager(){ try{ var t=String((state.user&&state.user.title)||'').toLowerCase();
+    return t.indexOf('manager')>=0||t.indexOf('giám đốc')>=0||t.indexOf('giam doc')>=0||t.indexOf('head')>=0||t.indexOf('trưởng')>=0||t.indexOf('truong')>=0; }catch(e){ return false; } }
+  function canEdit(a){ var u=userName(); return isManager() || (u&&String(a.created_by||'')===u) || (u&&String(a.owner||'')===u); }
 
   /* ---------- thẻ trên màn chọn loại ---------- */
   M.injectCard = function(team){
@@ -3759,7 +3780,9 @@ function confirmFraudSubmit() {
   M.close=function(){ if(M._hb){clearInterval(M._hb);M._hb=null;} clearOpen(); var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
   M.back=function(){
     if(M.view==='create-review'){ M.view='create'; renderCreate(); return; }
-    if(M.view==='create' || M.view==='mine' || M.view==='detail'){ M.view='home'; renderHome(); return; }
+    if(M.view==='edit'){ M.view='detail'; renderDetail(); return; }
+    if(M.view==='detail'){ M.view='mine'; renderMine(); return; }
+    if(M.view==='create' || M.view==='mine'){ M.view='home'; renderHome(); return; }
     M.close();
   };
 
@@ -3858,6 +3881,7 @@ function confirmFraudSubmit() {
     M.d={ chain:'', source:'', activity_type:(M.cfg.activity_types[0]||{}).key||'', duration_type:'period',
           status:'plan', date_start:tnow(), date_end:'', scope:'store',
           costs:[], stores:[], items:[] };
+    ensurePositionCost(M.d);
     M.view='create'; renderCreate();
   };
   function renderCreate(){
@@ -3878,7 +3902,7 @@ function confirmFraudSubmit() {
     h+='<select class="mbud-select" onchange="MktBudgetMod.setSource(this.value)"'+(d.chain?'':' disabled')+'>'+srcOpts+'</select>';
     h+='<div id="mbudRemain"></div>';
     h+='<div class="mbud-label">Loại hoạt động</div>';
-    h+='<select class="mbud-select" onchange="MktBudgetMod.d.activity_type=this.value">'+typeOpts+'</select>';
+    h+='<select class="mbud-select" onchange="MktBudgetMod.setType(this.value)">'+typeOpts+'</select>';
     h+='<div class="mbud-row"><div><div class="mbud-label">Thời hạn</div>'+
        '<div class="mbud-seg"><button class="'+(d.duration_type==='period'?'on':'')+'" onclick="MktBudgetMod.setDur(\'period\')">Theo kỳ</button>'+
        '<button class="'+(d.duration_type==='annual'?'on':'')+'" onclick="MktBudgetMod.setDur(\'annual\')">Cả năm</button></div></div></div>';
@@ -3891,7 +3915,8 @@ function confirmFraudSubmit() {
     h+='</div>';
 
     // chi phí hỗ trợ (mẫu chung)
-    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hỗ trợ (mẫu chung — sửa được từng store sau)</div>';
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hoạt động (mẫu chung — sửa được từng store sau)</div>';
+    h+='<div class="mbud-hint" style="margin-bottom:7px">💡 Gồm cả <b>phí thuê vị trí/kệ</b> (nếu có) + chi phí hỗ trợ (POSM, PG, sampling…). Tổng = cộng tất cả dòng.</div>';
     h+='<div id="mbudCosts"></div>';
     h+='<button class="mbud-add" onclick="MktBudgetMod.addCost()">＋ Thêm dòng chi phí</button>';
     h+='<div class="mbud-sum" id="mbudCostSum"></div></div>';
@@ -3907,8 +3932,9 @@ function confirmFraudSubmit() {
     setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">Huỷ</button>'+
             '<button class="mbud-btn mbud-btn-primary" onclick="MktBudgetMod.toReview()">Xem lại ▶</button>');
   }
-  M.setChain=function(v){ M.d.chain=v; M.d.source=''; renderCreate(); };
+  M.setChain=function(v){ M.d.chain=v; M.d.source=''; if(v && chainStores(v).length===0) M.d.scope='chain'; renderCreate(); };
   M.setSource=function(v){ M.d.source=v; renderRemain(); };
+  M.setType=function(v){ M.d.activity_type=v; ensurePositionCost(M.d); renderCreate(); };
   M.setDur=function(v){ M.d.duration_type=v; renderCreate(); };
   M.setStatus=function(v){ M.d.status=v; renderCreate(); };
   M.setScope=function(v){ M.d.scope=v; renderCreate(); };
@@ -3959,7 +3985,7 @@ function confirmFraudSubmit() {
     box.innerHTML=
       '<div>'+chips+'</div>'+
       (all.length?('<input class="mbud-input mbud-srch" placeholder="🔍 Tìm store ('+all.length+')" value="'+esc(M._srch)+'" oninput="MktBudgetMod.srchStore(this.value)">'+list+more)
-                 :'<div class="mbud-hint">Chain này chưa có danh sách store trong app.</div>')+
+                 :'<div class="mbud-hint">Chain này chưa có danh sách store trong app — chọn <b onclick="MktBudgetMod.setScope(\'chain\')" style="color:#6a1b9a;cursor:pointer;text-decoration:underline">Toàn chain</b> hoặc gõ tên store bên dưới rồi ＋ Thêm.</div>')+
       '<div class="mbud-row" style="margin-top:8px"><input class="mbud-input" id="mbudCustom" placeholder="Nhập tên store khác…"><button class="mbud-add" style="max-width:120px;margin-top:0" onclick="MktBudgetMod.addCustom()">＋ Thêm</button></div>';
   }
   M.srchStore=function(v){ M._srch=v; renderScope(); var i=$id('mbudScopeBox').querySelector('.mbud-srch'); if(i){i.focus(); try{i.setSelectionRange(v.length,v.length);}catch(e){}} };
@@ -4048,7 +4074,7 @@ function confirmFraudSubmit() {
     M.view='mine'; setTitle('Hoạt động của tôi'); setFoot('');
     $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải…</div>';
     var who=encodeURIComponent(userName());
-    fetch(scriptUrl()+'?action=getBudgetActivities&created_by='+who+'&_t='+Date.now(),{mode:'cors'})
+    fetch(scriptUrl()+'?action=getBudgetActivities&me='+who+'&_t='+Date.now(),{mode:'cors'})
       .then(function(r){return r.json();}).then(function(res){
         M.myActs=(res&&res.ok&&res.activities)?res.activities:[];
         renderMine();
@@ -4065,6 +4091,7 @@ function confirmFraudSubmit() {
         '<h4>'+(a.outlet_name?esc(a.outlet_name):('🏬 '+esc(a.chain)+' (toàn chain)'))+'</h4>'+
         '<span class="mbud-st '+a.status+'">'+stLabel(a.status)+'</span></div>'+
         '<div class="meta">'+esc(a.chain)+(a.source?(' · '+esc(a.source)):'')+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
+        ((a.created_by && a.owner && a.created_by!==a.owner)?('<div class="meta" style="color:#7e57c2">✍️ '+esc(a.created_by)+' ghi hộ</div>'):'')+
         '<div class="meta">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+' · <b style="color:#6a1b9a">'+vnd(pl)+' đ</b></div>'+
         '</div>';
     }).join('');
@@ -4084,6 +4111,8 @@ function confirmFraudSubmit() {
       '<div class="meta" style="font-size:12px;color:#777;margin-top:2px">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+'</div>'+
       (costs?('<div class="mbud-label">Chi phí kế hoạch ('+vnd(a.planned_budget)+' đ)</div>'+costs):'')+
       '</div>';
+
+    if(canEdit(a)) h+='<button class="mbud-add" style="margin-bottom:12px" onclick="MktBudgetMod.openEdit()">✏️ Sửa kế hoạch (chi phí, ngày, loại, mục…)</button>';
 
     h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chuyển trạng thái</div>'+
        '<div class="mbud-seg">'+['plan','running','done','cancel'].map(function(s){
@@ -4134,6 +4163,65 @@ function confirmFraudSubmit() {
         .catch(function(){ if(msg) msg.textContent='⚠️ Lỗi tải ảnh'; });
     };
     rd.readAsDataURL(f);
+  };
+
+  /* ---------- SỬA KẾ HOẠCH (người tạo / phụ trách / manager) ---------- */
+  M.openEdit=function(){
+    var a=M.curAct;
+    if(!canEdit(a)){ tt('Bạn không có quyền sửa hoạt động này'); return; }
+    var cb=a.cost_breakdown; if(typeof cb==='string'){ try{cb=JSON.parse(cb);}catch(e){cb=[];} }
+    M.e={ activity_id:a.activity_id, chain:a.chain, source:String(a.source||''),
+          activity_type:a.activity_type||'other', duration_type:a.duration_type||'period',
+          outlet_name:String(a.outlet_name||''), date_start:String(a.date_start||''),
+          date_end:String(a.date_end||''), note:String(a.note||''),
+          costs:(cb||[]).map(function(c){return {item:c.item||'other',label:c.label||labelOf(M.cfg.cost_items,c.item),amount:c.amount};}) };
+    M.view='edit'; renderEdit();
+  };
+  function renderEdit(){
+    M.view='edit'; setTitle('Sửa kế hoạch'); var e=M.e;
+    var srcList=bucketsOfChain(e.chain);
+    var srcOpts=srcList.map(function(m){var s=String(m.source||'').trim(); return '<option value="'+esc(s)+'"'+(e.source===s?' selected':'')+'>'+esc(s||'(không tên)')+'</option>';}).join('');
+    if(!srcList.some(function(m){return String(m.source||'').trim()===e.source;})) srcOpts='<option value="'+esc(e.source)+'" selected>'+esc(e.source||'(không tên)')+'</option>'+srcOpts;
+    var typeOpts=M.cfg.activity_types.map(function(t){return '<option value="'+t.key+'"'+(e.activity_type===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('');
+    var h='<div class="mbud-card">';
+    h+='<div style="font-size:12px;color:#777">Khách hàng: <b>'+esc(e.chain)+'</b></div>';
+    h+='<div class="mbud-label">Mục ngân sách</div><select class="mbud-select" onchange="MktBudgetMod.e.source=this.value">'+srcOpts+'</select>';
+    h+='<div class="mbud-label">Loại hoạt động</div><select class="mbud-select" onchange="MktBudgetMod.eSetType(this.value)">'+typeOpts+'</select>';
+    h+='<div class="mbud-label">Thời hạn</div><div class="mbud-seg"><button class="'+(e.duration_type==='period'?'on':'')+'" onclick="MktBudgetMod.eSet(\'duration_type\',\'period\')">Theo kỳ</button><button class="'+(e.duration_type==='annual'?'on':'')+'" onclick="MktBudgetMod.eSet(\'duration_type\',\'annual\')">Cả năm</button></div>';
+    h+='<div class="mbud-label">Điểm bán (trống = toàn chain)</div><input class="mbud-input" value="'+esc(e.outlet_name)+'" oninput="MktBudgetMod.e.outlet_name=this.value">';
+    h+='<div class="mbud-row"><div><div class="mbud-label">Bắt đầu</div><input type="date" class="mbud-input" value="'+esc(e.date_start)+'" onchange="MktBudgetMod.e.date_start=this.value"></div><div><div class="mbud-label">Kết thúc</div><input type="date" class="mbud-input" value="'+esc(e.date_end)+'" onchange="MktBudgetMod.e.date_end=this.value"></div></div>';
+    h+='</div>';
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hoạt động</div><div class="mbud-hint" style="margin-bottom:7px">💡 Gồm phí thuê vị trí/kệ + hỗ trợ (POSM, PG…). Tổng = cộng tất cả dòng.</div><div id="mbudECosts"></div><button class="mbud-add" onclick="MktBudgetMod.eAddCost()">＋ Thêm dòng chi phí</button><div class="mbud-sum" id="mbudECostSum"></div></div>';
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Ghi chú</div><textarea class="mbud-input" rows="2" oninput="MktBudgetMod.e.note=this.value">'+esc(e.note)+'</textarea></div>';
+    $id('mbudBody').innerHTML=h; renderECosts();
+    setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">◀ Huỷ</button><button class="mbud-btn mbud-btn-primary" id="mbudESaveBtn" onclick="MktBudgetMod.saveEdit()">Lưu thay đổi</button>');
+  }
+  M.eSet=function(k,v){ M.e[k]=v; renderEdit(); };
+  M.eSetType=function(v){ M.e.activity_type=v; ensurePositionCost(M.e); renderEdit(); };
+  function renderECosts(){
+    var box=$id('mbudECosts'); if(!box)return;
+    box.innerHTML=M.e.costs.map(function(c,i){
+      return '<div class="mbud-cost"><select onchange="MktBudgetMod.eSetCost('+i+',\'item\',this.value)">'+costItemOpts(c.item)+'</select><input inputmode="numeric" placeholder="Số tiền" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.eSetCost('+i+',\'amount\',this.value)"><button onclick="MktBudgetMod.eDelCost('+i+')">×</button></div>';
+    }).join('');
+    var sum=M.e.costs.reduce(function(t,c){return t+num(c.amount);},0);
+    var el=$id('mbudECostSum'); if(el) el.textContent='Tổng: '+vnd(sum)+' đ';
+  }
+  M.eAddCost=function(){ var f=(M.cfg.cost_items[0]||{}).key||''; M.e.costs.push({item:f,label:labelOf(M.cfg.cost_items,f),amount:''}); renderECosts(); };
+  M.eDelCost=function(i){ M.e.costs.splice(i,1); renderECosts(); };
+  M.eSetCost=function(i,k,v){ if(!M.e.costs[i])return; if(k==='item'){M.e.costs[i].item=v;M.e.costs[i].label=labelOf(M.cfg.cost_items,v);}else{M.e.costs[i].amount=v;} if(k==='amount'){var sum=M.e.costs.reduce(function(t,c){return t+num(c.amount);},0);var el=$id('mbudECostSum');if(el)el.textContent='Tổng: '+vnd(sum)+' đ';} };
+  M.saveEdit=function(){
+    var e=M.e;
+    var btn=$id('mbudESaveBtn'); if(btn){btn.disabled=true;btn.textContent='Đang lưu…';}
+    var payload={ type:'BUDGET_ACTIVITY_UPDATE', activity_id:e.activity_id, chain:e.chain, source:e.source,
+      activity_type:e.activity_type, duration_type:e.duration_type, outlet_name:e.outlet_name,
+      date_start:e.date_start, date_end:e.date_end, note:e.note, created_by:userName(),
+      cost_breakdown:e.costs.map(function(c){return {item:c.item,label:c.label,amount:num(c.amount)};}) };
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    fetch(scriptUrl()+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).then(function(res){
+        if(res&&res.ok){ tt('✅ Đã lưu thay đổi'); refreshSummary().then(function(){ M.openMine(); }); }
+        else { if(btn){btn.disabled=false;btn.textContent='Lưu thay đổi';} tt('⚠️ Lỗi. Thử lại.'); }
+      }).catch(function(){ if(btn){btn.disabled=false;btn.textContent='Lưu thay đổi';} tt('⚠️ Lỗi mạng.'); });
   };
 
   /* ---------- KHÔI PHỤC SAU REFRESH ----------
