@@ -3679,6 +3679,7 @@ function confirmFraudSubmit() {
   var M = {
     cfg:null, loaded:false, loading:null,
     master:[], summaryByChain:{}, year:(new Date()).getFullYear(),
+    onlyMine:false, hasPic:false,
     view:'home',
     d:null,           // draft tạo HĐ
     myActs:[], curAct:null
@@ -3709,6 +3710,11 @@ function confirmFraudSubmit() {
     return [];
   }
   function labelOf(list,key){ for(var i=0;i<(list||[]).length;i++){ if(list[i].key===key) return list[i].label; } return key; }
+  function picMatch(m){ var p=String(m.pic||'').trim().toLowerCase(); var u=userName().trim().toLowerCase(); return p && u && p===u; }
+  function visibleMaster(){
+    if(M.onlyMine){ var mine=M.master.filter(picMatch); if(mine.length) return mine; }
+    return M.master;
+  }
 
   /* ---------- thẻ trên màn chọn loại ---------- */
   M.injectCard = function(team){
@@ -3740,7 +3746,7 @@ function confirmFraudSubmit() {
   }
   function setTitle(t){ var e=$id('mbudTitle'); if(e) e.textContent=t; }
   function setFoot(html){ var e=$id('mbudFoot'); if(e) e.innerHTML=html; }
-  M.close=function(){ var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
+  M.close=function(){ try{ sessionStorage.removeItem('mbud_open'); }catch(e){} var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
   M.back=function(){
     if(M.view==='create-review'){ M.view='create'; renderCreate(); return; }
     if(M.view==='create' || M.view==='mine' || M.view==='detail'){ M.view='home'; renderHome(); return; }
@@ -3759,6 +3765,9 @@ function confirmFraudSubmit() {
     ]).then(function(res){
       M.cfg=(res[0]&&res[0].ok)?res[0]:{activity_types:[],cost_items:[],statuses:[],durations:[]};
       M.master=(res[1]&&res[1].ok&&res[1].master)?res[1].master:[];
+      M.hasPic=M.master.some(function(m){return String(m.pic||'').trim();});
+      var mine=M.master.filter(picMatch);
+      M.onlyMine=(mine.length>0);   // có chain được giao cho mình → mặc định chỉ xem của mình
       M.summaryByChain={};
       if(res[2]&&res[2].ok&&res[2].summary){ res[2].summary.forEach(function(s){ M.summaryByChain[s.chain]=s; }); }
       M.loaded=true; M.loading=null;
@@ -3776,6 +3785,7 @@ function confirmFraudSubmit() {
 
   /* ---------- HOME ---------- */
   M.open=function(){
+    try{ sessionStorage.setItem('mbud_open','1'); }catch(e){}
     ensureOverlay().classList.add('show');
     M.view='home'; setTitle('Ngân sách MKT');
     $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải dữ liệu…</div>'; setFoot('');
@@ -3788,20 +3798,29 @@ function confirmFraudSubmit() {
     h+='<button class="mbud-home-btn" style="background:#6a1b9a;color:#fff" onclick="MktBudgetMod.openCreate()">➕ <span>Tạo hoạt động mới</span></button>';
     h+='<button class="mbud-home-btn" style="background:#ede7f6;color:#4a148c" onclick="MktBudgetMod.openMine()">📋 <span>Hoạt động của tôi</span></button>';
     // bảng còn lại nhanh theo chain
-    h+='<div class="mbud-label">Còn lại theo chain ('+M.year+')</div>';
-    var keys=Object.keys(M.summaryByChain).sort();
-    if(!keys.length && !chains){ h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
+    var toggle='';
+    if(M.hasPic){
+      toggle='<div class="mbud-seg" style="margin:2px 0 10px">'+
+        '<button class="'+(M.onlyMine?'on':'')+'" onclick="MktBudgetMod.setMine(1)">Của tôi</button>'+
+        '<button class="'+(M.onlyMine?'':'on')+'" onclick="MktBudgetMod.setMine(0)">Tất cả</button></div>';
+    }
+    h+='<div class="mbud-label">Còn lại theo chain ('+M.year+')</div>'+toggle;
+    var vm=visibleMaster();
+    if(!vm.length && !Object.keys(M.summaryByChain).length){ h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
     else {
-      var rows=(M.master.length?M.master.map(function(m){return m.chain;}):keys);
+      var rows=(vm.length?vm.map(function(m){return m.chain;}):Object.keys(M.summaryByChain).sort());
+      var picByChain={}; M.master.forEach(function(m){ picByChain[m.chain]=String(m.pic||'').trim(); });
       var seen={};
       rows.forEach(function(ch){
         if(seen[ch])return; seen[ch]=true;
         var s=M.summaryByChain[ch]; if(!s) s={annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0};
         var warn=(s.annual>0 && s.pct>=0.9);
+        var pic=picByChain[ch];
         h+='<div class="mbud-card" style="padding:11px 13px">'+
            '<div style="display:flex;justify-content:space-between;align-items:center">'+
            '<b style="font-size:14px">'+esc(ch)+'</b>'+
            '<span style="font-size:12px;color:'+(warn?'#b71c1c':'#6a1b9a')+';font-weight:700">'+Math.round((s.pct||0)*100)+'% đã dùng</span></div>'+
+           (pic?('<div style="font-size:11.5px;color:#7e57c2;margin-top:2px">👤 '+esc(pic)+'</div>'):'')+
            '<div style="font-size:12px;color:#666;margin-top:5px">NS năm: <b>'+vnd(s.annual)+'</b> · Đã chi: '+vnd(s.spent)+' · Cam kết: '+vnd(s.committed)+'</div>'+
            '<div style="font-size:13px;margin-top:4px;color:'+(s.remaining<0?'#b71c1c':'#2e7d32')+';font-weight:800">Còn lại: '+vnd(s.remaining)+' đ</div>'+
            '</div>';
@@ -3809,6 +3828,7 @@ function confirmFraudSubmit() {
     }
     $id('mbudBody').innerHTML=h;
   }
+  M.setMine=function(v){ M.onlyMine=!!v; renderHome(); };
 
   /* ---------- TẠO HĐ ---------- */
   M.openCreate=function(){
@@ -3820,7 +3840,7 @@ function confirmFraudSubmit() {
   function renderCreate(){
     M.view='create'; setTitle('Tạo hoạt động');
     var d=M.d, cfg=M.cfg;
-    var chainOpts='<option value="">— Chọn chain —</option>'+M.master.map(function(m){
+    var chainOpts='<option value="">— Chọn chain —</option>'+visibleMaster().map(function(m){
       return '<option value="'+esc(m.chain)+'"'+(d.chain===m.chain?' selected':'')+'>'+esc(m.chain)+'</option>';
     }).join('');
     var typeOpts=cfg.activity_types.map(function(t){return '<option value="'+t.key+'"'+(d.activity_type===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('');
@@ -4084,6 +4104,22 @@ function confirmFraudSubmit() {
     };
     rd.readAsDataURL(f);
   };
+
+  /* ---------- KHÔI PHỤC SAU REFRESH ----------
+     F5 xong: nếu đang mở module Ngân sách thì tự mở lại (chờ app khôi phục user). */
+  (function restoreAfterRefresh(){
+    try{
+      if(sessionStorage.getItem('mbud_open')!=='1') return;
+      var tries=0;
+      var timer=setInterval(function(){
+        tries++;
+        var ready=false;
+        try{ ready=!!(window.state && state.user && state.user.name); }catch(e){}
+        if(ready){ clearInterval(timer); try{ M.open(); }catch(e){} }
+        else if(tries>30){ clearInterval(timer); }   // ~9s chờ tối đa
+      },300);
+    }catch(e){}
+  })();
 
 })();
 </script>
