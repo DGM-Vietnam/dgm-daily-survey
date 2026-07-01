@@ -955,6 +955,7 @@ function renderTypeCards(team) {
   cards.innerHTML = html;
   try{ if(window.DisplayMod) DisplayMod.injectCard(team); if(window.GiftMod) GiftMod.injectCard(team); }catch(e){} // ĐỢT 2: thẻ Trưng bày + Tặng quà
   try{ if(window.InvMod) InvMod.injectCard(team); }catch(e){} // ĐỢT 3: thẻ Quản kho quà tặng (title=Inventory)
+  try{ if(window.MktBudgetMod) MktBudgetMod.injectCard(team); }catch(e){} // 💰 Ngân sách MKT (MT leader)
 }
 
 // ============ GT REGION PICKER (for MT/GT manager) ============
@@ -3617,6 +3618,475 @@ function confirmFraudSubmit() {
 })();
 </script>
 <!-- ===== /DGM OVERLAY POSITION PERSIST ===== -->
+
+
+<!-- ===== 💰 MKT BUDGET MODULE (thêm mới, cô lập) ===== -->
+<!-- ============================================================
+     💰 NGÂN SÁCH MKT (Trade Spend) — MODULE APP  (v1)
+     CÔ LẬP: namespace MktBudgetMod, overlay riêng #mbudOverlay,
+     KHÔNG đụng submitMT / goTo / renderTypeCards logic cũ.
+     Chỉ hiện thẻ cho MT leader/manager. POST base64 y hệt các module cũ.
+     ============================================================ -->
+<style id="mbud-style">
+.mbud-overlay{position:fixed;inset:0;background:#f4f6fb;z-index:9600;display:none;flex-direction:column}
+.mbud-overlay.show{display:flex}
+.mbud-head{display:flex;align-items:center;gap:10px;padding:14px 14px;background:#6a1b9a;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.mbud-head h2{font-size:17px;margin:0;flex:1;font-weight:700}
+.mbud-back{background:rgba(255,255,255,.2);border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer}
+.mbud-body{flex:1;overflow-y:auto;padding:14px;-webkit-overflow-scrolling:touch}
+.mbud-foot{display:flex;gap:10px;padding:12px 14px;background:#fff;border-top:1px solid #e6e6ef}
+.mbud-btn{flex:1;padding:13px;border-radius:11px;border:none;font-size:15px;font-weight:700;cursor:pointer}
+.mbud-btn-primary{background:#6a1b9a;color:#fff}
+.mbud-btn-ghost{background:#eee;color:#555}
+.mbud-btn:disabled{opacity:.5}
+.mbud-card{background:#fff;border-radius:13px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06)}
+.mbud-label{font-size:12.5px;font-weight:700;color:#6a1b9a;margin:10px 0 5px}
+.mbud-input,.mbud-select{width:100%;padding:11px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;box-sizing:border-box;background:#fff}
+.mbud-row{display:flex;gap:8px}
+.mbud-row>div{flex:1}
+.mbud-seg{display:flex;gap:8px;margin-top:4px}
+.mbud-seg button{flex:1;padding:10px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#555}
+.mbud-seg button.on{background:#f3e5f5;border-color:#6a1b9a;color:#6a1b9a}
+.mbud-home-btn{width:100%;padding:16px;border-radius:13px;border:none;font-size:16px;font-weight:800;cursor:pointer;margin-bottom:12px;text-align:left;display:flex;align-items:center;gap:12px}
+.mbud-remain{background:#f3e5f5;border-radius:11px;padding:11px 13px;margin-top:8px;font-size:13px;color:#4a148c}
+.mbud-remain b{font-size:16px}
+.mbud-remain.warn{background:#ffebee;color:#b71c1c}
+.mbud-chip{display:inline-flex;align-items:center;gap:6px;background:#ede7f6;color:#4a148c;border-radius:20px;padding:5px 11px;font-size:12.5px;font-weight:600;margin:3px 4px 0 0}
+.mbud-chip b{cursor:pointer}
+.mbud-chk{display:flex;align-items:center;gap:9px;padding:9px 6px;border-bottom:1px solid #f0f0f5;font-size:13.5px}
+.mbud-chk input{width:19px;height:19px}
+.mbud-cost{display:flex;gap:7px;align-items:center;margin-bottom:7px}
+.mbud-cost select{flex:2}
+.mbud-cost input{flex:1.4}
+.mbud-cost button{width:34px;height:38px;border:none;background:#ffebee;color:#c62828;border-radius:9px;font-size:18px;cursor:pointer}
+.mbud-add{width:100%;padding:9px;border:1.5px dashed #b39ddb;background:#faf6ff;color:#6a1b9a;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-top:2px}
+.mbud-sum{text-align:right;font-weight:800;color:#6a1b9a;font-size:15px;margin-top:6px}
+.mbud-empty{text-align:center;color:#999;padding:26px 10px;font-size:14px}
+.mbud-st{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800}
+.mbud-st.plan{background:#fff3e0;color:#e65100}
+.mbud-st.running{background:#e3f2fd;color:#1565c0}
+.mbud-st.done{background:#e8f5e9;color:#2e7d32}
+.mbud-st.cancel{background:#f5f5f5;color:#999}
+.mbud-acard{background:#fff;border-radius:12px;padding:12px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.06);cursor:pointer}
+.mbud-acard h4{margin:0 0 4px;font-size:14.5px}
+.mbud-acard .meta{font-size:12px;color:#777;margin-top:3px}
+.mbud-srch{margin-bottom:8px}
+.mbud-hint{font-size:11.5px;color:#999;margin-top:3px}
+</style>
+<script id="mbud-script">
+(function(){
+  "use strict";
+  var M = {
+    cfg:null, loaded:false, loading:null,
+    master:[], summaryByChain:{}, year:(new Date()).getFullYear(),
+    view:'home',
+    d:null,           // draft tạo HĐ
+    myActs:[], curAct:null
+  };
+  window.MktBudgetMod = M;
+
+  /* ---------- helpers ---------- */
+  function $id(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function tt(m){ try{ if(typeof toast==='function'){toast(m);return;} }catch(e){} alert(m); }
+  function tnow(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  function num(v){ if(v==null||v==='')return 0; var n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
+  function vnd(n){ n=Math.round(num(n)); var s=(n<0?'-':'')+String(Math.abs(n)); return s.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+  function scriptUrl(){ try{ return (window.state&&state.scriptUrl)||''; }catch(e){ return ''; } }
+  function userName(){ try{ return (state.user&&state.user.name)||''; }catch(e){ return ''; } }
+  function isLeader(){
+    try{
+      var u=(window.state&&state.user)||{};
+      var key=(String(u.title||'')+' '+String(u.role||'')).toLowerCase();
+      if(!String(u.title||'').trim()) return true; // không rõ chức danh → cho phép (giống module cũ)
+      return key.indexOf('leader')>=0||key.indexOf('manager')>=0||key.indexOf('trưởng')>=0||
+             key.indexOf('truong')>=0||key.indexOf('giám sát')>=0||key.indexOf('giam sat')>=0||
+             key.indexOf('asm')>=0||key.indexOf('sup')>=0||key.indexOf('quản lý')>=0||key.indexOf('quan ly')>=0;
+    }catch(e){ return true; }
+  }
+  function chainStores(chain){
+    try{ if(typeof MT_CHAINS!=='undefined' && MT_CHAINS[chain]) return MT_CHAINS[chain].slice(); }catch(e){}
+    return [];
+  }
+  function labelOf(list,key){ for(var i=0;i<(list||[]).length;i++){ if(list[i].key===key) return list[i].label; } return key; }
+
+  /* ---------- thẻ trên màn chọn loại ---------- */
+  M.injectCard = function(team){
+    try{
+      if(team!=='MT' && team!=='MT/GT') return;      // chỉ kênh MT
+      if(!isLeader()) return;                         // chỉ leader/manager
+      var host = document.querySelector('#typeCards .type-cards');
+      if(!host || host.querySelector('[data-mbud="card"]')) return;
+      var c=document.createElement('div');
+      c.className='type-card'; c.setAttribute('data-mbud','card');
+      c.style.cssText='border-color:#6a1b9a;background:#faf5ff';
+      c.onclick=function(){ M.open(); };
+      c.innerHTML='<div class="icon">💰</div><div class="title" style="color:#6a1b9a">Ngân sách MKT</div><div class="desc">Trade spend theo chain — kế hoạch & thực chi</div>';
+      host.appendChild(c);
+    }catch(e){}
+  };
+
+  /* ---------- overlay ---------- */
+  function ensureOverlay(){
+    var ov=$id('mbudOverlay'); if(ov) return ov;
+    ov=document.createElement('div'); ov.id='mbudOverlay'; ov.className='mbud-overlay';
+    ov.innerHTML='<div class="mbud-head"><button class="mbud-back" id="mbudBack">‹</button>'+
+      '<h2 id="mbudTitle">Ngân sách MKT</h2></div>'+
+      '<div class="mbud-body" id="mbudBody"></div>'+
+      '<div class="mbud-foot" id="mbudFoot"></div>';
+    document.body.appendChild(ov);
+    $id('mbudBack').onclick=function(){ M.back(); };
+    return ov;
+  }
+  function setTitle(t){ var e=$id('mbudTitle'); if(e) e.textContent=t; }
+  function setFoot(html){ var e=$id('mbudFoot'); if(e) e.innerHTML=html; }
+  M.close=function(){ var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
+  M.back=function(){
+    if(M.view==='create-review'){ M.view='create'; renderCreate(); return; }
+    if(M.view==='create' || M.view==='mine' || M.view==='detail'){ M.view='home'; renderHome(); return; }
+    M.close();
+  };
+
+  /* ---------- nạp config + master + summary ---------- */
+  function loadData(force){
+    if(M.loaded && !force) return Promise.resolve();
+    if(M.loading) return M.loading;
+    var url=scriptUrl();
+    M.loading=Promise.all([
+      fetch(url+'?action=getBudgetConfig&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(url+'?action=getBudgetMaster&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(url+'?action=getBudgetSummary&year='+M.year+'&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;})
+    ]).then(function(res){
+      M.cfg=(res[0]&&res[0].ok)?res[0]:{activity_types:[],cost_items:[],statuses:[],durations:[]};
+      M.master=(res[1]&&res[1].ok&&res[1].master)?res[1].master:[];
+      M.summaryByChain={};
+      if(res[2]&&res[2].ok&&res[2].summary){ res[2].summary.forEach(function(s){ M.summaryByChain[s.chain]=s; }); }
+      M.loaded=true; M.loading=null;
+    });
+    return M.loading;
+  }
+  function refreshSummary(){
+    var url=scriptUrl();
+    return fetch(url+'?action=getBudgetSummary&year='+M.year+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).then(function(res){
+        M.summaryByChain={};
+        if(res&&res.ok&&res.summary) res.summary.forEach(function(s){ M.summaryByChain[s.chain]=s; });
+      }).catch(function(){});
+  }
+
+  /* ---------- HOME ---------- */
+  M.open=function(){
+    ensureOverlay().classList.add('show');
+    M.view='home'; setTitle('Ngân sách MKT');
+    $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải dữ liệu…</div>'; setFoot('');
+    loadData(true).then(renderHome).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được dữ liệu. Thử lại.</div>'; });
+  };
+  function renderHome(){
+    M.view='home'; setTitle('Ngân sách MKT'); setFoot('');
+    var chains=M.master.length;
+    var h='';
+    h+='<button class="mbud-home-btn" style="background:#6a1b9a;color:#fff" onclick="MktBudgetMod.openCreate()">➕ <span>Tạo hoạt động mới</span></button>';
+    h+='<button class="mbud-home-btn" style="background:#ede7f6;color:#4a148c" onclick="MktBudgetMod.openMine()">📋 <span>Hoạt động của tôi</span></button>';
+    // bảng còn lại nhanh theo chain
+    h+='<div class="mbud-label">Còn lại theo chain ('+M.year+')</div>';
+    var keys=Object.keys(M.summaryByChain).sort();
+    if(!keys.length && !chains){ h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
+    else {
+      var rows=(M.master.length?M.master.map(function(m){return m.chain;}):keys);
+      var seen={};
+      rows.forEach(function(ch){
+        if(seen[ch])return; seen[ch]=true;
+        var s=M.summaryByChain[ch]; if(!s) s={annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0};
+        var warn=(s.annual>0 && s.pct>=0.9);
+        h+='<div class="mbud-card" style="padding:11px 13px">'+
+           '<div style="display:flex;justify-content:space-between;align-items:center">'+
+           '<b style="font-size:14px">'+esc(ch)+'</b>'+
+           '<span style="font-size:12px;color:'+(warn?'#b71c1c':'#6a1b9a')+';font-weight:700">'+Math.round((s.pct||0)*100)+'% đã dùng</span></div>'+
+           '<div style="font-size:12px;color:#666;margin-top:5px">NS năm: <b>'+vnd(s.annual)+'</b> · Đã chi: '+vnd(s.spent)+' · Cam kết: '+vnd(s.committed)+'</div>'+
+           '<div style="font-size:13px;margin-top:4px;color:'+(s.remaining<0?'#b71c1c':'#2e7d32')+';font-weight:800">Còn lại: '+vnd(s.remaining)+' đ</div>'+
+           '</div>';
+      });
+    }
+    $id('mbudBody').innerHTML=h;
+  }
+
+  /* ---------- TẠO HĐ ---------- */
+  M.openCreate=function(){
+    M.d={ chain:'', activity_type:(M.cfg.activity_types[0]||{}).key||'', duration_type:'period',
+          status:'plan', date_start:tnow(), date_end:'', scope:'store',
+          costs:[], stores:[], items:[] };
+    M.view='create'; renderCreate();
+  };
+  function renderCreate(){
+    M.view='create'; setTitle('Tạo hoạt động');
+    var d=M.d, cfg=M.cfg;
+    var chainOpts='<option value="">— Chọn chain —</option>'+M.master.map(function(m){
+      return '<option value="'+esc(m.chain)+'"'+(d.chain===m.chain?' selected':'')+'>'+esc(m.chain)+'</option>';
+    }).join('');
+    var typeOpts=cfg.activity_types.map(function(t){return '<option value="'+t.key+'"'+(d.activity_type===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('');
+
+    var h='<div class="mbud-card">';
+    h+='<div class="mbud-label">Chain / Khách MT</div>';
+    h+='<select class="mbud-select" onchange="MktBudgetMod.setChain(this.value)">'+chainOpts+'</select>';
+    h+='<div id="mbudRemain"></div>';
+    h+='<div class="mbud-label">Loại hoạt động</div>';
+    h+='<select class="mbud-select" onchange="MktBudgetMod.d.activity_type=this.value">'+typeOpts+'</select>';
+    h+='<div class="mbud-row"><div><div class="mbud-label">Thời hạn</div>'+
+       '<div class="mbud-seg"><button class="'+(d.duration_type==='period'?'on':'')+'" onclick="MktBudgetMod.setDur(\'period\')">Theo kỳ</button>'+
+       '<button class="'+(d.duration_type==='annual'?'on':'')+'" onclick="MktBudgetMod.setDur(\'annual\')">Cả năm</button></div></div></div>';
+    h+='<div class="mbud-label">Trạng thái</div>'+
+       '<div class="mbud-seg">'+
+       ['plan','running','done'].map(function(s){var lbl={plan:'Kế hoạch',running:'Đang chạy',done:'Hoàn thành'}[s];
+         return '<button class="'+(d.status===s?'on':'')+'" onclick="MktBudgetMod.setStatus(\''+s+'\')">'+lbl+'</button>';}).join('')+'</div>';
+    h+='<div class="mbud-row"><div><div class="mbud-label">Bắt đầu</div><input type="date" class="mbud-input" value="'+esc(d.date_start)+'" onchange="MktBudgetMod.d.date_start=this.value"></div>'+
+       '<div><div class="mbud-label">Kết thúc</div><input type="date" class="mbud-input" value="'+esc(d.date_end)+'" onchange="MktBudgetMod.d.date_end=this.value"></div></div>';
+    h+='</div>';
+
+    // chi phí hỗ trợ (mẫu chung)
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hỗ trợ (mẫu chung — sửa được từng store sau)</div>';
+    h+='<div id="mbudCosts"></div>';
+    h+='<button class="mbud-add" onclick="MktBudgetMod.addCost()">＋ Thêm dòng chi phí</button>';
+    h+='<div class="mbud-sum" id="mbudCostSum"></div></div>';
+
+    // phạm vi
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Phạm vi</div>'+
+       '<div class="mbud-seg"><button class="'+(d.scope==='chain'?'on':'')+'" onclick="MktBudgetMod.setScope(\'chain\')">Toàn chain</button>'+
+       '<button class="'+(d.scope==='store'?'on':'')+'" onclick="MktBudgetMod.setScope(\'store\')">Chọn store</button></div>';
+    h+='<div id="mbudScopeBox" style="margin-top:10px"></div></div>';
+
+    $id('mbudBody').innerHTML=h;
+    renderRemain(); renderCosts(); renderScope();
+    setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">Huỷ</button>'+
+            '<button class="mbud-btn mbud-btn-primary" onclick="MktBudgetMod.toReview()">Xem lại ▶</button>');
+  }
+  M.setChain=function(v){ M.d.chain=v; renderRemain(); if(M.d.scope==='store') renderScope(); };
+  M.setDur=function(v){ M.d.duration_type=v; renderCreate(); };
+  M.setStatus=function(v){ M.d.status=v; renderCreate(); };
+  M.setScope=function(v){ M.d.scope=v; renderCreate(); };
+
+  function renderRemain(){
+    var box=$id('mbudRemain'); if(!box) return;
+    var s=M.summaryByChain[M.d.chain];
+    if(!M.d.chain){ box.innerHTML=''; return; }
+    if(!s){ box.innerHTML='<div class="mbud-remain">Chain này chưa có ngân sách trong Master (còn lại = 0).</div>'; return; }
+    var warn=(s.remaining<0);
+    box.innerHTML='<div class="mbud-remain'+(warn?' warn':'')+'">Còn lại của <b>'+esc(M.d.chain)+'</b>: <b>'+vnd(s.remaining)+' đ</b><br>'+
+      '<span style="font-size:11.5px">NS năm '+vnd(s.annual)+' · đã chi '+vnd(s.spent)+' · cam kết '+vnd(s.committed)+'</span></div>';
+  }
+
+  /* cost template */
+  function costItemOpts(sel){
+    return (M.cfg.cost_items||[]).map(function(c){return '<option value="'+c.key+'"'+(sel===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
+  }
+  function renderCosts(){
+    var box=$id('mbudCosts'); if(!box) return;
+    box.innerHTML=M.d.costs.map(function(c,i){
+      return '<div class="mbud-cost"><select onchange="MktBudgetMod.setCost('+i+',\'item\',this.value)">'+costItemOpts(c.item)+'</select>'+
+        '<input inputmode="numeric" placeholder="Số tiền" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.setCost('+i+',\'amount\',this.value)">'+
+        '<button onclick="MktBudgetMod.delCost('+i+')">×</button></div>';
+    }).join('');
+    var sum=M.d.costs.reduce(function(t,c){return t+num(c.amount);},0);
+    var e=$id('mbudCostSum'); if(e) e.textContent='Tổng kế hoạch mẫu: '+vnd(sum)+' đ';
+  }
+  M.addCost=function(){ var first=(M.cfg.cost_items[0]||{}).key||''; M.d.costs.push({item:first,label:labelOf(M.cfg.cost_items,first),amount:''}); renderCosts(); };
+  M.delCost=function(i){ M.d.costs.splice(i,1); renderCosts(); };
+  M.setCost=function(i,k,v){ if(!M.d.costs[i])return; if(k==='item'){ M.d.costs[i].item=v; M.d.costs[i].label=labelOf(M.cfg.cost_items,v);} else { M.d.costs[i].amount=v; } if(k==='amount') { var sum=M.d.costs.reduce(function(t,c){return t+num(c.amount);},0); var e=$id('mbudCostSum'); if(e) e.textContent='Tổng kế hoạch mẫu: '+vnd(sum)+' đ'; } };
+
+  /* scope / store picker */
+  M._srch='';
+  function renderScope(){
+    var box=$id('mbudScopeBox'); if(!box) return;
+    if(M.d.scope==='chain'){ box.innerHTML='<div class="mbud-hint">Hoạt động áp dụng cho toàn chain (không gắn store cụ thể).</div>'; return; }
+    if(!M.d.chain){ box.innerHTML='<div class="mbud-hint">Chọn chain trước để hiện danh sách store.</div>'; return; }
+    var all=chainStores(M.d.chain);
+    var chips=M.d.stores.map(function(s,i){return '<span class="mbud-chip">'+esc(s)+' <b onclick="MktBudgetMod.rmStore('+i+')">×</b></span>';}).join('');
+    var q=M._srch.toLowerCase();
+    var filtered=all.filter(function(s){return !q||s.toLowerCase().indexOf(q)>=0;});
+    var list=filtered.slice(0,60).map(function(s){
+      var on=M.d.stores.indexOf(s)>=0;
+      return '<label class="mbud-chk"><input type="checkbox" '+(on?'checked':'')+' data-store="'+esc(s)+'" onchange="MktBudgetMod.toggleStoreEl(this)"><span>'+esc(s)+'</span></label>';
+    }).join('');
+    var more=filtered.length>60?'<div class="mbud-hint">…'+(filtered.length-60)+' store nữa — gõ để lọc.</div>':'';
+    box.innerHTML=
+      '<div>'+chips+'</div>'+
+      (all.length?('<input class="mbud-input mbud-srch" placeholder="🔍 Tìm store ('+all.length+')" value="'+esc(M._srch)+'" oninput="MktBudgetMod.srchStore(this.value)">'+list+more)
+                 :'<div class="mbud-hint">Chain này chưa có danh sách store trong app.</div>')+
+      '<div class="mbud-row" style="margin-top:8px"><input class="mbud-input" id="mbudCustom" placeholder="Nhập tên store khác…"><button class="mbud-add" style="max-width:120px;margin-top:0" onclick="MktBudgetMod.addCustom()">＋ Thêm</button></div>';
+  }
+  M.srchStore=function(v){ M._srch=v; renderScope(); var i=$id('mbudScopeBox').querySelector('.mbud-srch'); if(i){i.focus(); try{i.setSelectionRange(v.length,v.length);}catch(e){}} };
+  M.toggleStoreEl=function(el){ var s=el.getAttribute('data-store'); var i=M.d.stores.indexOf(s); if(el.checked){ if(i<0)M.d.stores.push(s);} else if(i>=0){ M.d.stores.splice(i,1);} renderScope(); };
+  M.rmStore=function(i){ M.d.stores.splice(i,1); renderScope(); };
+  M.addCustom=function(){ var el=$id('mbudCustom'); if(!el)return; var v=(el.value||'').trim(); if(!v)return; if(M.d.stores.indexOf(v)<0)M.d.stores.push(v); el.value=''; renderScope(); };
+
+  /* build items -> review */
+  M.toReview=function(){
+    var d=M.d;
+    if(!d.chain){ tt('⚠️ Chọn chain trước'); return; }
+    if(!d.date_start){ tt('⚠️ Chọn ngày bắt đầu'); return; }
+    var targets = (d.scope==='chain')?['']:d.stores.slice();
+    if(d.scope==='store' && !targets.length){ tt('⚠️ Chọn ít nhất 1 store (hoặc chuyển "Toàn chain")'); return; }
+    // clone template cho từng target, giữ chỉnh sửa cũ nếu có
+    var prev={}; (d.items||[]).forEach(function(it){ prev[it.outlet_name||'__chain__']=it; });
+    d.items=targets.map(function(name){
+      var key=name||'__chain__';
+      if(prev[key]) return prev[key];
+      return { outlet_name:name, date_start:d.date_start, date_end:d.date_end, status:d.status,
+               costs:d.costs.map(function(c){return {item:c.item,label:c.label,amount:c.amount};}) };
+    });
+    M.view='create-review'; renderReview();
+  };
+  function itemPlanned(it){ return it.costs.reduce(function(t,c){return t+num(c.amount);},0); }
+  function renderReview(){
+    M.view='create-review'; setTitle('Xem lại & lưu');
+    var d=M.d;
+    var total=d.items.reduce(function(t,it){return t+itemPlanned(it);},0);
+    var s=M.summaryByChain[d.chain]; var remaining=s?s.remaining:0;
+    var willWarn = s && (remaining-total<0);
+    var h='<div class="mbud-card" style="padding:11px 13px">'+
+      '<b>'+esc(d.chain)+'</b> · '+esc(labelOf(M.cfg.activity_types,d.activity_type))+' · '+(d.duration_type==='annual'?'Cả năm':'Theo kỳ')+
+      '<div style="font-size:12.5px;margin-top:5px">Tổng kế hoạch: <b style="color:#6a1b9a">'+vnd(total)+' đ</b> cho '+d.items.length+' dòng</div>'+
+      (s?('<div style="font-size:12px;margin-top:3px;color:'+(willWarn?'#b71c1c':'#2e7d32')+';font-weight:700">'+
+          (willWarn?('⚠️ Vượt còn lại ('+vnd(remaining)+' đ) — vẫn lưu được'):('Còn lại sau khi lưu: '+vnd(remaining-total)+' đ'))+'</div>'):'')+
+      '</div>';
+    h+=d.items.map(function(it,i){
+      var pl=itemPlanned(it);
+      var costHtml=it.costs.map(function(c,ci){
+        return '<div class="mbud-cost"><span style="flex:2;font-size:12.5px;align-self:center">'+esc(c.label)+'</span>'+
+          '<input inputmode="numeric" style="flex:1.4" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.setItemCost('+i+','+ci+',this.value)"></div>';
+      }).join('');
+      return '<div class="mbud-card"><h4 style="margin:0 0 6px;font-size:14px">'+(it.outlet_name?esc(it.outlet_name):'🏬 Toàn chain '+esc(d.chain))+'</h4>'+
+        '<div class="mbud-row"><div><div class="mbud-label" style="margin-top:2px">Bắt đầu</div><input type="date" class="mbud-input" value="'+esc(it.date_start)+'" onchange="MktBudgetMod.setItem('+i+',\'date_start\',this.value)"></div>'+
+        '<div><div class="mbud-label" style="margin-top:2px">Kết thúc</div><input type="date" class="mbud-input" value="'+esc(it.date_end)+'" onchange="MktBudgetMod.setItem('+i+',\'date_end\',this.value)"></div></div>'+
+        (costHtml?('<div class="mbud-label">Chi phí</div>'+costHtml):'')+
+        '<div class="mbud-sum">Kế hoạch: '+vnd(pl)+' đ</div></div>';
+    }).join('');
+    $id('mbudBody').innerHTML=h;
+    setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">◀ Sửa</button>'+
+            '<button class="mbud-btn mbud-btn-primary" id="mbudSaveBtn" onclick="MktBudgetMod.save()">Lưu '+d.items.length+' hoạt động</button>');
+  }
+  M.setItem=function(i,k,v){ if(M.d.items[i]) M.d.items[i][k]=v; };
+  M.setItemCost=function(i,ci,v){ if(M.d.items[i]&&M.d.items[i].costs[ci]){ M.d.items[i].costs[ci].amount=v; renderReview(); } };
+
+  M.save=function(){
+    var d=M.d;
+    var btn=$id('mbudSaveBtn'); if(btn){btn.disabled=true; btn.textContent='Đang lưu…';}
+    var payload={ type:'BUDGET_ACTIVITY_BATCH', chain:d.chain, activity_type:d.activity_type,
+      duration_type:d.duration_type, created_by:userName(), year:String(M.year),
+      items:d.items.map(function(it){ return {
+        chain:d.chain, activity_type:d.activity_type, duration_type:d.duration_type,
+        scope: it.outlet_name?'store':'chain', outlet_name:it.outlet_name||'', outlet_id:'',
+        date_start:it.date_start, date_end:it.date_end, status:it.status||'plan',
+        cost_breakdown: it.costs.map(function(c){return {item:c.item,label:c.label,amount:num(c.amount)};})
+      };})};
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    fetch(scriptUrl()+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(res&&res.ok){
+          var msg='✅ Đã lưu '+(res.count||d.items.length)+' hoạt động';
+          if(res.over_budget) msg+=' ⚠️ (đã vượt ngân sách chain)';
+          tt(msg);
+          refreshSummary().then(function(){ M.view='home'; renderHome(); });
+        } else { if(btn){btn.disabled=false; btn.textContent='Lưu '+d.items.length+' hoạt động';} tt('⚠️ Lưu lỗi. Thử lại.'); }
+      })
+      .catch(function(){ if(btn){btn.disabled=false; btn.textContent='Lưu '+d.items.length+' hoạt động';} tt('⚠️ Lỗi mạng. Thử lại.'); });
+  };
+
+  /* ---------- HOẠT ĐỘNG CỦA TÔI ---------- */
+  M.openMine=function(){
+    M.view='mine'; setTitle('Hoạt động của tôi'); setFoot('');
+    $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải…</div>';
+    var who=encodeURIComponent(userName());
+    fetch(scriptUrl()+'?action=getBudgetActivities&created_by='+who+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).then(function(res){
+        M.myActs=(res&&res.ok&&res.activities)?res.activities:[];
+        renderMine();
+      }).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được. Thử lại.</div>'; });
+  };
+  function stLabel(s){ return {plan:'Kế hoạch',running:'Đang chạy',done:'Hoàn thành',cancel:'Hủy'}[s]||s; }
+  function renderMine(){
+    M.view='mine'; setTitle('Hoạt động của tôi'); setFoot('<button class="mbud-btn mbud-btn-primary" onclick="MktBudgetMod.openCreate()">➕ Tạo hoạt động</button>');
+    if(!M.myActs.length){ $id('mbudBody').innerHTML='<div class="mbud-empty">Chưa có hoạt động nào bạn tạo.</div>'; return; }
+    var h=M.myActs.map(function(a,i){
+      var pl=(a.status==='done'&&num(a.actual_budget)>0)?a.actual_budget:a.planned_budget;
+      return '<div class="mbud-acard" onclick="MktBudgetMod.openDetail('+i+')">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
+        '<h4>'+(a.outlet_name?esc(a.outlet_name):('🏬 '+esc(a.chain)+' (toàn chain)'))+'</h4>'+
+        '<span class="mbud-st '+a.status+'">'+stLabel(a.status)+'</span></div>'+
+        '<div class="meta">'+esc(a.chain)+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
+        '<div class="meta">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+' · <b style="color:#6a1b9a">'+vnd(pl)+' đ</b></div>'+
+        '</div>';
+    }).join('');
+    $id('mbudBody').innerHTML=h;
+  }
+
+  /* ---------- CHI TIẾT / CẬP NHẬT ---------- */
+  M.openDetail=function(i){
+    M.curAct=M.myActs[i]; M.view='detail'; renderDetail();
+  };
+  function renderDetail(){
+    M.view='detail'; var a=M.curAct; setTitle('Cập nhật hoạt động');
+    var costs=(a.cost_breakdown||[]).map(function(c){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+esc(c.label||c.item)+'</span><b>'+vnd(c.amount)+' đ</b></div>';}).join('');
+    var h='<div class="mbud-card">'+
+      '<h4 style="margin:0 0 4px">'+(a.outlet_name?esc(a.outlet_name):('🏬 '+esc(a.chain)+' (toàn chain)'))+'</h4>'+
+      '<div class="meta" style="font-size:12px;color:#777">'+esc(a.chain)+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
+      '<div class="meta" style="font-size:12px;color:#777;margin-top:2px">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+'</div>'+
+      (costs?('<div class="mbud-label">Chi phí kế hoạch ('+vnd(a.planned_budget)+' đ)</div>'+costs):'')+
+      '</div>';
+
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chuyển trạng thái</div>'+
+       '<div class="mbud-seg">'+['plan','running','done','cancel'].map(function(s){
+          return '<button class="'+(a._newStatus===s||(!a._newStatus&&a.status===s)?'on':'')+'" onclick="MktBudgetMod.pickStatus(\''+s+'\')">'+stLabel(s)+'</button>';}).join('')+'</div>';
+    var willDone=(a._newStatus==='done')||(!a._newStatus&&a.status==='done');
+    if(willDone){
+      h+='<div class="mbud-label">Thực chi (VND)</div><input inputmode="numeric" class="mbud-input" id="mbudActual" placeholder="Số tiền thực chi" value="'+esc(a.actual_budget||'')+'">';
+      h+='<div class="mbud-hint">Chốt hoàn thành: tiền chuyển từ "cam kết" sang "đã chi".</div>';
+    }
+    h+='<div class="mbud-label">Kết quả / KPI</div><textarea class="mbud-input" id="mbudResult" rows="2" placeholder="VD: sản lượng kỳ KM, ghi nhận…">'+esc(a.result_kpi||'')+'</textarea>';
+    h+='<div class="mbud-label">Kế hoạch tiếp theo</div><textarea class="mbud-input" id="mbudNext" rows="2" placeholder="Bước tiếp theo…">'+esc(a.next_plan||'')+'</textarea>';
+    h+='</div>';
+
+    // ảnh (tuỳ chọn)
+    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Ảnh (tuỳ chọn)</div>'+
+       '<input type="file" accept="image/*" id="mbudPhoto" onchange="MktBudgetMod.uploadPhoto(this)">'+
+       '<div class="mbud-hint" id="mbudPhotoMsg">'+((a.photo_ids&&a.photo_ids.length)?('Đã có '+a.photo_ids.length+' ảnh'):'Chưa có ảnh')+'</div></div>';
+
+    $id('mbudBody').innerHTML=h;
+    setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">◀</button>'+
+            '<button class="mbud-btn mbud-btn-primary" id="mbudUpdBtn" onclick="MktBudgetMod.saveUpdate()">Lưu cập nhật</button>');
+  }
+  M.pickStatus=function(s){ M.curAct._newStatus=s; renderDetail(); };
+  M.saveUpdate=function(){
+    var a=M.curAct;
+    var status=a._newStatus||a.status;
+    var payload={ type:'BUDGET_ACTIVITY_UPDATE', activity_id:a.activity_id, status:status, created_by:userName(),
+      result_kpi:($id('mbudResult')||{}).value||'', next_plan:($id('mbudNext')||{}).value||'' };
+    if(status==='done'){ payload.actual_budget=num(($id('mbudActual')||{}).value||0); }
+    var btn=$id('mbudUpdBtn'); if(btn){btn.disabled=true; btn.textContent='Đang lưu…';}
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    fetch(scriptUrl()+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).then(function(res){
+        if(res&&res.ok){ tt('✅ Đã cập nhật'); refreshSummary().then(function(){ M.openMine(); }); }
+        else { if(btn){btn.disabled=false; btn.textContent='Lưu cập nhật';} tt('⚠️ Lỗi. Thử lại.'); }
+      }).catch(function(){ if(btn){btn.disabled=false; btn.textContent='Lưu cập nhật';} tt('⚠️ Lỗi mạng.'); });
+  };
+  M.uploadPhoto=function(inp){
+    var f=inp.files&&inp.files[0]; if(!f)return;
+    var msg=$id('mbudPhotoMsg'); if(msg) msg.textContent='Đang tải ảnh…';
+    var rd=new FileReader();
+    rd.onload=function(){
+      var b64=String(rd.result||''); if(b64.indexOf(',')>-1) b64=b64.split(',')[1];
+      var payload={ type:'BUDGET_PHOTO', activity_id:M.curAct.activity_id, filename:(f.name||'budget.jpg'), photo_b64:b64 };
+      var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(payload))))});
+      fetch(scriptUrl(),{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body})
+        .then(function(){ if(msg) msg.textContent='✅ Đã tải ảnh (làm mới để xem)'; })
+        .catch(function(){ if(msg) msg.textContent='⚠️ Lỗi tải ảnh'; });
+    };
+    rd.readAsDataURL(f);
+  };
+
+})();
+</script>
 
 </body>
 </html>
