@@ -3678,7 +3678,7 @@ function confirmFraudSubmit() {
   "use strict";
   var M = {
     cfg:null, loaded:false, loading:null,
-    master:[], summaryByChain:{}, year:(new Date()).getFullYear(),
+    master:[], summaryByBucket:{}, year:(new Date()).getFullYear(),
     onlyMine:false, hasPic:false,
     view:'home',
     d:null,           // draft tạo HĐ
@@ -3719,6 +3719,12 @@ function confirmFraudSubmit() {
     if(M.onlyMine){ var mine=M.master.filter(picMatch); if(mine.length) return mine; }
     return M.master;
   }
+  function bkey(ch,src){ return String(ch||'')+'\u00a6'+String(src||''); }
+  function uniqueChains(list){ var seen={},out=[]; (list||[]).forEach(function(m){ var c=String(m.chain||'').trim(); if(c&&!seen[c]){seen[c]=true;out.push(c);} }); return out; }
+  function bucketsOfChain(ch){ return visibleMaster().filter(function(m){ return String(m.chain||'').trim()===String(ch||'').trim(); }); }
+  function bucketSummary(ch,src){ return M.summaryByBucket[bkey(ch,src)]||{annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0}; }
+  function touchOpen(){ try{ localStorage.setItem('mbud_open_ts', String(Date.now())); }catch(e){} }
+  function clearOpen(){ try{ localStorage.removeItem('mbud_open_ts'); }catch(e){} }
 
   /* ---------- thẻ trên màn chọn loại ---------- */
   M.injectCard = function(team){
@@ -3750,7 +3756,7 @@ function confirmFraudSubmit() {
   }
   function setTitle(t){ var e=$id('mbudTitle'); if(e) e.textContent=t; }
   function setFoot(html){ var e=$id('mbudFoot'); if(e) e.innerHTML=html; }
-  M.close=function(){ try{ sessionStorage.removeItem('mbud_open'); }catch(e){} var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
+  M.close=function(){ if(M._hb){clearInterval(M._hb);M._hb=null;} clearOpen(); var ov=$id('mbudOverlay'); if(ov) ov.classList.remove('show'); };
   M.back=function(){
     if(M.view==='create-review'){ M.view='create'; renderCreate(); return; }
     if(M.view==='create' || M.view==='mine' || M.view==='detail'){ M.view='home'; renderHome(); return; }
@@ -3773,8 +3779,8 @@ function confirmFraudSubmit() {
       M.hasPic=M.master.some(function(m){return String(m.pic||'').trim();});
       var mine=M.master.filter(picMatch);
       M.onlyMine=(mine.length>0);   // có chain được giao cho mình → mặc định chỉ xem của mình
-      M.summaryByChain={};
-      if(res[2]&&res[2].ok&&res[2].summary){ res[2].summary.forEach(function(s){ M.summaryByChain[s.chain]=s; }); }
+      M.summaryByBucket={};
+      if(res[2]&&res[2].ok&&res[2].summary){ res[2].summary.forEach(function(s){ M.summaryByBucket[bkey(s.chain,s.source)]=s; }); }
       M.loaded=true; M.loading=null;
     });
     return M.loading;
@@ -3783,14 +3789,14 @@ function confirmFraudSubmit() {
     var url=scriptUrl();
     return fetch(url+'?action=getBudgetSummary&year='+M.year+'&_t='+Date.now(),{mode:'cors'})
       .then(function(r){return r.json();}).then(function(res){
-        M.summaryByChain={};
-        if(res&&res.ok&&res.summary) res.summary.forEach(function(s){ M.summaryByChain[s.chain]=s; });
+        M.summaryByBucket={};
+        if(res&&res.ok&&res.summary) res.summary.forEach(function(s){ M.summaryByBucket[bkey(s.chain,s.source)]=s; });
       }).catch(function(){});
   }
 
   /* ---------- HOME ---------- */
   M.open=function(){
-    try{ sessionStorage.setItem('mbud_open','1'); }catch(e){}
+    touchOpen(); if(M._hb){clearInterval(M._hb);} M._hb=setInterval(touchOpen,15000);
     ensureOverlay().classList.add('show');
     M.view='home'; setTitle('Ngân sách MKT');
     $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải dữ liệu…</div>'; setFoot('');
@@ -3810,29 +3816,37 @@ function confirmFraudSubmit() {
         '<button class="'+(M.onlyMine?'on':'')+'" onclick="MktBudgetMod.setMine(1)">Của tôi</button>'+
         '<button class="'+(M.onlyMine?'':'on')+'" onclick="MktBudgetMod.setMine(0)">Tất cả</button></div>';
     }
-    h+='<div class="mbud-label">Còn lại theo chain ('+M.year+')</div>'+toggle;
+    h+='<div class="mbud-label">Ngân sách theo khách hàng ('+M.year+')</div>'+toggle;
     var vm=visibleMaster();
-    if(!vm.length && !Object.keys(M.summaryByChain).length){
+    if(!vm.length && !Object.keys(M.summaryByBucket).length){
       if(M.masterFetchFailed){ h+='<div class="mbud-empty">Không tải được dữ liệu (mạng/deploy).<br><button class="mbud-add" style="max-width:200px;margin:12px auto 0;display:block" onclick="MktBudgetMod.reload()">🔄 Thử lại</button></div>'; }
-      else { h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
-    }
-    else {
-      var rows=(vm.length?vm.map(function(m){return m.chain;}):Object.keys(M.summaryByChain).sort());
-      var picByChain={}; M.master.forEach(function(m){ picByChain[m.chain]=String(m.pic||'').trim(); });
-      var seen={};
-      rows.forEach(function(ch){
-        if(seen[ch])return; seen[ch]=true;
-        var s=M.summaryByChain[ch]; if(!s) s={annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0};
-        var warn=(s.annual>0 && s.pct>=0.9);
-        var pic=picByChain[ch];
-        h+='<div class="mbud-card" style="padding:11px 13px">'+
-           '<div style="display:flex;justify-content:space-between;align-items:center">'+
-           '<b style="font-size:14px">'+esc(ch)+'</b>'+
-           '<span style="font-size:12px;color:'+(warn?'#b71c1c':'#6a1b9a')+';font-weight:700">'+Math.round((s.pct||0)*100)+'% đã dùng</span></div>'+
-           (pic?('<div style="font-size:11.5px;color:#7e57c2;margin-top:2px">👤 '+esc(pic)+'</div>'):'')+
-           '<div style="font-size:12px;color:#666;margin-top:5px">NS năm: <b>'+vnd(s.annual)+'</b> · Đã chi: '+vnd(s.spent)+' · Cam kết: '+vnd(s.committed)+'</div>'+
-           '<div style="font-size:13px;margin-top:4px;color:'+(s.remaining<0?'#b71c1c':'#2e7d32')+';font-weight:800">Còn lại: '+vnd(s.remaining)+' đ</div>'+
-           '</div>';
+      else { h+='<div class="mbud-empty">Chưa có mục ngân sách nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
+    } else {
+      var chains=uniqueChains(vm);
+      chains.forEach(function(ch){
+        var bks=bucketsOfChain(ch);
+        // tổng khách hàng
+        var tAnnual=0,tUsed=0,tRemain=0;
+        bks.forEach(function(m){ var s=bucketSummary(ch,String(m.source||'').trim()); tAnnual+=s.annual; tUsed+=s.used; tRemain+=s.remaining; });
+        var pic=String((bks[0]||{}).pic||'').trim();
+        h+='<div class="mbud-card" style="padding:12px 13px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center">'+
+          '<b style="font-size:15px">'+esc(ch)+'</b>'+
+          '<span style="font-size:11.5px;color:'+(tRemain<0?'#b71c1c':'#2e7d32')+';font-weight:800">Còn '+vnd(tRemain)+'đ</span></div>'+
+          (pic?('<div style="font-size:11px;color:#7e57c2;margin-top:1px">👤 '+esc(pic)+'</div>'):'')+
+          '<div style="font-size:11px;color:#999;margin-top:2px">Tổng NS '+vnd(tAnnual)+'đ · đã dùng '+vnd(tUsed)+'đ</div>'+
+          '<div style="margin-top:8px">';
+        bks.forEach(function(m){
+          var src=String(m.source||'').trim();
+          var s=bucketSummary(ch,src);
+          var warn=(s.annual>0 && s.pct>=0.9);
+          h+='<div style="border-top:1px solid #f0eef7;padding:7px 0 4px">'+
+            '<div style="display:flex;justify-content:space-between"><span style="font-size:12.5px;font-weight:600;color:#4a148c">'+esc(src||'(không tên)')+'</span>'+
+            '<span style="font-size:11px;color:'+(warn?'#b71c1c':'#777')+';font-weight:700">'+Math.round((s.pct||0)*100)+'%</span></div>'+
+            '<div style="font-size:11px;color:#666;margin-top:2px">NS '+vnd(s.annual)+' · chi '+vnd(s.spent)+' · cam kết '+vnd(s.committed)+' · <b style="color:'+(s.remaining<0?'#b71c1c':'#2e7d32')+'">còn '+vnd(s.remaining)+'</b></div>'+
+            '</div>';
+        });
+        h+='</div></div>';
       });
     }
     $id('mbudBody').innerHTML=h;
@@ -3841,7 +3855,7 @@ function confirmFraudSubmit() {
 
   /* ---------- TẠO HĐ ---------- */
   M.openCreate=function(){
-    M.d={ chain:'', activity_type:(M.cfg.activity_types[0]||{}).key||'', duration_type:'period',
+    M.d={ chain:'', source:'', activity_type:(M.cfg.activity_types[0]||{}).key||'', duration_type:'period',
           status:'plan', date_start:tnow(), date_end:'', scope:'store',
           costs:[], stores:[], items:[] };
     M.view='create'; renderCreate();
@@ -3849,14 +3863,19 @@ function confirmFraudSubmit() {
   function renderCreate(){
     M.view='create'; setTitle('Tạo hoạt động');
     var d=M.d, cfg=M.cfg;
-    var chainOpts='<option value="">— Chọn chain —</option>'+visibleMaster().map(function(m){
-      return '<option value="'+esc(m.chain)+'"'+(d.chain===m.chain?' selected':'')+'>'+esc(m.chain)+'</option>';
+    var chainOpts='<option value="">— Chọn khách hàng —</option>'+uniqueChains(visibleMaster()).map(function(ch){
+      return '<option value="'+esc(ch)+'"'+(d.chain===ch?' selected':'')+'>'+esc(ch)+'</option>';
     }).join('');
+    var srcList=d.chain?bucketsOfChain(d.chain):[];
+    var srcOpts='<option value="">— Chọn mục ngân sách —</option>'+srcList.map(function(m){var s=String(m.source||'').trim();
+      return '<option value="'+esc(s)+'"'+(d.source===s?' selected':'')+'>'+esc(s||'(không tên)')+'</option>';}).join('');
     var typeOpts=cfg.activity_types.map(function(t){return '<option value="'+t.key+'"'+(d.activity_type===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('');
 
     var h='<div class="mbud-card">';
-    h+='<div class="mbud-label">Chain / Khách MT</div>';
+    h+='<div class="mbud-label">Khách hàng (chain)</div>';
     h+='<select class="mbud-select" onchange="MktBudgetMod.setChain(this.value)">'+chainOpts+'</select>';
+    h+='<div class="mbud-label">Mục ngân sách</div>';
+    h+='<select class="mbud-select" onchange="MktBudgetMod.setSource(this.value)"'+(d.chain?'':' disabled')+'>'+srcOpts+'</select>';
     h+='<div id="mbudRemain"></div>';
     h+='<div class="mbud-label">Loại hoạt động</div>';
     h+='<select class="mbud-select" onchange="MktBudgetMod.d.activity_type=this.value">'+typeOpts+'</select>';
@@ -3888,19 +3907,20 @@ function confirmFraudSubmit() {
     setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">Huỷ</button>'+
             '<button class="mbud-btn mbud-btn-primary" onclick="MktBudgetMod.toReview()">Xem lại ▶</button>');
   }
-  M.setChain=function(v){ M.d.chain=v; renderRemain(); if(M.d.scope==='store') renderScope(); };
+  M.setChain=function(v){ M.d.chain=v; M.d.source=''; renderCreate(); };
+  M.setSource=function(v){ M.d.source=v; renderRemain(); };
   M.setDur=function(v){ M.d.duration_type=v; renderCreate(); };
   M.setStatus=function(v){ M.d.status=v; renderCreate(); };
   M.setScope=function(v){ M.d.scope=v; renderCreate(); };
 
   function renderRemain(){
     var box=$id('mbudRemain'); if(!box) return;
-    var s=M.summaryByChain[M.d.chain];
     if(!M.d.chain){ box.innerHTML=''; return; }
-    if(!s){ box.innerHTML='<div class="mbud-remain">Chain này chưa có ngân sách trong Master (còn lại = 0).</div>'; return; }
+    if(!M.d.source){ box.innerHTML='<div class="mbud-remain">Chọn mục ngân sách để xem còn lại.</div>'; return; }
+    var s=bucketSummary(M.d.chain,M.d.source);
     var warn=(s.remaining<0);
-    box.innerHTML='<div class="mbud-remain'+(warn?' warn':'')+'">Còn lại của <b>'+esc(M.d.chain)+'</b>: <b>'+vnd(s.remaining)+' đ</b><br>'+
-      '<span style="font-size:11.5px">NS năm '+vnd(s.annual)+' · đã chi '+vnd(s.spent)+' · cam kết '+vnd(s.committed)+'</span></div>';
+    box.innerHTML='<div class="mbud-remain'+(warn?' warn':'')+'">Còn lại của <b>'+esc(M.d.chain)+' · '+esc(M.d.source)+'</b>: <b>'+vnd(s.remaining)+' đ</b><br>'+
+      '<span style="font-size:11.5px">NS '+vnd(s.annual)+' · đã chi '+vnd(s.spent)+' · cam kết '+vnd(s.committed)+'</span></div>';
   }
 
   /* cost template */
@@ -3950,7 +3970,8 @@ function confirmFraudSubmit() {
   /* build items -> review */
   M.toReview=function(){
     var d=M.d;
-    if(!d.chain){ tt('⚠️ Chọn chain trước'); return; }
+    if(!d.chain){ tt('⚠️ Chọn khách hàng trước'); return; }
+    if(!d.source){ tt('⚠️ Chọn mục ngân sách'); return; }
     if(!d.date_start){ tt('⚠️ Chọn ngày bắt đầu'); return; }
     var targets = (d.scope==='chain')?['']:d.stores.slice();
     if(d.scope==='store' && !targets.length){ tt('⚠️ Chọn ít nhất 1 store (hoặc chuyển "Toàn chain")'); return; }
@@ -3969,13 +3990,14 @@ function confirmFraudSubmit() {
     M.view='create-review'; setTitle('Xem lại & lưu');
     var d=M.d;
     var total=d.items.reduce(function(t,it){return t+itemPlanned(it);},0);
-    var s=M.summaryByChain[d.chain]; var remaining=s?s.remaining:0;
-    var willWarn = s && (remaining-total<0);
+    var s=bucketSummary(d.chain,d.source); var remaining=s.remaining;
+    var willWarn = (remaining-total<0);
     var h='<div class="mbud-card" style="padding:11px 13px">'+
-      '<b>'+esc(d.chain)+'</b> · '+esc(labelOf(M.cfg.activity_types,d.activity_type))+' · '+(d.duration_type==='annual'?'Cả năm':'Theo kỳ')+
+      '<b>'+esc(d.chain)+'</b> · <span style="color:#4a148c;font-weight:700">'+esc(d.source)+'</span><br>'+
+      '<span style="font-size:12px;color:#666">'+esc(labelOf(M.cfg.activity_types,d.activity_type))+' · '+(d.duration_type==='annual'?'Cả năm':'Theo kỳ')+'</span>'+
       '<div style="font-size:12.5px;margin-top:5px">Tổng kế hoạch: <b style="color:#6a1b9a">'+vnd(total)+' đ</b> cho '+d.items.length+' dòng</div>'+
-      (s?('<div style="font-size:12px;margin-top:3px;color:'+(willWarn?'#b71c1c':'#2e7d32')+';font-weight:700">'+
-          (willWarn?('⚠️ Vượt còn lại ('+vnd(remaining)+' đ) — vẫn lưu được'):('Còn lại sau khi lưu: '+vnd(remaining-total)+' đ'))+'</div>'):'')+
+      '<div style="font-size:12px;margin-top:3px;color:'+(willWarn?'#b71c1c':'#2e7d32')+';font-weight:700">'+
+          (willWarn?('⚠️ Vượt còn lại của mục ('+vnd(remaining)+' đ) — vẫn lưu được'):('Còn lại sau khi lưu: '+vnd(remaining-total)+' đ'))+'</div>'+
       '</div>';
     h+=d.items.map(function(it,i){
       var pl=itemPlanned(it);
@@ -3999,10 +4021,10 @@ function confirmFraudSubmit() {
   M.save=function(){
     var d=M.d;
     var btn=$id('mbudSaveBtn'); if(btn){btn.disabled=true; btn.textContent='Đang lưu…';}
-    var payload={ type:'BUDGET_ACTIVITY_BATCH', chain:d.chain, activity_type:d.activity_type,
+    var payload={ type:'BUDGET_ACTIVITY_BATCH', chain:d.chain, source:d.source, activity_type:d.activity_type,
       duration_type:d.duration_type, created_by:userName(), year:String(M.year),
       items:d.items.map(function(it){ return {
-        chain:d.chain, activity_type:d.activity_type, duration_type:d.duration_type,
+        chain:d.chain, source:d.source, activity_type:d.activity_type, duration_type:d.duration_type,
         scope: it.outlet_name?'store':'chain', outlet_name:it.outlet_name||'', outlet_id:'',
         date_start:it.date_start, date_end:it.date_end, status:it.status||'plan',
         cost_breakdown: it.costs.map(function(c){return {item:c.item,label:c.label,amount:num(c.amount)};})
@@ -4042,7 +4064,7 @@ function confirmFraudSubmit() {
         '<div style="display:flex;justify-content:space-between;align-items:flex-start">'+
         '<h4>'+(a.outlet_name?esc(a.outlet_name):('🏬 '+esc(a.chain)+' (toàn chain)'))+'</h4>'+
         '<span class="mbud-st '+a.status+'">'+stLabel(a.status)+'</span></div>'+
-        '<div class="meta">'+esc(a.chain)+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
+        '<div class="meta">'+esc(a.chain)+(a.source?(' · '+esc(a.source)):'')+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
         '<div class="meta">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+' · <b style="color:#6a1b9a">'+vnd(pl)+' đ</b></div>'+
         '</div>';
     }).join('');
@@ -4058,7 +4080,7 @@ function confirmFraudSubmit() {
     var costs=(a.cost_breakdown||[]).map(function(c){return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span>'+esc(c.label||c.item)+'</span><b>'+vnd(c.amount)+' đ</b></div>';}).join('');
     var h='<div class="mbud-card">'+
       '<h4 style="margin:0 0 4px">'+(a.outlet_name?esc(a.outlet_name):('🏬 '+esc(a.chain)+' (toàn chain)'))+'</h4>'+
-      '<div class="meta" style="font-size:12px;color:#777">'+esc(a.chain)+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
+      '<div class="meta" style="font-size:12px;color:#777">'+esc(a.chain)+(a.source?(' · '+esc(a.source)):'')+' · '+esc(labelOf(M.cfg.activity_types,a.activity_type))+(a.duration_type==='annual'?' · Cả năm':'')+'</div>'+
       '<div class="meta" style="font-size:12px;color:#777;margin-top:2px">'+esc(a.date_start||'')+(a.date_end?(' → '+esc(a.date_end)):'')+'</div>'+
       (costs?('<div class="mbud-label">Chi phí kế hoạch ('+vnd(a.planned_budget)+' đ)</div>'+costs):'')+
       '</div>';
@@ -4115,18 +4137,22 @@ function confirmFraudSubmit() {
   };
 
   /* ---------- KHÔI PHỤC SAU REFRESH ----------
-     F5 xong: nếu đang mở module Ngân sách thì tự mở lại (chờ app khôi phục user). */
+     F5 xong: nếu vừa đang mở module (cờ thời gian còn mới) thì tự mở lại,
+     và giữ mở nếu bị màn hình app che, trong ~15 giây đầu. */
   (function restoreAfterRefresh(){
     try{
-      if(sessionStorage.getItem('mbud_open')!=='1') return;
-      var tries=0;
-      var timer=setInterval(function(){
-        tries++;
-        var ready=false;
-        try{ ready=!!(window.state && state.user && state.user.name); }catch(e){}
-        if(ready){ clearInterval(timer); try{ M.open(); }catch(e){} }
-        else if(tries>30){ clearInterval(timer); }   // ~9s chờ tối đa
-      },300);
+      var ts=parseInt(localStorage.getItem('mbud_open_ts')||'0',10);
+      if(!ts || (Date.now()-ts)>60000) return;   // chỉ khôi phục nếu vừa dùng trong 60s (tức là reload)
+      var start=Date.now();
+      var iv=setInterval(function(){
+        if(Date.now()-start>15000){ clearInterval(iv); return; }
+        var freshTs=parseInt(localStorage.getItem('mbud_open_ts')||'0',10);
+        if(!freshTs){ clearInterval(iv); return; }        // user đã đóng module
+        var ready=false; try{ ready=!!(window.state && state.user && state.user.name); }catch(e){}
+        if(!ready) return;
+        var ov=document.getElementById('mbudOverlay');
+        if(!ov || !ov.classList.contains('show')){ try{ M.open(); }catch(e){} }
+      },400);
     }catch(e){}
   })();
 
