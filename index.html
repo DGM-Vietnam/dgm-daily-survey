@@ -3693,7 +3693,11 @@ function confirmFraudSubmit() {
   function tnow(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function num(v){ if(v==null||v==='')return 0; var n=parseFloat(String(v).replace(/[^0-9.\-]/g,'')); return isNaN(n)?0:n; }
   function vnd(n){ n=Math.round(num(n)); var s=(n<0?'-':'')+String(Math.abs(n)); return s.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-  function scriptUrl(){ try{ return (window.state&&state.scriptUrl)||''; }catch(e){ return ''; } }
+  function scriptUrl(){
+    try{ if(window.state && state.scriptUrl) return state.scriptUrl; }catch(e){}
+    try{ if(typeof HARDCODED_SCRIPT_URL!=='undefined' && HARDCODED_SCRIPT_URL) return HARDCODED_SCRIPT_URL; }catch(e){}
+    return '';
+  }
   function userName(){ try{ return (state.user&&state.user.name)||''; }catch(e){ return ''; } }
   function isLeader(){
     try{
@@ -3764,6 +3768,7 @@ function confirmFraudSubmit() {
       fetch(url+'?action=getBudgetSummary&year='+M.year+'&_t='+Date.now(),{mode:'cors'}).then(function(r){return r.json();}).catch(function(){return null;})
     ]).then(function(res){
       M.cfg=(res[0]&&res[0].ok)?res[0]:{activity_types:[],cost_items:[],statuses:[],durations:[]};
+      M.masterFetchFailed = !res[1];   // null = fetch lỗi (khác với sheet trống)
       M.master=(res[1]&&res[1].ok&&res[1].master)?res[1].master:[];
       M.hasPic=M.master.some(function(m){return String(m.pic||'').trim();});
       var mine=M.master.filter(picMatch);
@@ -3789,8 +3794,9 @@ function confirmFraudSubmit() {
     ensureOverlay().classList.add('show');
     M.view='home'; setTitle('Ngân sách MKT');
     $id('mbudBody').innerHTML='<div class="mbud-empty">Đang tải dữ liệu…</div>'; setFoot('');
-    loadData(true).then(renderHome).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được dữ liệu. Thử lại.</div>'; });
+    loadData(true).then(renderHome).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được dữ liệu.<br><button class="mbud-add" style="max-width:200px;margin:12px auto 0;display:block" onclick="MktBudgetMod.reload()">🔄 Thử lại</button></div>'; });
   };
+  M.reload=function(){ M.loaded=false; M.loading=null; M.open(); };
   function renderHome(){
     M.view='home'; setTitle('Ngân sách MKT'); setFoot('');
     var chains=M.master.length;
@@ -3806,7 +3812,10 @@ function confirmFraudSubmit() {
     }
     h+='<div class="mbud-label">Còn lại theo chain ('+M.year+')</div>'+toggle;
     var vm=visibleMaster();
-    if(!vm.length && !Object.keys(M.summaryByChain).length){ h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
+    if(!vm.length && !Object.keys(M.summaryByChain).length){
+      if(M.masterFetchFailed){ h+='<div class="mbud-empty">Không tải được dữ liệu (mạng/deploy).<br><button class="mbud-add" style="max-width:200px;margin:12px auto 0;display:block" onclick="MktBudgetMod.reload()">🔄 Thử lại</button></div>'; }
+      else { h+='<div class="mbud-empty">Chưa có chain nào trong MT_Budget_Master.<br>Quy nhập ngân sách trong Google Sheet trước nhé.</div>'; }
+    }
     else {
       var rows=(vm.length?vm.map(function(m){return m.chain;}):Object.keys(M.summaryByChain).sort());
       var picByChain={}; M.master.forEach(function(m){ picByChain[m.chain]=String(m.pic||'').trim(); });
@@ -4021,7 +4030,7 @@ function confirmFraudSubmit() {
       .then(function(r){return r.json();}).then(function(res){
         M.myActs=(res&&res.ok&&res.activities)?res.activities:[];
         renderMine();
-      }).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được. Thử lại.</div>'; });
+      }).catch(function(){ $id('mbudBody').innerHTML='<div class="mbud-empty">Không tải được.<br><button class="mbud-add" style="max-width:200px;margin:12px auto 0;display:block" onclick="MktBudgetMod.openMine()">🔄 Thử lại</button></div>'; });
   };
   function stLabel(s){ return {plan:'Kế hoạch',running:'Đang chạy',done:'Hoàn thành',cancel:'Hủy'}[s]||s; }
   function renderMine(){
