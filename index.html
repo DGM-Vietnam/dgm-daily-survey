@@ -3881,8 +3881,7 @@ function confirmFraudSubmit() {
   M.openCreate=function(){
     M.d={ chain:'', source:'', activity_type:(M.cfg.activity_types[0]||{}).key||'', duration_type:'period',
           status:'plan', date_start:tnow(), date_end:'', scope:'store',
-          costs:[], stores:[], items:[] };
-    ensurePositionCost(M.d);
+          positionFee:'', costs:[], stores:[], items:[] };
     M.view='create'; renderCreate();
   };
   function renderCreate(){
@@ -3915,11 +3914,21 @@ function confirmFraudSubmit() {
        '<div><div class="mbud-label">Kết thúc</div><input type="date" class="mbud-input" value="'+esc(d.date_end)+'" onchange="MktBudgetMod.d.date_end=this.value"></div></div>';
     h+='</div>';
 
-    // chi phí hỗ trợ (mẫu chung)
-    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hoạt động (mẫu chung — sửa được từng store sau)</div>';
-    h+='<div class="mbud-hint" style="margin-bottom:7px">💡 Gồm cả <b>phí thuê vị trí/kệ</b> (nếu có) + chi phí hỗ trợ (POSM, PG, sampling…). Tổng = cộng tất cả dòng.</div>';
+    // chi phí: tách "thuê vị trí chính" (cho loại thuê kệ/billboard…) và "hỗ trợ thêm"
+    h+='<div class="mbud-card">';
+    if(isPositionType(d.activity_type)){
+      var rem=(d.source?bucketSummary(d.chain,d.source).remaining:0);
+      h+='<div class="mbud-label" style="margin-top:0">💰 Phí thuê vị trí / kệ (chính)</div>';
+      h+='<div class="mbud-hint" style="margin-bottom:5px">Phí thuê billboard/kệ/vị trí — thường bằng ngân sách của mục.</div>';
+      h+='<input inputmode="numeric" class="mbud-input" placeholder="VD 90000000" value="'+esc(d.positionFee||'')+'" oninput="MktBudgetMod.setPos(this.value)">';
+      h+='<div class="mbud-hint" style="margin-top:5px">👉 <b onclick="MktBudgetMod.usePos('+rem+')" style="color:#6a1b9a;cursor:pointer;text-decoration:underline">Dùng còn lại của mục ('+vnd(rem)+'đ)</b></div>';
+      h+='<div class="mbud-label">Chi phí hỗ trợ thêm (POSM, PG, sampling…)</div>';
+    } else {
+      h+='<div class="mbud-label" style="margin-top:0">Chi phí hoạt động</div>';
+    }
+    h+='<div class="mbud-hint" style="margin-bottom:7px">Tổng = phí thuê vị trí + tất cả dòng hỗ trợ thêm bên dưới.</div>';
     h+='<div id="mbudCosts"></div>';
-    h+='<button class="mbud-add" onclick="MktBudgetMod.addCost()">＋ Thêm dòng chi phí</button>';
+    h+='<button class="mbud-add" onclick="MktBudgetMod.addCost()">＋ Thêm dòng hỗ trợ</button>';
     h+='<div class="mbud-sum" id="mbudCostSum"></div></div>';
 
     // phạm vi
@@ -3935,7 +3944,7 @@ function confirmFraudSubmit() {
   }
   M.setChain=function(v){ M.d.chain=v; M.d.source=''; if(v && chainStores(v).length===0) M.d.scope='chain'; renderCreate(); };
   M.setSource=function(v){ M.d.source=v; renderRemain(); };
-  M.setType=function(v){ M.d.activity_type=v; ensurePositionCost(M.d); renderCreate(); };
+  M.setType=function(v){ M.d.activity_type=v; renderCreate(); };
   M.setDur=function(v){ M.d.duration_type=v; renderCreate(); };
   M.setStatus=function(v){ M.d.status=v; renderCreate(); };
   M.setScope=function(v){ M.d.scope=v; renderCreate(); };
@@ -3954,19 +3963,25 @@ function confirmFraudSubmit() {
   function costItemOpts(sel){
     return (M.cfg.cost_items||[]).map(function(c){return '<option value="'+c.key+'"'+(sel===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join('');
   }
+  function supportItems(){ return (M.cfg.cost_items||[]).filter(function(c){return c.key!=='position';}); }
+  function costItemOptsNoPos(sel){ return supportItems().map(function(c){return '<option value="'+c.key+'"'+(sel===c.key?' selected':'')+'>'+esc(c.label)+'</option>';}).join(''); }
+  function firstSupportKey(){ var s=supportItems(); return (s[0]||{}).key||'other'; }
+  function dTotal(){ var pos=isPositionType(M.d.activity_type)?num(M.d.positionFee):0; var sup=M.d.costs.reduce(function(t,c){return t+num(c.amount);},0); return {pos:pos,sup:sup,total:pos+sup}; }
+  function updateDSum(){ var t=dTotal(); var e=$id('mbudCostSum'); if(e) e.innerHTML=(t.pos?('Thuê vị trí '+vnd(t.pos)+'đ + '):'')+'hỗ trợ '+vnd(t.sup)+'đ = <b style="color:#6a1b9a">'+vnd(t.total)+' đ</b>'; }
   function renderCosts(){
     var box=$id('mbudCosts'); if(!box) return;
     box.innerHTML=M.d.costs.map(function(c,i){
-      return '<div class="mbud-cost"><select onchange="MktBudgetMod.setCost('+i+',\'item\',this.value)">'+costItemOpts(c.item)+'</select>'+
+      return '<div class="mbud-cost"><select onchange="MktBudgetMod.setCost('+i+',\'item\',this.value)">'+costItemOptsNoPos(c.item)+'</select>'+
         '<input inputmode="numeric" placeholder="Số tiền" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.setCost('+i+',\'amount\',this.value)">'+
         '<button onclick="MktBudgetMod.delCost('+i+')">×</button></div>';
     }).join('');
-    var sum=M.d.costs.reduce(function(t,c){return t+num(c.amount);},0);
-    var e=$id('mbudCostSum'); if(e) e.textContent='Tổng kế hoạch mẫu: '+vnd(sum)+' đ';
+    updateDSum();
   }
-  M.addCost=function(){ var first=(M.cfg.cost_items[0]||{}).key||''; M.d.costs.push({item:first,label:labelOf(M.cfg.cost_items,first),amount:''}); renderCosts(); };
+  M.addCost=function(){ var f=firstSupportKey(); M.d.costs.push({item:f,label:labelOf(M.cfg.cost_items,f),amount:''}); renderCosts(); };
   M.delCost=function(i){ M.d.costs.splice(i,1); renderCosts(); };
-  M.setCost=function(i,k,v){ if(!M.d.costs[i])return; if(k==='item'){ M.d.costs[i].item=v; M.d.costs[i].label=labelOf(M.cfg.cost_items,v);} else { M.d.costs[i].amount=v; } if(k==='amount') { var sum=M.d.costs.reduce(function(t,c){return t+num(c.amount);},0); var e=$id('mbudCostSum'); if(e) e.textContent='Tổng kế hoạch mẫu: '+vnd(sum)+' đ'; } };
+  M.setCost=function(i,k,v){ if(!M.d.costs[i])return; if(k==='item'){ M.d.costs[i].item=v; M.d.costs[i].label=labelOf(M.cfg.cost_items,v);} else { M.d.costs[i].amount=v; } if(k==='amount') updateDSum(); };
+  M.setPos=function(v){ M.d.positionFee=v; updateDSum(); };
+  M.usePos=function(v){ M.d.positionFee=String(v); renderCreate(); };
 
   /* scope / store picker */
   M._srch='';
@@ -4004,11 +4019,14 @@ function confirmFraudSubmit() {
     if(d.scope==='store' && !targets.length){ tt('⚠️ Chọn ít nhất 1 store (hoặc chuyển "Toàn chain")'); return; }
     // clone template cho từng target, giữ chỉnh sửa cũ nếu có
     var prev={}; (d.items||[]).forEach(function(it){ prev[it.outlet_name||'__chain__']=it; });
+    var baseCosts=[];
+    if(isPositionType(d.activity_type) && num(d.positionFee)>0) baseCosts.push({item:'position',label:labelOf(M.cfg.cost_items,'position'),amount:d.positionFee});
+    d.costs.forEach(function(c){ baseCosts.push({item:c.item,label:c.label,amount:c.amount}); });
     d.items=targets.map(function(name){
       var key=name||'__chain__';
       if(prev[key]) return prev[key];
       return { outlet_name:name, date_start:d.date_start, date_end:d.date_end, status:d.status,
-               costs:d.costs.map(function(c){return {item:c.item,label:c.label,amount:c.amount};}) };
+               costs:baseCosts.map(function(c){return {item:c.item,label:c.label,amount:c.amount};}) };
     });
     M.view='create-review'; renderReview();
   };
@@ -4171,11 +4189,13 @@ function confirmFraudSubmit() {
     var a=M.curAct;
     if(!canEdit(a)){ tt('Bạn không có quyền sửa hoạt động này'); return; }
     var cb=a.cost_breakdown; if(typeof cb==='string'){ try{cb=JSON.parse(cb);}catch(e){cb=[];} }
+    var posSum=0, support=[];
+    (cb||[]).forEach(function(c){ if(c.item==='position'){ posSum+=num(c.amount); } else { support.push({item:c.item||'other',label:c.label||labelOf(M.cfg.cost_items,c.item),amount:c.amount}); } });
     M.e={ activity_id:a.activity_id, chain:a.chain, source:String(a.source||''),
           activity_type:a.activity_type||'other', duration_type:a.duration_type||'period',
           outlet_name:String(a.outlet_name||''), date_start:String(a.date_start||''),
           date_end:String(a.date_end||''), note:String(a.note||''),
-          costs:(cb||[]).map(function(c){return {item:c.item||'other',label:c.label||labelOf(M.cfg.cost_items,c.item),amount:c.amount};}) };
+          positionFee:(posSum?String(posSum):''), costs:support };
     M.view='edit'; renderEdit();
   };
   function renderEdit(){
@@ -4192,31 +4212,48 @@ function confirmFraudSubmit() {
     h+='<div class="mbud-label">Điểm bán (trống = toàn chain)</div><input class="mbud-input" value="'+esc(e.outlet_name)+'" oninput="MktBudgetMod.e.outlet_name=this.value">';
     h+='<div class="mbud-row"><div><div class="mbud-label">Bắt đầu</div><input type="date" class="mbud-input" value="'+esc(e.date_start)+'" onchange="MktBudgetMod.e.date_start=this.value"></div><div><div class="mbud-label">Kết thúc</div><input type="date" class="mbud-input" value="'+esc(e.date_end)+'" onchange="MktBudgetMod.e.date_end=this.value"></div></div>';
     h+='</div>';
-    h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Chi phí hoạt động</div><div class="mbud-hint" style="margin-bottom:7px">💡 Gồm phí thuê vị trí/kệ + hỗ trợ (POSM, PG…). Tổng = cộng tất cả dòng.</div><div id="mbudECosts"></div><button class="mbud-add" onclick="MktBudgetMod.eAddCost()">＋ Thêm dòng chi phí</button><div class="mbud-sum" id="mbudECostSum"></div></div>';
+    h+='<div class="mbud-card">';
+    if(isPositionType(e.activity_type)){
+      var remE=bucketSummary(e.chain,e.source).remaining;
+      h+='<div class="mbud-label" style="margin-top:0">💰 Phí thuê vị trí / kệ (chính)</div>';
+      h+='<div class="mbud-hint" style="margin-bottom:5px">Phí thuê billboard/kệ/vị trí — thường bằng ngân sách mục.</div>';
+      h+='<input inputmode="numeric" class="mbud-input" placeholder="VD 90000000" value="'+esc(e.positionFee||'')+'" oninput="MktBudgetMod.eSetPos(this.value)">';
+      h+='<div class="mbud-hint" style="margin-top:5px">👉 <b onclick="MktBudgetMod.eUsePos('+remE+')" style="color:#6a1b9a;cursor:pointer;text-decoration:underline">Dùng còn lại của mục ('+vnd(remE)+'đ)</b></div>';
+      h+='<div class="mbud-label">Chi phí hỗ trợ thêm (POSM, PG…)</div>';
+    } else {
+      h+='<div class="mbud-label" style="margin-top:0">Chi phí hoạt động</div>';
+    }
+    h+='<div class="mbud-hint" style="margin-bottom:7px">Tổng = phí thuê vị trí + tất cả dòng hỗ trợ.</div><div id="mbudECosts"></div><button class="mbud-add" onclick="MktBudgetMod.eAddCost()">＋ Thêm dòng hỗ trợ</button><div class="mbud-sum" id="mbudECostSum"></div></div>';
     h+='<div class="mbud-card"><div class="mbud-label" style="margin-top:0">Ghi chú</div><textarea class="mbud-input" rows="2" oninput="MktBudgetMod.e.note=this.value">'+esc(e.note)+'</textarea></div>';
     $id('mbudBody').innerHTML=h; renderECosts();
     setFoot('<button class="mbud-btn mbud-btn-ghost" onclick="MktBudgetMod.back()">◀ Huỷ</button><button class="mbud-btn mbud-btn-primary" id="mbudESaveBtn" onclick="MktBudgetMod.saveEdit()">Lưu thay đổi</button>');
   }
   M.eSet=function(k,v){ M.e[k]=v; renderEdit(); };
-  M.eSetType=function(v){ M.e.activity_type=v; ensurePositionCost(M.e); renderEdit(); };
+  M.eSetType=function(v){ M.e.activity_type=v; renderEdit(); };
+  M.eSetPos=function(v){ M.e.positionFee=v; updateESum(); };
+  M.eUsePos=function(v){ M.e.positionFee=String(v); renderEdit(); };
+  function eTotal(){ var pos=isPositionType(M.e.activity_type)?num(M.e.positionFee):0; var sup=M.e.costs.reduce(function(t,c){return t+num(c.amount);},0); return {pos:pos,sup:sup,total:pos+sup}; }
+  function updateESum(){ var t=eTotal(); var el=$id('mbudECostSum'); if(el) el.innerHTML=(t.pos?('Thuê vị trí '+vnd(t.pos)+'đ + '):'')+'hỗ trợ '+vnd(t.sup)+'đ = <b style="color:#6a1b9a">'+vnd(t.total)+' đ</b>'; }
   function renderECosts(){
     var box=$id('mbudECosts'); if(!box)return;
     box.innerHTML=M.e.costs.map(function(c,i){
-      return '<div class="mbud-cost"><select onchange="MktBudgetMod.eSetCost('+i+',\'item\',this.value)">'+costItemOpts(c.item)+'</select><input inputmode="numeric" placeholder="Số tiền" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.eSetCost('+i+',\'amount\',this.value)"><button onclick="MktBudgetMod.eDelCost('+i+')">×</button></div>';
+      return '<div class="mbud-cost"><select onchange="MktBudgetMod.eSetCost('+i+',\'item\',this.value)">'+costItemOptsNoPos(c.item)+'</select><input inputmode="numeric" placeholder="Số tiền" value="'+esc(c.amount||'')+'" oninput="MktBudgetMod.eSetCost('+i+',\'amount\',this.value)"><button onclick="MktBudgetMod.eDelCost('+i+')">×</button></div>';
     }).join('');
-    var sum=M.e.costs.reduce(function(t,c){return t+num(c.amount);},0);
-    var el=$id('mbudECostSum'); if(el) el.textContent='Tổng: '+vnd(sum)+' đ';
+    updateESum();
   }
-  M.eAddCost=function(){ var f=(M.cfg.cost_items[0]||{}).key||''; M.e.costs.push({item:f,label:labelOf(M.cfg.cost_items,f),amount:''}); renderECosts(); };
+  M.eAddCost=function(){ var f=firstSupportKey(); M.e.costs.push({item:f,label:labelOf(M.cfg.cost_items,f),amount:''}); renderECosts(); };
   M.eDelCost=function(i){ M.e.costs.splice(i,1); renderECosts(); };
-  M.eSetCost=function(i,k,v){ if(!M.e.costs[i])return; if(k==='item'){M.e.costs[i].item=v;M.e.costs[i].label=labelOf(M.cfg.cost_items,v);}else{M.e.costs[i].amount=v;} if(k==='amount'){var sum=M.e.costs.reduce(function(t,c){return t+num(c.amount);},0);var el=$id('mbudECostSum');if(el)el.textContent='Tổng: '+vnd(sum)+' đ';} };
+  M.eSetCost=function(i,k,v){ if(!M.e.costs[i])return; if(k==='item'){M.e.costs[i].item=v;M.e.costs[i].label=labelOf(M.cfg.cost_items,v);}else{M.e.costs[i].amount=v;} if(k==='amount') updateESum(); };
   M.saveEdit=function(){
     var e=M.e;
     var btn=$id('mbudESaveBtn'); if(btn){btn.disabled=true;btn.textContent='Đang lưu…';}
+    var cb=[];
+    if(isPositionType(e.activity_type) && num(e.positionFee)>0) cb.push({item:'position',label:labelOf(M.cfg.cost_items,'position'),amount:num(e.positionFee)});
+    e.costs.forEach(function(c){ cb.push({item:c.item,label:c.label,amount:num(c.amount)}); });
     var payload={ type:'BUDGET_ACTIVITY_UPDATE', activity_id:e.activity_id, chain:e.chain, source:e.source,
       activity_type:e.activity_type, duration_type:e.duration_type, outlet_name:e.outlet_name,
       date_start:e.date_start, date_end:e.date_end, note:e.note, created_by:userName(),
-      cost_breakdown:e.costs.map(function(c){return {item:c.item,label:c.label,amount:num(c.amount)};}) };
+      cost_breakdown:cb };
     var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
     fetch(scriptUrl()+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
       .then(function(r){return r.json();}).then(function(res){
