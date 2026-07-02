@@ -3733,8 +3733,9 @@ function confirmFraudSubmit() {
   function uniqueChains(list){ var seen={},out=[]; (list||[]).forEach(function(m){ var c=String(m.chain||'').trim(); if(c&&!seen[c]){seen[c]=true;out.push(c);} }); return out; }
   function bucketsOfChain(ch){ return visibleMaster().filter(function(m){ return String(m.chain||'').trim()===String(ch||'').trim(); }); }
   function bucketSummary(ch,src){ return M.summaryByBucket[bkey(ch,src)]||{annual:0,used:0,remaining:0,spent:0,committed:0,count:0,pct:0}; }
-  function touchOpen(){ try{ localStorage.setItem('mbud_open_ts', String(Date.now())); }catch(e){} }
-  function clearOpen(){ try{ localStorage.removeItem('mbud_open_ts'); }catch(e){} }
+  function touchOpen(){ var t=String(Date.now()); try{ localStorage.setItem('mbud_open_ts',t); }catch(e){} try{ sessionStorage.setItem('mbud_open_ts',t); }catch(e){} }
+  function clearOpen(){ try{ localStorage.removeItem('mbud_open_ts'); }catch(e){} try{ sessionStorage.removeItem('mbud_open_ts'); }catch(e){} }
+  function readOpenTs(){ var a=0,b=0; try{ a=parseInt(localStorage.getItem('mbud_open_ts')||'0',10)||0; }catch(e){} try{ b=parseInt(sessionStorage.getItem('mbud_open_ts')||'0',10)||0; }catch(e){} return Math.max(a,b); }
   var POSITION_TYPES=['shelf','endcap','island','offshelf','billboard'];
   function isPositionType(t){ return POSITION_TYPES.indexOf(t)>=0; }
   function ensurePositionCost(d){
@@ -4229,18 +4230,17 @@ function confirmFraudSubmit() {
      và giữ mở nếu bị màn hình app che, trong ~15 giây đầu. */
   (function restoreAfterRefresh(){
     try{
-      var ts=parseInt(localStorage.getItem('mbud_open_ts')||'0',10);
-      if(!ts || (Date.now()-ts)>60000) return;   // chỉ khôi phục nếu vừa dùng trong 60s (tức là reload)
+      var ts=readOpenTs();
+      if(!ts || (Date.now()-ts)>600000) return;   // chỉ khôi phục nếu vừa dùng trong 10 phút
       var start=Date.now();
       var iv=setInterval(function(){
-        if(Date.now()-start>15000){ clearInterval(iv); return; }
-        var freshTs=parseInt(localStorage.getItem('mbud_open_ts')||'0',10);
-        if(!freshTs){ clearInterval(iv); return; }        // user đã đóng module
-        var ready=false; try{ ready=!!(window.state && state.user && state.user.name); }catch(e){}
+        if(Date.now()-start>120000){ clearInterval(iv); return; }   // thử tối đa 120s (đủ để chọn lại user)
+        if(readOpenTs()<=0){ clearInterval(iv); return; }           // user đã đóng module
+        var ready=false; try{ ready=!!(window.state && state.user); }catch(e){}
         if(!ready) return;
         var ov=document.getElementById('mbudOverlay');
         if(!ov || !ov.classList.contains('show')){ try{ M.open(); }catch(e){} }
-      },400);
+      },350);
     }catch(e){}
   })();
 
