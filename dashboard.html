@@ -355,6 +355,17 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <div class="dupe-body" id="dupeBody" style="display:none"></div>
     </div>
 
+    <!-- MULTI-DEVICE ALERT SECTION (v4.5): 1 nhân viên đăng nhập nhiều thiết bị -->
+    <div class="fraud-section clean" id="mdevSection">
+      <div class="fraud-header" onclick="toggleMdev()">
+        <span style="font-size:15px">📱</span>
+        <h3>Cảnh báo 1 nhân viên dùng nhiều thiết bị</h3>
+        <span class="fraud-badge ok" id="mdevBadge">✅ Không có</span>
+        <span class="fraud-toggle" id="mdevToggle">▼</span>
+      </div>
+      <div class="fraud-body" id="mdevBody" style="display:none"></div>
+    </div>
+
     <div class="scorecards" id="sc-overview"></div>
     <div class="grid2">
       <div class="chart-card">
@@ -918,6 +929,7 @@ async function loadData(){
     document.getElementById('lastUpdate').textContent='Cập nhật: '+new Date().toLocaleTimeString('vi-VN')+' | MT:'+mt+'+'+mto+' GT:'+gt+'+'+gto+(gton?'+🏆'+gton:'');
     populateMapDayFilter(); populateMapMemberFilter();
     renderAll();
+    loadDeviceLog(); // v4.5: tải cảnh báo nhiều thiết bị (chạy nền, lỗi thì bỏ qua)
   }catch(e){ alert('Lỗi kết nối: '+e.message); }
   finally{ document.getElementById('loadingOverlay').style.display='none'; }
 }
@@ -974,6 +986,45 @@ function renderFraudAlert(allData){
         <div class="fraud-flag-badge">SUSPICIOUS</div>
       </div>
     </div>`).join('');
+}
+
+// ── v4.5: MULTI-DEVICE ALERT (đọc từ sheet Device_Log qua action=getDeviceLog) ──
+let _mdevOpen=false;
+function toggleMdev(){
+  _mdevOpen=!_mdevOpen;
+  document.getElementById('mdevBody').style.display=_mdevOpen?'':'none';
+  document.getElementById('mdevToggle').className='fraud-toggle'+(_mdevOpen?' up':'');
+}
+
+async function loadDeviceLog(){
+  const section=document.getElementById('mdevSection');
+  const badge=document.getElementById('mdevBadge');
+  const body=document.getElementById('mdevBody');
+  if(!section||!badge||!body) return;
+  try{
+    const res=await fetch(SCRIPT_URL+'?action=getDeviceLog&t='+Date.now());
+    const j=await res.json();
+    if(!j||!j.ok){ badge.textContent='— chưa có dữ liệu'; badge.className='fraud-badge ok'; return; }
+    const alerts=j.alerts||[];
+    if(alerts.length===0){
+      section.className='fraud-section clean';
+      badge.textContent='✅ Không có cảnh báo'; badge.className='fraud-badge ok';
+      body.innerHTML='<div class="empty" style="padding:16px">✅ Không có nhân viên nào đăng nhập từ 2 thiết bị trở lên trong '+(j.windowDays||14)+' ngày qua (manager được miễn trừ).</div>';
+      return;
+    }
+    section.className='fraud-section';
+    badge.textContent='⚠️ '+alerts.length+' nhân viên'; badge.className='fraud-badge';
+    body.innerHTML=alerts.map(a=>`
+      <div class="fraud-row" style="grid-template-columns:1fr auto">
+        <div>
+          <div class="fraud-name">📱 ${esc(a.name)} — ${a.count} thiết bị / ${j.windowDays||14} ngày</div>
+          <div class="fraud-detail">${(a.devices||[]).map(d=>
+            '• <b>'+esc(d.id)+'</b> — '+esc(d.info||'?')+'<br>&nbsp;&nbsp;Lần đầu: '+esc(d.first||'?')+' · Lần cuối: '+esc(d.last||'?')+' · Số lần login: '+esc(d.logins||0)
+          ).join('<br>')}</div>
+        </div>
+        <div class="fraud-meta"><span class="fraud-badge">⚠️ MULTI</span></div>
+      </div>`).join('');
+  }catch(e){ badge.textContent='— chưa kết nối'; badge.className='fraud-badge ok'; }
 }
 
 let _fraudOpen=false;

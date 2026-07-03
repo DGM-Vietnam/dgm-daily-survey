@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>DGM Sales Survey v4.4</title>
+<title>DGM Sales Survey v4.5</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -277,6 +277,14 @@ textarea{resize:vertical;min-height:80px}
     <div><h1 id="typeTitle">Chọn loại khảo sát</h1><div class="sub" id="typeSubtitle"></div></div>
   </div>
   <div class="content">
+    <!-- v4.5: Banner cảnh báo 1 tài khoản đăng nhập nhiều thiết bị -->
+    <div class="fraud-banner" id="deviceBanner">
+      <div class="fraud-icon">📱</div>
+      <div class="fraud-body">
+        <div class="fraud-title">CẢNH BÁO NHIỀU THIẾT BỊ</div>
+        <div class="fraud-msg" id="deviceBannerMsg"></div>
+      </div>
+    </div>
     <div class="card" id="typeCards"></div>
   </div>
 </div>
@@ -820,6 +828,8 @@ function proceedToApp(user, remember) {
   _refreshLogoutBtn();
   // Fraud: show early warning banner before navigating
   showFraudBannerIfNeeded(u.name);
+  // v4.5: báo thiết bị về server, cảnh báo nếu 1 tên dùng nhiều máy (manager miễn trừ)
+  reportDevice(u);
   document.getElementById('typeTitle').textContent = `Xin chào, ${u.name.split(' ').pop()}!`;
   document.getElementById('typeSubtitle').textContent = u.team;
   renderTypeCards(u.team);
@@ -828,6 +838,65 @@ function proceedToApp(user, remember) {
 }
 
 // v4.4: selectManualUser() ĐÃ BỊ GỠ — không cho phép tự nhập tên nhân viên ngoài danh sách.
+
+// ============================================================
+// v4.5: DEVICE TRACKING — phát hiện 1 tên đăng nhập nhiều thiết bị
+// (bổ sung cho fraud module cũ vốn chỉ bắt "nhiều tên trên 1 máy")
+// ============================================================
+const DEVICE_KEY = 'dgm_device_id';
+
+// Mỗi thiết bị được cấp 1 mã cố định, sinh lần đầu mở app
+function getDeviceId(){
+  var id = '';
+  try { id = localStorage.getItem(DEVICE_KEY) || ''; } catch(e){}
+  if (!id) {
+    id = 'DV-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2,10).toUpperCase();
+    try { localStorage.setItem(DEVICE_KEY, id); } catch(e){}
+  }
+  return id;
+}
+
+// Thông tin phụ giúp manager nhận diện máy (model + màn hình)
+function getDeviceInfo(){
+  try {
+    var ua = navigator.userAgent || '';
+    var model = 'Unknown';
+    var m = ua.match(/\(([^)]+)\)/);
+    if (m) model = m[1].split(';').slice(0,3).join(';').trim();
+    return (model + ' | ' + screen.width + 'x' + screen.height).slice(0,120);
+  } catch(e){ return 'Unknown'; }
+}
+
+// Manager miễn trừ cảnh báo (dò theo chức danh trong Sales_Team)
+function isManagerUser(u){
+  var t = String((u && u.title) || '').toLowerCase();
+  return t.indexOf('manager') >= 0 || t.indexOf('quản lý') >= 0 || t.indexOf('quan ly') >= 0;
+}
+
+// Báo thiết bị về server sau khi đăng nhập (không chặn luồng, lỗi mạng thì bỏ qua)
+function reportDevice(u){
+  if (!state.scriptUrl || !navigator.onLine) return;
+  var url = state.scriptUrl + '?action=checkDevice'
+    + '&name='   + encodeURIComponent(u.name)
+    + '&title='  + encodeURIComponent(u.title || '')
+    + '&device=' + encodeURIComponent(getDeviceId())
+    + '&info='   + encodeURIComponent(getDeviceInfo())
+    + '&t=' + Date.now();
+  fetch(url).then(function(r){ return r.json(); }).then(function(res){
+    if (!res || !res.ok) return;
+    if (res.warn && !res.isManager && !isManagerUser(u)) showDeviceBanner(res.deviceCount);
+    else hideDeviceBanner();
+  }).catch(function(){ /* offline hoặc server bận: không chặn nhân viên */ });
+}
+
+function showDeviceBanner(n){
+  var b = document.getElementById('deviceBanner');
+  var m = document.getElementById('deviceBannerMsg');
+  if (!b || !m) return;
+  m.textContent = 'Tài khoản của bạn đã đăng nhập trên ' + n + ' thiết bị khác nhau trong 14 ngày gần đây. Hoạt động này đã được ghi nhận và báo cáo quản lý. Nếu bạn vừa đổi điện thoại, vui lòng báo quản lý để xác nhận.';
+  b.classList.add('show');
+}
+function hideDeviceBanner(){ var b = document.getElementById('deviceBanner'); if (b) b.classList.remove('show'); }
 
 // ============================================================
 // v7: TEAM + LOGIN PIN — đọc từ Google Sheet (action=getTeam)
