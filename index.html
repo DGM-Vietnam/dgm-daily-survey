@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>DGM Sales Survey v4.3</title>
+<title>DGM Sales Survey v4.4</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -240,22 +240,10 @@ textarea{resize:vertical;min-height:80px}
       <button class="btn btn-secondary" onclick="forceRefreshStores()" style="padding:10px;font-size:13px;width:100%">🔄 Cập nhật Store & Sản phẩm</button>
       <p style="font-size:11px;color:var(--text2);margin-top:6px">Bấm để lấy dữ liệu store & SKU mới nhất từ server</p>
     </div>
-    <div class="card" style="border:1.5px dashed #ddd;background:#fafafa">
-      <h3 style="color:var(--text2);font-size:12px">✏️ Nhập thủ công (nếu chưa có trong danh sách)</h3>
-      <div class="field" style="margin-bottom:10px">
-        <label>Họ và tên</label>
-        <input type="text" id="manualName" placeholder="Nhập họ tên đầy đủ..." style="margin-bottom:8px">
-        <label style="margin-top:8px">Khu vực làm việc</label>
-        <select id="manualTeam">
-          <option value="">— Chọn khu vực —</option>
-          <option value="MT">MT — Modern Trade</option>
-          <option value="GT South">GT Miền Nam</option>
-          <option value="GT Central">GT Miền Trung</option>
-          <option value="GT North">GT Miền Bắc</option>
-          <option value="MT/GT">MT + GT (Quản lý)</option>
-        </select>
-      </div>
-      <button class="btn btn-primary" onclick="selectManualUser()" style="padding:11px">Bắt đầu khảo sát →</button>
+    <!-- v4.4: ĐÃ GỠ form "Nhập thủ công nhân viên" — chỉ đăng nhập bằng danh sách Sales_Team + PIN.
+         Nhân viên mới phải được thêm vào sheet Sales_Team trước khi dùng app. -->
+    <div class="card" style="border:1.5px solid #e3f2fd;background:#f0f7ff;padding:12px 14px">
+      <p style="font-size:12px;color:#1565c0;line-height:1.5">🔒 <b>Chỉ đăng nhập bằng tên trong danh sách.</b> Nếu bạn là nhân viên mới chưa có tên, liên hệ quản lý để được thêm vào hệ thống trước khi làm khảo sát.</p>
     </div>
   </div>
 </div>
@@ -610,6 +598,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (saved) {
       var sess = JSON.parse(saved);
       if (sess.user && sess.screen) {
+        // v4.4: chặn khôi phục session của tên không có trong danh sách nhân viên
+        if (!isValidStaff(sess.user.name)) {
+          try { sessionStorage.removeItem('dgm_session'); } catch(e){}
+          try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+          throw new Error('invalid staff session');
+        }
         state.user = sess.user;
         // Khôi phục state bổ sung nếu có
         if (sess.mtMode) state.mtMode = sess.mtMode;
@@ -792,7 +786,29 @@ function selectUser(user) {
 }
 
 // v7: Vào app thật — gọi sau khi PIN đúng (hoặc nhân viên chưa đặt PIN)
+// v4.4: Chỉ chấp nhận tên có trong danh sách nhân viên chính thức (TEAM hardcode / LIVE_TEAM từ Sheet / _teamByName)
+function isValidStaff(name){
+  if (!name) return false;
+  try {
+    if (TEAM.some(function(t){ return t.name === name; })) return true;
+    if (LIVE_TEAM && LIVE_TEAM.some(function(t){ return t.name === name; })) return true;
+    if (_teamByName && _teamByName[name]) return true;
+  } catch(e) {}
+  return false;
+}
+
 function proceedToApp(user, remember) {
+  // v4.4: CHẶN tên không có trong Sales_Team — kể cả auto-login từ localStorage cũ.
+  // Thiết bị nào còn lưu tên rác (VD nhập thủ công trước đây) sẽ bị xóa phiên và ép chọn lại từ danh sách.
+  if (!isValidStaff(user.name)) {
+    try { localStorage.removeItem(AUTH_KEY); } catch(e){}
+    try { sessionStorage.removeItem('dgm_session'); } catch(e){}
+    state.user = null;
+    _refreshLogoutBtn();
+    toast('⚠️ Tên "' + user.name + '" không có trong danh sách nhân viên. Vui lòng chọn tên từ danh sách.');
+    goTo('scLogin');
+    return;
+  }
   const info = _teamByName[user.name] || {};
   const u = {
     name: user.name,
@@ -811,14 +827,7 @@ function proceedToApp(user, remember) {
   initGPS();
 }
 
-function selectManualUser() {
-  const name = (function(){var _e=document.getElementById('manualName');return _e&&_e.value?_e.value.trim():''})();
-  const team = (document.getElementById('manualTeam')?document.getElementById('manualTeam').value:'');
-  if (!name) { toast('⚠️ Vui lòng nhập họ tên'); return; }
-  if (!team) { toast('⚠️ Vui lòng chọn khu vực làm việc'); return; }
-  // Nhập thủ công (không có trong danh sách) → không yêu cầu PIN
-  proceedToApp({ name, team, title: '' }, true);
-}
+// v4.4: selectManualUser() ĐÃ BỊ GỠ — không cho phép tự nhập tên nhân viên ngoài danh sách.
 
 // ============================================================
 // v7: TEAM + LOGIN PIN — đọc từ Google Sheet (action=getTeam)
