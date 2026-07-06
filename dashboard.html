@@ -653,6 +653,17 @@ tr:hover td{background:rgba(255,255,255,.025);}
   .dsp-pass{background:#e8f5e9;color:#2e7d32}.dsp-fail{background:#ffebee;color:#c62828}.dsp-pend{background:#f0f0f0;color:#888}
   .dsp-ph{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap}
   .dsp-ph img{width:74px;height:74px;object-fit:cover;border-radius:6px;border:1px solid #ddd;background:#f3f3f3}
+  /* ── Nhóm theo điểm bán + so sánh các lần báo cáo theo chiều ngang ── */
+  .dsp-group{background:#f7f8fb;border:1px solid #e3e6ee;border-radius:12px;padding:12px;margin-bottom:16px}
+  .dsp-group-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:wrap}
+  .dsp-group-h b{font-size:15px;color:#1a1a1a}
+  .dsp-group-h small{color:#777}
+  .dsp-scrollhint{font-size:11px;color:#8a90a5;white-space:nowrap}
+  .dsp-hscroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+  .dsp-hscroll>.dsp-card{flex:0 0 min(380px,86vw);max-width:min(380px,86vw);margin-bottom:0;scroll-snap-align:start;display:flex;flex-direction:column}
+  .dsp-hscroll::-webkit-scrollbar{height:8px}
+  .dsp-hscroll::-webkit-scrollbar-thumb{background:#c8cde0;border-radius:4px}
+  .dsp-seqbadge{display:inline-block;background:#1565c0;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;margin-right:6px}
   .gft-thumb{width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,.05);cursor:pointer;vertical-align:middle;}
   .dsp-sku{font-size:12px;color:#555;background:#fafafa;border-radius:6px;padding:6px 8px;margin:6px 0}
   .dsp-sku span{font-weight:700;color:#333}
@@ -1969,10 +1980,38 @@ function renderDisplayReports(){
     if((fe==='Đạt'||fe==='Không đạt') && rp.eval_result!==fe) return false;
     return true;
   });
-  list.sort(function(a,b){ return String(b.timestamp||'').localeCompare(String(a.timestamp||'')); });
   var cnt=document.getElementById('dspRptCount'); if(cnt) cnt.textContent='('+list.length+')';
   var box=document.getElementById('dspReports'); if(!box) return;
-  box.innerHTML=list.length?list.map(function(rp){return dspReportCard(rp,full);}).join(''):'<div style="text-align:center;color:#888;padding:24px">Chưa có báo cáo</div>';
+  if(!list.length){ box.innerHTML='<div style="text-align:center;color:#888;padding:24px">Chưa có báo cáo</div>'; return; }
+
+  // ── Nhóm theo enroll_id (cùng điểm bán + cùng chương trình) ──
+  var groups={}, order=[];
+  list.forEach(function(rp){
+    var k=rp.enroll_id||('__'+rp.report_id);
+    if(!groups[k]){ groups[k]={key:k,reports:[],last:''}; order.push(k); }
+    groups[k].reports.push(rp);
+    var t=String(rp.timestamp||rp.report_date||'');
+    if(t>groups[k].last) groups[k].last=t;
+  });
+  // Nhóm mới nhất lên đầu; trong nhóm: lần 1 → 2 → 3... (trái → phải)
+  order.sort(function(a,b){ return groups[b].last.localeCompare(groups[a].last); });
+  var html=order.map(function(k){
+    var g=groups[k];
+    g.reports.sort(function(a,b){
+      var sa=parseInt(a.report_seq,10)||0, sb=parseInt(b.report_seq,10)||0;
+      if(sa!==sb) return sa-sb;
+      return String(a.timestamp||'').localeCompare(String(b.timestamp||''));
+    });
+    var r0=g.reports[0], enr=dspEnrById(r0.enroll_id);
+    var camp=r0.campaign_name||(enr?enr.campaign_name:'')||'';
+    var hint=g.reports.length>1?'<span class="dsp-scrollhint">⇄ Kéo ngang để so sánh '+g.reports.length+' lần báo cáo</span>':'';
+    var head='<div class="dsp-group-h"><div><b>'+dspEsc(r0.outlet_name)+'</b>'+
+      '<br><small>'+dspEsc(r0.region)+' · '+dspEsc(r0.salesman)+(camp?(' · '+dspEsc(camp)):'')+
+      (enr&&enr.frame_type?(' · '+dspEsc(enr.frame_type)):'')+' · '+g.reports.length+' lần báo cáo</small></div>'+hint+'</div>';
+    var cards=g.reports.map(function(rp){ return dspReportCard(rp,full); }).join('');
+    return '<div class="dsp-group">'+head+'<div class="dsp-hscroll">'+cards+'</div></div>';
+  }).join('');
+  box.innerHTML=html;
 }
 
 function dspEvalControls(rp){
@@ -2013,7 +2052,7 @@ function dspReportCard(rp, full){
     else { ctrl='<div style="margin-top:8px;border-top:1px dashed #e0e0e0;padding-top:6px"><div style="font-size:12px;color:#888">Đã chấm bởi <b>'+dspEsc(rp.eval_by||'')+'</b> · '+dspEsc(rp.eval_at||'')+' <button onclick="dspEditEval(\''+rp.report_id+'\')" style="margin-left:8px;background:#eef;border:1px solid #ccd;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px">✎ Sửa đánh giá</button></div><div id="edit_'+rp.report_id+'"></div></div>'; }
   }
   return '<div class="dsp-card">'+
-    '<div class="dsp-h"><div><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+framesInfo+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
+    '<div class="dsp-h"><div><span class="dsp-seqbadge">Lần '+dspEsc(rp.report_seq||'?')+'</span><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+framesInfo+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
     scoreHtml+'</div>'+
     (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
     '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+
