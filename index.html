@@ -3201,7 +3201,7 @@ function confirmFraudSubmit() {
   "use strict";
   var G={ _cfg:null,_products:[],_inv:[],_loaded:false,_loading:null,
     _region:'',_scenario:'',_photo:'',_gps:null,
-    _market:'',_outlet:'',_warned:false,_purch:[],_giftKey:'',_giftLabel:'',_giftQty:1,_trigger:'ncd_65ml',_triggerOther:'' };
+    _market:'',_outlet:'',_warned:false,_purch:[],_gifts:[{key:'',label:'',qty:1}],_trigger:'ncd_65ml',_triggerOther:'' };
   window.GiftMod=G;
 
   function $id(id){ return document.getElementById(id); }
@@ -3246,7 +3246,17 @@ function confirmFraudSubmit() {
     });
     return G._loading;
   }
-  function remainOf(key){ for(var i=0;i<G._inv.length;i++){ if(G._inv[i].gift_type===key) return G._inv[i].remaining; } return null; }
+  function giftSlug(s){ try{ s=String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D'); }catch(e){ s=String(s||''); } return s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+  // Khớp tồn kho theo MÃ CHUẨN từ tên quà (Bút = Bút, bất kể key "but"/"but_viet")
+  function remainOf(key,label){
+    var canon=label?giftSlug(label):'';
+    for(var i=0;i<G._inv.length;i++){
+      var it=G._inv[i];
+      var itCanon=it.gift_key_canon||(it.gift_label_vi?giftSlug(it.gift_label_vi):(it.gift_type||''));
+      if((key&&it.gift_type===key)||(canon&&itCanon===canon)) return it.remaining;
+    }
+    return null;
+  }
 
   function ensureOverlay(){
     var ov=$id('gftOverlay'); if(ov) return ov;
@@ -3263,7 +3273,7 @@ function confirmFraudSubmit() {
     ensureOverlay().classList.add('show');
     $id('gftBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
     $id('gftFoot').style.display='none';
-    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._giftKey=''; G._giftLabel=''; G._giftQty=1; G._trigger='ncd_65ml'; G._triggerOther='';
+    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._gifts=[{key:'',label:'',qty:1}]; G._trigger='ncd_65ml'; G._triggerOther='';
     try{ if(navigator.geolocation) navigator.geolocation.getCurrentPosition(function(p){ G._gps=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6); },function(){},{timeout:6000}); }catch(e){}
     loadData().then(function(){
       var r=userRegion();
@@ -3289,15 +3299,19 @@ function confirmFraudSubmit() {
 
   function giftBlock(){
     var gts=(G._cfg.gift_types||[]);
-    var rem=remainOf(G._giftKey);
-    return '<div class="dspm-label">Loại quà tặng</div>'+
-      '<select class="dspm-select" onchange="GiftMod.setGift(this.value)"><option value="">— Chọn quà —</option>'+
-        gts.map(function(g){return '<option value="'+esc(g.key)+'"'+(G._giftKey===g.key?' selected':'')+'>'+esc(g.label)+'</option>';}).join('')+'</select>'+
-      (G._giftKey?('<div style="font-size:12px;margin-top:4px;color:'+(rem!=null&&rem<=0?'#c62828':'#2e7d32')+'">Tồn còn lại: '+(rem!=null?rem:'(chưa thiết lập)')+'</div>'):'')+
-      '<div class="dspm-row" style="margin-top:6px"><div><div class="dspm-label">Số lượng quà</div><input class="dspm-input" type="number" min="1" value="'+G._giftQty+'" onchange="GiftMod.setGiftQty(this.value)"></div>'+
-      '<div><div class="dspm-label">Lý do tặng</div><select class="dspm-select" onchange="GiftMod.setTrigger(this.value)">'+
+    var rows=G._gifts.map(function(g,i){
+      var rem=(g.key||g.label)?remainOf(g.key,g.label):null;
+      var remTxt=(g.key||g.label)?('<div style="font-size:11px;margin:-2px 0 6px 2px;color:'+(rem!=null&&rem<=0?'#c62828':'#2e7d32')+'">Tồn còn lại: '+(rem!=null?rem:'(chưa thiết lập)')+'</div>'):'';
+      return '<div class="dspm-sku"><select onchange="GiftMod.setGift('+i+',this.value)"><option value="">— Chọn quà —</option>'+
+        gts.map(function(x){return '<option value="'+esc(x.key)+'"'+(g.key===x.key?' selected':'')+'>'+esc(x.label)+'</option>';}).join('')+'</select>'+
+        '<input type="number" min="1" value="'+esc(g.qty||1)+'" onchange="GiftMod.setGiftQty('+i+',this.value)">'+
+        '<button onclick="GiftMod.delGift('+i+')">×</button></div>'+remTxt;
+    }).join('');
+    return '<div class="dspm-label">Quà tặng — chọn được NHIỀU món, mỗi món điền số lượng</div>'+rows+
+      '<button class="dspm-add" onclick="GiftMod.addGift()">+ Thêm món quà</button>'+
+      '<div class="dspm-label" style="margin-top:8px">Lý do tặng</div><select class="dspm-select" onchange="GiftMod.setTrigger(this.value)">'+
         (G._cfg.triggers||[]).filter(function(t){ if(t.key==='new_outlet') return G._scenario==='new'; if(t.key==='ncd_65ml') return G._scenario!=='new'; return true; }).map(function(t){return '<option value="'+esc(t.key)+'"'+(G._trigger===t.key?' selected':'')+'>'+esc(t.label)+'</option>';}).join('')+
-        '</select></div></div>'+
+        '</select>'+
       '<div id="gftOtherWrap" style="margin-top:6px;display:'+(G._trigger==='other'?'block':'none')+'"><div class="dspm-label">Lý do khác (tự nhập)</div><input class="dspm-input" id="gftOtherTxt" placeholder="Nhập lý do tặng…" value="'+esc(G._triggerOther||'')+'" oninput="GiftMod._triggerOther=this.value"></div>';
   }
   function purchBlock(){
@@ -3364,8 +3378,11 @@ function confirmFraudSubmit() {
       }).catch(function(){});
   };
 
-  G.setGift=function(k){ G._giftKey=k; var g=(G._cfg.gift_types||[]).filter(function(x){return x.key===k;})[0]; G._giftLabel=g?g.label:''; (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
-  G.setGiftQty=function(v){ G._giftQty=parseInt(v,10)||1; };
+  function giftRerender(){ (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); }
+  G.setGift=function(i,k){ var g=(G._cfg.gift_types||[]).filter(function(x){return x.key===k;})[0]; if(G._gifts[i]){ G._gifts[i].key=k; G._gifts[i].label=g?g.label:''; } giftRerender(); };
+  G.setGiftQty=function(i,v){ if(G._gifts[i]) G._gifts[i].qty=Math.max(1,parseInt(v,10)||1); };
+  G.addGift=function(){ G._gifts.push({key:'',label:'',qty:1}); giftRerender(); };
+  G.delGift=function(i){ G._gifts.splice(i,1); if(!G._gifts.length) G._gifts.push({key:'',label:'',qty:1}); giftRerender(); };
   G.addPurch=function(){ G._purch.push({product:'',qty:1}); (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
   G.delPurch=function(i){ G._purch.splice(i,1); (G._scenario==='new')?renderNewForm():renderExistForm(); restoreExist(); };
   G.setPurch=function(i,k,v){ if(G._purch[i]) G._purch[i][k]=(k==='qty'?(parseInt(v,10)||1):v); };
@@ -3397,14 +3414,17 @@ function confirmFraudSubmit() {
       outletName=G._outlet; isNew=false; market=G._market;
       if(!outletName){ tt('⚠️ Chọn điểm bán'); return; }
     }
-    if(!G._giftKey){ tt('⚠️ Chọn loại quà'); return; }
+    var gifts=G._gifts.filter(function(g){ return g.key; }).map(function(g){ return { gift_type:g.key, gift_label_vi:g.label, qty:Math.max(1,parseInt(g.qty,10)||1) }; });
+    if(!gifts.length){ tt('⚠️ Chọn ít nhất 1 món quà'); return; }
     if(!G._photo){ tt('⚠️ Bắt buộc có ảnh'); return; }
     var note=($id('gftNote')&&$id('gftNote').value)||'';
     var giftId='GIFT-'+tnow().replace(/-/g,'')+'-'+Date.now().toString().slice(-5);
     var photo=G._photo, region=G._region, date=tnow();
-    var payload={type:'GIFT_LOG', gift_log_id:giftId, salesman:name, region:region,
+    var totalQty=gifts.reduce(function(a,g){return a+g.qty;},0);
+    var payload={type:'GIFT_LOG', gift_log_id:giftId, event_id:giftId, salesman:name, region:region,
       outlet_name:outletName, outlet_is_new:isNew, province:prov, market:market, sub_channel:'GT Outlet',
-      trigger_type:(G._trigger==='other'?((G._triggerOther||'').trim()||'Khác'):G._trigger), gift_type:G._giftKey, gift_label_vi:G._giftLabel, qty:G._giftQty,
+      trigger_type:(G._trigger==='other'?((G._triggerOther||'').trim()||'Khác'):G._trigger),
+      gifts:gifts,
       purchased_sku:G._purch.filter(function(s){return s.product;}), gps:gps(),
       warning_shown:G._warned, notes:note };
     tt('📤 Đang lưu tặng quà…'); G.close();
@@ -3414,7 +3434,7 @@ function confirmFraudSubmit() {
       .then(function(res){
         if(res&&res.ok){
           uploadGiftPhoto(giftId, name, region, date, photo);
-          tt('✅ Đã lưu tặng quà'+(res.store_appended?' + thêm điểm mới vào Storelist':''));
+          tt('✅ Đã lưu '+gifts.length+' món ('+totalQty+' quà)'+(res.store_appended?' + thêm điểm mới vào Storelist':''));
         } else tt('⚠️ Lưu lỗi, thử lại.');
       }).catch(function(){ tt('⚠️ Mất mạng — chưa lưu được.'); });
   };
@@ -3428,7 +3448,7 @@ function confirmFraudSubmit() {
     var b=photo; if(b.indexOf(',')>-1) b=b.split(',')[1];
     function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
     var folder=['Tặng quà',seg(region),seg(salesman),seg(date)].join('/');
-    var pl={type:'GIFT_PHOTO', gift_log_id:giftId, salesman:salesman, region:region, date:date, folder_path:folder, photo_b64:b};
+    var pl={type:'GIFT_PHOTO', gift_log_id:giftId, event_id:giftId, salesman:salesman, region:region, date:date, folder_path:folder, photo_b64:b};
     var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
     (function send(attempt){
       var sg=gftSignal(45000);

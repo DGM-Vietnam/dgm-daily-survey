@@ -2102,32 +2102,39 @@ function renderGiftInvHead(){
 
 function renderGiftSummary(){
   var regions=['GT South','GT Central','GT North'];
-  var by={}; regions.forEach(function(r){ by[r]={n:0,qty:0,nw:0,warn:0}; });
+  var by={}; regions.forEach(function(r){ by[r]={ev:{},qty:0,nw:{},warn:{}}; });
   GIFT_LOG.forEach(function(g){
     var b=by[g.region]; if(!b) return;
-    b.n++; b.qty+=parseInt(g.qty,10)||0;
-    if(String(g.outlet_is_new).toUpperCase()==='TRUE') b.nw++;
-    if(String(g.warning_shown).toUpperCase()==='TRUE') b.warn++;
+    var ev=g.event_id||g.gift_log_id||Math.random();   // 1 lượt tặng nhiều món = 1 lượt
+    b.ev[ev]=1; b.qty+=parseInt(g.qty,10)||0;
+    if(String(g.outlet_is_new).toUpperCase()==='TRUE') b.nw[ev]=1;
+    if(String(g.warning_shown).toUpperCase()==='TRUE') b.warn[ev]=1;
   });
   var tot={n:0,qty:0,nw:0,warn:0}, rows='';
-  regions.forEach(function(r){ var b=by[r]; tot.n+=b.n;tot.qty+=b.qty;tot.nw+=b.nw;tot.warn+=b.warn;
-    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+b.n+'</td><td class="num">'+b.qty+'</td><td class="num">'+b.nw+'</td><td class="num">'+(b.warn?('<span style="color:#c62828;font-weight:700">'+b.warn+'</span>'):0)+'</td></tr>'; });
+  regions.forEach(function(r){ var b=by[r];
+    var n=Object.keys(b.ev).length, nw=Object.keys(b.nw).length, warn=Object.keys(b.warn).length;
+    tot.n+=n;tot.qty+=b.qty;tot.nw+=nw;tot.warn+=warn;
+    rows+='<tr><td><b>'+r+'</b></td><td class="num">'+n+'</td><td class="num">'+b.qty+'</td><td class="num">'+nw+'</td><td class="num">'+(warn?('<span style="color:#c62828;font-weight:700">'+warn+'</span>'):0)+'</td></tr>'; });
   rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.n+'</td><td class="num">'+tot.qty+'</td><td class="num">'+tot.nw+'</td><td class="num">'+tot.warn+'</td></tr>';
   var el=document.getElementById('gftSummary'); if(el) el.innerHTML=GIFT_LOG.length?rows:'<tr><td colspan="5" style="text-align:center;color:#888">Chưa có lượt tặng nào</td></tr>';
 }
 
+function gftSlug(s){ try{ s=String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D'); }catch(e){ s=String(s==null?'':s); } return s.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
 function renderGiftInv(){
-  // pivot: salesman+region → {gift_type: {rem,open}}
+  // pivot: salesman+region → {MÃ CHUẨN theo tên quà: {rem,open}}
+  // (fix: key thô "but"/"but_viet"/"hoa_don_ban_le_2" lệch nhau → khớp theo slug tên quà)
   var map={}; var order=[];
   GIFT_INV.forEach(function(it){
     var k=it.salesman+'||'+it.region;
     if(!map[k]){ map[k]={salesman:it.salesman,region:it.region,g:{}}; order.push(k); }
-    map[k].g[it.gift_type]={rem:it.remaining,open:it.opening_qty};
+    var canon=it.gift_key_canon||(it.gift_label_vi?gftSlug(it.gift_label_vi):it.gift_type);
+    map[k].g[canon]={rem:it.remaining,open:it.opening_qty};
   });
   var rows=order.map(function(k){
     var m=map[k];
     var cells=GIFT_TYPES.map(function(t){
-      var v=m.g[t[0]];
+      var canon=t[1]?gftSlug(t[1]):t[0];
+      var v=m.g[canon]||m.g[t[0]];
       if(!v) return '<td class="num" style="color:#ccc">—</td>';
       var col=(v.rem<=0)?'#c62828':(v.rem<=2?'#ef6c00':'#2e7d32');
       return '<td class="num"><b style="color:'+col+'">'+v.rem+'</b><span style="color:#aaa">/'+v.open+'</span></td>';
