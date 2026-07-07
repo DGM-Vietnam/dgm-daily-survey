@@ -3135,6 +3135,7 @@ function confirmFraudSubmit() {
       .catch(function(){ tt('⚠️ Mất mạng — báo cáo chưa gửi được. Thử lại.'); });
   };
 
+  // ══════ UPLOAD ẢNH v2 — GỬI THEO NHÓM + WAKE LOCK + TỰ GỬI LẠI ══════
   // Timeout an toàn: Android/WebView cũ không có AbortController → không dùng signal, vẫn upload được
   function dspSignal(ms){
     try{ var c=new AbortController(); var t=setTimeout(function(){ try{c.abort();}catch(e){} },ms);
@@ -3142,50 +3143,124 @@ function confirmFraudSubmit() {
     catch(e){ return { signal:undefined, clear:function(){} }; }
   }
 
+  var DSP_QK='dgm_dsp_photo_queue_v1';
+  function dspFolderPath_(meta){
+    function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
+    return [seg(meta.campaign),seg(meta.region),seg(meta.salesman),seg(meta.rdate)].join('/');
+  }
+  // Lưu job vào localStorage TRƯỚC khi gửi → tắt app giữa chừng cũng không mất ảnh
+  function queuePhotos_(meta, photos){
+    try{
+      var q=JSON.parse(localStorage.getItem(DSP_QK)||'[]');
+      q=q.filter(function(e){ return e && e.report_id!==meta.report_id && (Date.now()-(e.ts||0))<3*86400000; });
+      q.push({ report_id:meta.report_id, meta:meta, photos:photos, ts:Date.now() });
+      while(q.length>2) q.shift();
+      localStorage.setItem(DSP_QK, JSON.stringify(q));
+    }catch(e){ /* hết quota → bỏ qua persist, vẫn gửi trực tiếp */ }
+  }
+  function dequeuePhotos_(reportId){
+    try{ var q=JSON.parse(localStorage.getItem(DSP_QK)||'[]');
+      q=q.filter(function(e){ return e && e.report_id!==reportId; });
+      localStorage.setItem(DSP_QK, JSON.stringify(q)); }catch(e){}
+  }
+  function requeueOnly_(reportId, keys, photos){
+    try{ var q=JSON.parse(localStorage.getItem(DSP_QK)||'[]');
+      for(var i=0;i<q.length;i++){ if(q[i] && q[i].report_id===reportId){
+        var np={}; keys.forEach(function(k){ if(photos[k]) np[k]=photos[k]; });
+        q[i].photos=np; q[i].ts=Date.now();
+      } }
+      localStorage.setItem(DSP_QK, JSON.stringify(q)); }catch(e){}
+  }
+
   function uploadReportPhotosBg(rep, photos, payload){
     var keys=Object.keys(photos||{});
     if(!keys.length) return;
-    var region=payload.region, campaign=payload.campaign_name||'(Khong ten CT)';
-    var salesman=payload.salesman||'NA', rdate=payload.report_date;
-    function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
-    var folderPath=[seg(campaign),seg(region),seg(salesman),seg(rdate)].join('/');
-    var failed=[];
-
-    function sendOne(key, attempt, cb){
-      var b64=photos[key]; if(b64.indexOf(',')>-1) b64=b64.split(',')[1];
-      var pkey=(key.indexOf('extra_')===0)?'extra':key;
-      var pl={type:'DISPLAY_PHOTO', report_id:rep.report_id, salesman:salesman,
-        region:region, campaign_name:campaign, report_date:rdate, folder_path:folderPath, photo_key:pkey, photo_b64:b64};
-      var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
-      var sg=dspSignal(45000);
-      fetch(state.scriptUrl,{method:'POST',mode:'cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:sg.signal})
-        .then(function(r){ sg.clear(); return r.json(); })
-        .then(function(res){
-          if(res&&res.ok){ cb(true); }
-          else if(attempt<3){ setTimeout(function(){ sendOne(key,attempt+1,cb); },1200*attempt); }
-          else { cb(false); }
-        })
-        .catch(function(){
-          sg.clear();
-          if(attempt<3){ setTimeout(function(){ sendOne(key,attempt+1,cb); },1200*attempt); }
-          else{
-            // Nỗ lực cuối: bắn no-cors (không xác nhận được, nhưng còn hơn mất hẳn)
-            try{ fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body}); }catch(e){}
-            cb(false);
-          }
-        });
-    }
-
-    (function next(idx){
-      if(idx>=keys.length){
-        if(failed.length) tt('⚠️ '+failed.length+'/'+keys.length+' ảnh chưa xác nhận được — mở lại báo cáo trên dashboard để kiểm tra');
-        else tt('✅ Đã tải xong '+keys.length+'/'+keys.length+' ảnh');
-        return;
+    var meta={ report_id:rep.report_id, region:payload.region,
+      campaign:payload.campaign_name||'(Khong ten CT)',
+      salesman:payload.salesman||'NA', rdate:payload.report_date };
+    queuePhotos_(meta, photos);
+    sendPhotoJob_(meta, photos, function(failedKeys){
+      if(!failedKeys.length){ dequeuePhotos_(meta.report_id); tt('✅ Đã tải xong '+keys.length+'/'+keys.length+' ảnh'); }
+      else{
+        requeueOnly_(meta.report_id, failedKeys, photos);
+        tt('⚠️ Còn '+failedKeys.length+' ảnh chưa gửi được — mở lại app khi có mạng, ảnh sẽ TỰ gửi tiếp');
       }
-      tt('📤 Đang tải ảnh '+(idx+1)+'/'+keys.length+' — đừng đóng app');
-      sendOne(keys[idx],1,function(ok){ if(!ok) failed.push(keys[idx]); setTimeout(function(){ next(idx+1); },300); });
+    });
+  }
+
+  // Gửi cả job: chia nhóm ≤4 ảnh / ≤2.5MB, mỗi nhóm 1 POST duy nhất
+  function sendPhotoJob_(meta, photos, done){
+    var keys=Object.keys(photos||{});
+    if(!keys.length){ done([]); return; }
+    var folderPath=dspFolderPath_(meta);
+    var chunks=[], cur=[], curSize=0;
+    keys.forEach(function(k){
+      var sz=(photos[k]||'').length;
+      if(cur.length>=4 || (curSize+sz)>2500000){ if(cur.length) chunks.push(cur); cur=[]; curSize=0; }
+      cur.push(k); curSize+=sz;
+    });
+    if(cur.length) chunks.push(cur);
+    // Giữ màn hình sáng trong lúc upload (máy hỗ trợ Wake Lock; máy cũ tự bỏ qua)
+    var wl=null;
+    try{ if(navigator.wakeLock && navigator.wakeLock.request){ navigator.wakeLock.request('screen').then(function(l){ wl=l; }).catch(function(){}); } }catch(e){}
+    var failed=[];
+    (function nextChunk(ci){
+      if(ci>=chunks.length){ try{ if(wl) wl.release(); }catch(e){} done(failed); return; }
+      tt('📤 Đang tải ảnh (nhóm '+(ci+1)+'/'+chunks.length+') — giữ app mở nhé');
+      var items=chunks[ci].map(function(k){
+        var b=photos[k]; if(b.indexOf(',')>-1) b=b.split(',')[1];
+        var pkey=(k.indexOf('extra_')===0)?'extra':k;
+        return { photo_key:pkey, _k:k, photo_b64:b };
+      });
+      sendBatch_(meta, folderPath, items, 1, function(failKeys){
+        failed=failed.concat(failKeys);
+        setTimeout(function(){ nextChunk(ci+1); },200);
+      });
     })(0);
   }
+
+  function sendBatch_(meta, folderPath, items, attempt, cb){
+    var pl={ type:'DISPLAY_PHOTOS_BATCH', report_id:meta.report_id, salesman:meta.salesman,
+      region:meta.region, campaign_name:meta.campaign, report_date:meta.rdate, folder_path:folderPath,
+      photos:items.map(function(it){ return { photo_key:it.photo_key, photo_b64:it.photo_b64 }; }) };
+    var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
+    var sg=dspSignal(90000);
+    fetch(state.scriptUrl,{method:'POST',mode:'cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:sg.signal})
+      .then(function(r){ sg.clear(); return r.json(); })
+      .then(function(res){
+        if(res && res.ok){ cb([]); return; }
+        // lỗi một phần → chỉ gửi lại đúng ảnh fail
+        var failItems=items;
+        if(res && res.results && res.results.length===items.length){
+          failItems=items.filter(function(_,i){ return !res.results[i].ok; });
+          if(!failItems.length) failItems=items;
+        }
+        if(attempt<3){ setTimeout(function(){ sendBatch_(meta,folderPath,failItems,attempt+1,cb); },1500*attempt); }
+        else cb(failItems.map(function(it){ return it._k; }));
+      })
+      .catch(function(){
+        sg.clear();
+        if(attempt<3){ setTimeout(function(){ sendBatch_(meta,folderPath,items,attempt+1,cb); },1500*attempt); }
+        else cb(items.map(function(it){ return it._k; }));
+      });
+  }
+
+  // Mở app lại → tự gửi tiếp ảnh còn kẹt trong hàng đợi
+  function resumePendingPhotos_(){
+    try{
+      if(typeof state==='undefined' || !state.scriptUrl){ setTimeout(resumePendingPhotos_,5000); return; }
+      var q=JSON.parse(localStorage.getItem(DSP_QK)||'[]');
+      if(!q.length) return;
+      var e=q[0]; var n=Object.keys((e&&e.photos)||{}).length;
+      if(!e || !n){ if(e) dequeuePhotos_(e.report_id); return; }
+      tt('🔁 Còn '+n+' ảnh báo cáo chưa gửi xong — đang tự gửi lại…');
+      sendPhotoJob_(e.meta, e.photos, function(failed){
+        if(!failed.length){ dequeuePhotos_(e.report_id); tt('✅ Đã gửi xong ảnh còn thiếu'); }
+        else requeueOnly_(e.report_id, failed, e.photos);
+      });
+    }catch(err){}
+  }
+  setTimeout(resumePendingPhotos_, 6000);
 
   DisplayMod.close=function(){ var ov=$id('dspmOverlay'); if(ov) ov.classList.remove('show'); };
 })();
