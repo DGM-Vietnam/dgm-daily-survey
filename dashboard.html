@@ -664,7 +664,13 @@ tr:hover td{background:rgba(255,255,255,.025);}
   .dsp-hscroll::-webkit-scrollbar{height:8px}
   .dsp-hscroll::-webkit-scrollbar-thumb{background:#c8cde0;border-radius:4px}
   .dsp-seqbadge{display:inline-block;background:#1565c0;color:#fff;font-size:11px;font-weight:700;padding:1px 8px;border-radius:10px;margin-right:6px}
-  .gft-thumb{width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid var(--border);background:rgba(255,255,255,.05);cursor:pointer;vertical-align:middle;}
+  .gft-thumb{width:84px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.05);cursor:pointer;vertical-align:middle;transition:transform .12s;}
+  .gft-thumb:hover{transform:scale(1.06);border-color:rgba(255,255,255,.35);}
+  .gft-phcell{display:flex;flex-wrap:wrap;gap:6px;max-width:290px;}
+  .gft-new{display:inline-block;background:rgba(76,175,130,.16);color:#5fd49a;border:1px solid rgba(76,175,130,.5);border-radius:6px;padding:3px 9px;font-size:12.5px;font-weight:700;letter-spacing:.3px;white-space:nowrap;}
+  .gft-warnrow{background:rgba(239,83,80,.10) !important;}
+  .gft-warnrow td{color:#ff8a80 !important;}
+  .gft-warntag{color:#ff5252;font-weight:700;font-size:12.5px;white-space:nowrap;}
   .dsp-sku{font-size:12px;color:#555;background:#fafafa;border-radius:6px;padding:6px 8px;margin:6px 0}
   .dsp-sku span{font-weight:700;color:#333}
   .dsp-cms{margin:6px 0}
@@ -1947,7 +1953,7 @@ function renderDisplaySummary(){
     rows+='<tr><td><b>'+r+'</b></td><td class="num">'+mk+'</td><td class="num">'+b.outlets+'</td><td class="num">'+b.f4+'</td><td class="num">'+b.f6+'</td><td class="num">'+b.fs+'</td><td class="num">'+b.frames+'</td><td class="num">'+dur+'</td><td class="num">'+b.rpt+'</td><td class="num">'+b.pass+'/'+b.scored+'</td><td class="num">'+comb+'</td></tr>';
   });
   var tdur=tot.durN?Math.round(tot.durSum/tot.durN):'—', tcomb=tot.combN?(tot.combSum/tot.combN).toFixed(1):'—';
-  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.mk+'</td><td class="num">'+tot.outlets+'</td><td class="num">'+tot.f4+'</td><td class="num">'+tot.f6+'</td><td class="num">'+tot.fs+'</td><td class="num">'+tot.frames+'</td><td class="num">'+tdur+'</td><td class="num">'+tot.rpt+'</td><td class="num">'+tot.pass+'/'+tot.scored+'</td><td class="num">'+tcomb+'</td></tr>';
+  rows+='<tr style="font-weight:700;background:rgba(255,255,255,.08)"><td>Tổng</td><td class="num">'+tot.mk+'</td><td class="num">'+tot.outlets+'</td><td class="num">'+tot.f4+'</td><td class="num">'+tot.f6+'</td><td class="num">'+tot.fs+'</td><td class="num">'+tot.frames+'</td><td class="num">'+tdur+'</td><td class="num">'+tot.rpt+'</td><td class="num">'+tot.pass+'/'+tot.scored+'</td><td class="num">'+tcomb+'</td></tr>';
   var sum=document.getElementById('dspSummary'); if(sum) sum.innerHTML=DISP_ENR.length?rows:'<tr><td colspan="11" style="text-align:center;color:#888">Chưa có chương trình trưng bày</td></tr>';
 }
 
@@ -2115,7 +2121,7 @@ function renderGiftSummary(){
     var n=Object.keys(b.ev).length, nw=Object.keys(b.nw).length, warn=Object.keys(b.warn).length;
     tot.n+=n;tot.qty+=b.qty;tot.nw+=nw;tot.warn+=warn;
     rows+='<tr><td><b>'+r+'</b></td><td class="num">'+n+'</td><td class="num">'+b.qty+'</td><td class="num">'+nw+'</td><td class="num">'+(warn?('<span style="color:#c62828;font-weight:700">'+warn+'</span>'):0)+'</td></tr>'; });
-  rows+='<tr style="font-weight:700;background:#fafafa"><td>Tổng</td><td class="num">'+tot.n+'</td><td class="num">'+tot.qty+'</td><td class="num">'+tot.nw+'</td><td class="num">'+tot.warn+'</td></tr>';
+  rows+='<tr style="font-weight:700;background:rgba(255,255,255,.08)"><td>Tổng</td><td class="num">'+tot.n+'</td><td class="num">'+tot.qty+'</td><td class="num">'+tot.nw+'</td><td class="num">'+tot.warn+'</td></tr>';
   var el=document.getElementById('gftSummary'); if(el) el.innerHTML=GIFT_LOG.length?rows:'<tr><td colspan="5" style="text-align:center;color:#888">Chưa có lượt tặng nào</td></tr>';
 }
 
@@ -2160,8 +2166,12 @@ function renderGiftLog(){
   var rows=list.map(function(g){
     var isNew=String(g.outlet_is_new).toUpperCase()==='TRUE';
     var warn=String(g.warning_shown).toUpperCase()==='TRUE';
-    var ph=g.photo_id?'<a href="https://drive.google.com/file/d/'+g.photo_id+'/view" target="_blank" rel="noopener"><img class="gft-thumb" src="'+dspThumb(g.photo_id)+'" data-id="'+g.photo_id+'" data-try="0" onerror="dspImgFallback(this)"></a>':'—';
-    return '<tr'+(warn?' style="background:#fff8f0"':'')+'><td>'+dspEsc((g.timestamp||'').slice(0,10))+'</td><td>'+dspEsc(g.salesman)+'</td><td>'+dspEsc(g.region)+'</td><td>'+dspEsc(g.outlet_name)+'</td><td>'+dspEsc(g.gift_label_vi||g.gift_type)+'</td><td class="num">'+dspEsc(g.qty)+'</td><td>'+dspEsc(trigLabel[g.trigger_type]||g.trigger_type)+'</td><td>'+(isNew?'🆕':'')+'</td><td>'+(warn?'<span style="color:#c62828">⚠️</span>':'')+'</td><td>'+ph+'</td></tr>';
+    // ★ v3.3: photo_id có thể là danh sách "id1,id2,..." → hiển thị TẤT CẢ ảnh
+    var pids=String(g.photo_id||'').split(',').map(function(x){return x.trim();}).filter(function(x){return x;});
+    var ph=pids.length?('<div class="gft-phcell">'+pids.map(function(id){
+      return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img class="gft-thumb" src="'+dspThumb(id)+'" data-id="'+id+'" data-try="0" onerror="dspImgFallback(this)"></a>';
+    }).join('')+'</div>'):'—';
+    return '<tr'+(warn?' class="gft-warnrow"':'')+'><td>'+dspEsc((g.timestamp||'').slice(0,10))+'</td><td>'+dspEsc(g.salesman)+'</td><td>'+dspEsc(g.region)+'</td><td>'+dspEsc(g.outlet_name)+'</td><td>'+dspEsc(g.gift_label_vi||g.gift_type)+'</td><td class="num">'+dspEsc(g.qty)+'</td><td>'+dspEsc(trigLabel[g.trigger_type]||g.trigger_type)+'</td><td>'+(isNew?'<span class="gft-new">🆕 MỚI</span>':'')+'</td><td>'+(warn?'<span class="gft-warntag">⚠️ Trùng</span>':'')+'</td><td>'+ph+'</td></tr>';
   }).join('');
   var el=document.getElementById('gftLog'); if(el) el.innerHTML=list.length?rows:'<tr><td colspan="10" style="text-align:center;color:#888">Chưa có lượt tặng</td></tr>';
 }

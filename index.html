@@ -3275,7 +3275,7 @@ function confirmFraudSubmit() {
 (function(){
   "use strict";
   var G={ _cfg:null,_products:[],_inv:[],_loaded:false,_loading:null,
-    _region:'',_scenario:'',_photo:'',_gps:null,
+    _region:'',_scenario:'',_photos:[],_gps:null,   /* ★ v3.3: nhiều ảnh (tối đa 10) */
     _market:'',_outlet:'',_warned:false,_purch:[],_gifts:[{key:'',label:'',qty:1}],_trigger:'ncd_65ml',_triggerOther:'' };
   window.GiftMod=G;
 
@@ -3348,7 +3348,7 @@ function confirmFraudSubmit() {
     ensureOverlay().classList.add('show');
     $id('gftBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
     $id('gftFoot').style.display='none';
-    G._scenario=''; G._photo=''; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._gifts=[{key:'',label:'',qty:1}]; G._trigger='ncd_65ml'; G._triggerOther='';
+    G._scenario=''; G._photos=[]; G._market=''; G._outlet=''; G._warned=false; G._purch=[]; G._gifts=[{key:'',label:'',qty:1}]; G._trigger='ncd_65ml'; G._triggerOther='';
     try{ if(navigator.geolocation) navigator.geolocation.getCurrentPosition(function(p){ G._gps=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6); },function(){},{timeout:6000}); }catch(e){}
     loadData().then(function(){
       var r=userRegion();
@@ -3402,12 +3402,19 @@ function confirmFraudSubmit() {
     var ps=G._products||[]; var o='<option value="">— Chọn SP —</option>';
     o+=ps.map(function(p){var n=p.name_vi||p.name_en||p.id;return '<option value="'+esc(n)+'"'+(sel===n?' selected':'')+'>'+esc(n)+'</option>';}).join(''); return o;
   }
+  var GFT_MAX_PHOTOS=10;   // ★ v3.3: tối đa 10 ảnh / lượt tặng
   function photoBlock(){
-    return '<div class="dspm-label">Ảnh chứng minh tặng (bắt buộc)</div><div class="dspm-ph">'+
-      '<label class="dspm-ph-slot'+(G._photo?' filled':'')+'" id="gftSlot" style="grid-column:span 2">'+
-      (G._photo?'<img src="'+G._photo+'"><button class="x" onclick="GiftMod.delPhoto(event)">×</button>':'<div class="cap">Chụp ảnh / chọn từ thư viện</div>')+
-      '<input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)"></label></div>';
+    var thumbs=G._photos.map(function(pd,i){
+      return '<div class="dspm-ph-slot filled"><img src="'+pd+'"><button class="x" onclick="GiftMod.delPhoto(event,'+i+')">×</button></div>';
+    }).join('');
+    var addSlot=(G._photos.length<GFT_MAX_PHOTOS)
+      ? '<label class="dspm-ph-slot"><div class="cap">📷 Thêm ảnh<br>(chọn được nhiều)</div><input type="file" accept="image/*" multiple onchange="GiftMod.pickPhoto(this)"></label>'
+      : '';
+    return '<div id="gftPhWrap"><div class="dspm-label">Ảnh chứng minh tặng (bắt buộc) — '+G._photos.length+'/'+GFT_MAX_PHOTOS+' ảnh</div>'+
+      '<div class="dspm-ph">'+thumbs+addSlot+'</div></div>';
   }
+  // ★ v3.3: chỉ vẽ lại khối ảnh — giữ nguyên nội dung form đã nhập (tên điểm, ghi chú…)
+  function refreshPhotoGrid(){ var w=$id('gftPhWrap'); if(w){ w.outerHTML=photoBlock(); } }
 
   function renderNewForm(){
     $id('gftBody').innerHTML='<div class="dspm-card">'+
@@ -3467,11 +3474,18 @@ function confirmFraudSubmit() {
     var m=$id('gftMarket'); if(m&&G._market){ m.value=G._market; G.onMarket._skip=true; var sel=$id('gftOutlet'); var outlets=((regionData(G._region)[G._market])||[]).slice().sort(); if(sel){ sel.innerHTML='<option value="">— Chọn điểm —</option>'+outlets.map(function(o){return '<option value="'+esc(o)+'"'+(o===G._outlet?' selected':'')+'>'+esc(o)+'</option>';}).join(''); } }
   }
 
-  G.pickPhoto=function(input){
-    var f=input.files&&input.files[0]; if(!f) return;
-    compress(f,function(d){ G._photo=d; var s=$id('gftSlot'); if(s){ s.classList.add('filled'); s.innerHTML='<img src="'+d+'"><button class="x" onclick="GiftMod.delPhoto(event)">×</button><input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)">'; } });
+  G.pickPhoto=function(input){   // ★ v3.3: chọn NHIỀU ảnh 1 lần, tối đa 10
+    var files=Array.prototype.slice.call((input&&input.files)||[]); if(!files.length) return;
+    var room=GFT_MAX_PHOTOS-G._photos.length;
+    if(room<=0){ tt('⚠️ Tối đa '+GFT_MAX_PHOTOS+' ảnh'); try{input.value='';}catch(e){} return; }
+    if(files.length>room){ files=files.slice(0,room); tt('⚠️ Chỉ nhận thêm '+room+' ảnh (tối đa '+GFT_MAX_PHOTOS+')'); }
+    var left=files.length;
+    files.forEach(function(f){
+      compress(f,function(d){ if(G._photos.length<GFT_MAX_PHOTOS) G._photos.push(d); if(--left<=0) refreshPhotoGrid(); });
+    });
+    try{ input.value=''; }catch(e){}
   };
-  G.delPhoto=function(ev){ ev.preventDefault(); ev.stopPropagation(); G._photo=''; var s=$id('gftSlot'); if(s){ s.classList.remove('filled'); s.innerHTML='<div class="cap">Chụp ảnh / chọn từ thư viện</div><input type="file" accept="image/*" onchange="GiftMod.pickPhoto(this)">'; } };
+  G.delPhoto=function(ev,i){ ev.preventDefault(); ev.stopPropagation(); G._photos.splice(i,1); refreshPhotoGrid(); };
   function compress(file,cb){
     var rd=new FileReader();
     rd.onload=function(e){ var img=new Image(); img.onload=function(){ function shrink(max){ var w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>=w&&h>max){w=Math.round(w*max/h);h=max;} var cv=document.createElement('canvas'); cv.width=w; cv.height=h; cv.getContext('2d').drawImage(img,0,0,w,h); return cv.toDataURL('image/jpeg',0.72); } try{cb(shrink(1280));}catch(e1){ try{cb(shrink(800));}catch(e2){cb(e.target.result);} } }; img.onerror=function(){cb(e.target.result);}; img.src=e.target.result; };
@@ -3491,10 +3505,10 @@ function confirmFraudSubmit() {
     }
     var gifts=G._gifts.filter(function(g){ return g.key; }).map(function(g){ return { gift_type:g.key, gift_label_vi:g.label, qty:Math.max(1,parseInt(g.qty,10)||1) }; });
     if(!gifts.length){ tt('⚠️ Chọn ít nhất 1 món quà'); return; }
-    if(!G._photo){ tt('⚠️ Bắt buộc có ảnh'); return; }
+    if(!G._photos.length){ tt('⚠️ Bắt buộc có ít nhất 1 ảnh'); return; }
     var note=($id('gftNote')&&$id('gftNote').value)||'';
     var giftId='GIFT-'+tnow().replace(/-/g,'')+'-'+Date.now().toString().slice(-5);
-    var photo=G._photo, region=G._region, date=tnow();
+    var photos=G._photos.slice(0,GFT_MAX_PHOTOS), region=G._region, date=tnow();
     var totalQty=gifts.reduce(function(a,g){return a+g.qty;},0);
     var payload={type:'GIFT_LOG', gift_log_id:giftId, event_id:giftId, salesman:name, region:region,
       outlet_name:outletName, outlet_is_new:isNew, province:prov, market:market, sub_channel:'GT Outlet',
@@ -3508,7 +3522,7 @@ function confirmFraudSubmit() {
       .then(function(r){return r.json();})
       .then(function(res){
         if(res&&res.ok){
-          uploadGiftPhoto(giftId, name, region, date, photo);
+          uploadGiftPhotos(giftId, name, region, date, photos);
           tt('✅ Đã lưu '+gifts.length+' món ('+totalQty+' quà)'+(res.store_appended?' + thêm điểm mới vào Storelist':''));
         } else tt('⚠️ Lưu lỗi, thử lại.');
       }).catch(function(){ tt('⚠️ Mất mạng — chưa lưu được.'); });
@@ -3519,30 +3533,43 @@ function confirmFraudSubmit() {
          return { signal:c.signal, clear:function(){ clearTimeout(t); } }; }
     catch(e){ return { signal:undefined, clear:function(){} }; }
   }
-  function uploadGiftPhoto(giftId,salesman,region,date,photo){
-    var b=photo; if(b.indexOf(',')>-1) b=b.split(',')[1];
+  // ★ v3.3: upload NHIỀU ảnh — chia chunk 3 ảnh/call (payload gọn, ít timeout),
+  // gửi TUẦN TỰ để backend append photo_id không đè nhau. Retry 3 lần/chunk.
+  function uploadGiftPhotos(giftId,salesman,region,date,photos){
     function seg(s){ return String(s==null?'':s).replace(/[\/\\]+/g,'-').trim()||'NA'; }
     var folder=['Tặng quà',seg(region),seg(salesman),seg(date)].join('/');
-    var pl={type:'GIFT_PHOTO', gift_log_id:giftId, event_id:giftId, salesman:salesman, region:region, date:date, folder_path:folder, photo_b64:b};
-    var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
-    (function send(attempt){
-      var sg=gftSignal(45000);
-      fetch(state.scriptUrl,{method:'POST',mode:'cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:sg.signal})
-        .then(function(r){ sg.clear(); return r.json(); })
-        .then(function(res){
-          if(res&&res.ok){ tt('✅ Đã tải ảnh tặng quà'); }
-          else if(attempt<3){ setTimeout(function(){ send(attempt+1); },1200*attempt); }
-          else { tt('⚠️ Ảnh tặng quà chưa xác nhận tải được'); }
-        })
-        .catch(function(){
-          sg.clear();
-          if(attempt<3){ setTimeout(function(){ send(attempt+1); },1200*attempt); }
-          else{
-            try{ fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body}); }catch(e){}
-            tt('⚠️ Ảnh tặng quà chưa xác nhận tải được');
-          }
-        });
-    })(1);
+    var b64s=(photos||[]).map(function(pd){ return (pd&&pd.indexOf(',')>-1)?pd.split(',')[1]:(pd||''); }).filter(function(x){return x;});
+    if(!b64s.length) return;
+    var CHUNK=3, chunks=[], i;
+    for(i=0;i<b64s.length;i+=CHUNK) chunks.push(b64s.slice(i,i+CHUNK));
+    var okCount=0, total=b64s.length;
+    if(total>1) tt('📤 Đang tải '+total+' ảnh tặng quà…');
+    (function sendChunk(ci){
+      if(ci>=chunks.length){
+        tt(okCount>=total?('✅ Đã tải '+okCount+'/'+total+' ảnh tặng quà'):('⚠️ Tải được '+okCount+'/'+total+' ảnh — kiểm tra mạng'));
+        return;
+      }
+      var pl={type:'GIFT_PHOTO', gift_log_id:giftId, event_id:giftId, salesman:salesman, region:region, date:date, folder_path:folder, photos_b64:chunks[ci]};
+      var body=JSON.stringify({data:btoa(unescape(encodeURIComponent(JSON.stringify(pl))))});
+      (function send(attempt){
+        var sg=gftSignal(60000);
+        fetch(state.scriptUrl,{method:'POST',mode:'cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body,signal:sg.signal})
+          .then(function(r){ sg.clear(); return r.json(); })
+          .then(function(res){
+            if(res&&res.ok){ okCount+=(res.uploaded||chunks[ci].length); sendChunk(ci+1); }
+            else if(attempt<3){ setTimeout(function(){ send(attempt+1); },1200*attempt); }
+            else { sendChunk(ci+1); }
+          })
+          .catch(function(){
+            sg.clear();
+            if(attempt<3){ setTimeout(function(){ send(attempt+1); },1200*attempt); }
+            else{
+              try{ fetch(state.scriptUrl,{method:'POST',mode:'no-cors',redirect:'follow',headers:{'Content-Type':'text/plain'},body:body}); }catch(e){}
+              sendChunk(ci+1);
+            }
+          });
+      })(1);
+    })(0);
   }
 
   G.close=function(){ var ov=$id('gftOverlay'); if(ov) ov.classList.remove('show'); };
