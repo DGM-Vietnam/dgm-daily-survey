@@ -2555,5 +2555,224 @@ function renderGiftLog(){
 })();
 </script>
 
+
+<!-- ===== 📦 NPP GT — TỒN KHO & SELL-OUT KHÁCH HÀNG KEY (DASHBOARD MODULE) =====
+     CÔ LẬP: namespace NppDash. Tự chèn tab '📦 NPP GT' (tab-manager) + bọc switchTab.
+     Backend: DistStock.gs → getDistAnalysis / getDistStockIn.
+     Chart dùng mkChart/destroyChart + Chart.js sẵn có của dashboard. -->
+<script id="npp-dash-script">
+(function(){
+  "use strict";
+  var N = { loaded:false, an:null, sin:[], fDist:'all' };
+  window.NppDash = N;
+
+  var CLR=['#C8102E','#4A9EBF','#FFE140','#4caf82','#ce93d8','#ffb74d','#80cbc4','#f48fb1','#a5d6a7','#90caf9'];
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function fmt1(n){ if(n==null) return '—'; return (Math.round(n*10)/10).toLocaleString('vi-VN'); }
+  function fmtVND(n){ n=parseFloat(n||0)||0; return n.toLocaleString('vi-VN')+'đ'; }
+  function wkLabel(w){ return String(w||'').replace(/^\d{4}-/,''); }
+
+  /* ---------- tự chèn tab + bọc switchTab ---------- */
+  function bootstrap(){
+    if(document.getElementById('tab-npp')) return;
+    var bar=document.getElementById('tabsBar');
+    if(bar){
+      var t=document.createElement('div'); t.className='tab tab-manager';
+      t.setAttribute('onclick',"switchTab('npp',this)"); t.textContent='📦 NPP GT';
+      bar.appendChild(t);
+    }
+    var host=document.getElementById('tab-overview'); var parent=host?host.parentNode:document.body;
+    var div=document.createElement('div'); div.className='tab-content'; div.id='tab-npp';
+    div.innerHTML='<div id="nppBody" style="padding:0"><div style="text-align:center;color:#888;padding:30px">Đang tải…</div></div>';
+    parent.appendChild(div);
+    if(typeof window.switchTab==='function' && !window.switchTab._nppWrapped){
+      var orig=window.switchTab;
+      window.switchTab=function(name,el){ orig(name,el); if(name==='npp'){ N.load(); } };
+      window.switchTab._nppWrapped=true;
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootstrap); else bootstrap();
+
+  /* ---------- nạp dữ liệu ---------- */
+  N.load=function(force){
+    if(N.loaded && !force){ render(); return; }
+    var body=document.getElementById('nppBody');
+    if(body) body.innerHTML='<div style="text-align:center;color:#888;padding:30px">Đang tải dữ liệu NPP…</div>';
+    Promise.all([
+      fetch(SCRIPT_URL+'?action=getDistAnalysis&_t='+Date.now()).then(function(r){return r.json();}).catch(function(){return null;}),
+      fetch(SCRIPT_URL+'?action=getDistStockIn&_t='+Date.now()).then(function(r){return r.json();}).catch(function(){return null;})
+    ]).then(function(res){
+      N.an=(res[0]&&res[0].ok)?res[0]:null;
+      N.sin=(res[1]&&res[1].ok)?res[1].items:[];
+      N.loaded=true; render();
+    }).catch(function(){
+      if(body) body.innerHTML='<div style="text-align:center;color:#c00;padding:30px">Không tải được dữ liệu. <button onclick="NppDash.load(true)" style="cursor:pointer">Thử lại</button></div>';
+    });
+  };
+  N.setDist=function(v){ N.fDist=v; render(); };
+
+  function dists(){ return (N.an&&N.an.dists)||[]; }
+  function gtDists(){ return dists().filter(function(d){return d.channel==='GT';}); }
+  function fsDists(){ return dists().filter(function(d){return d.channel==='FS';}); }
+  function visible(){ return N.fDist==='all'?dists():dists().filter(function(d){return d.dist_id===N.fDist;}); }
+
+  /* ---------- render ---------- */
+  function render(){
+    var body=document.getElementById('nppBody'); if(!body) return;
+    if(!N.an||!dists().length){
+      body.innerHTML='<div style="text-align:center;color:#888;padding:30px">Chưa có dữ liệu NPP.<br>Chạy <b>setupDistSheets()</b> và sửa tên khách trong sheet <b>Dist_Master</b>, sau đó GT Leader nhập liệu từ app.</div>';
+      return;
+    }
+    var weeks=N.an.weeks||[], wThis=N.an.this_week, wLast=N.an.last_week;
+    var vis=visible(), gt=vis.filter(function(d){return d.channel==='GT';});
+
+    // KPI tổng hợp
+    var kOnHand=0,kLow=0,kSuggest=0,kThis=0,kLastW=0;
+    vis.forEach(function(d){
+      var t=d.totals||{};
+      kOnHand+=t.on_hand||0; kLow+=t.sku_low||0; kSuggest+=t.suggest||0;
+      kThis+=t.sellout_this_week||0; kLastW+=t.sellout_last_week||0;
+    });
+    var delta=kLastW>0?Math.round((kThis-kLastW)/kLastW*100):null;
+
+    var html='';
+    // filter row
+    html+='<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">'+
+      '<select onchange="NppDash.setDist(this.value)" style="padding:8px 12px;background:var(--card);color:var(--white);border:1px solid var(--border);border-radius:8px;font-size:13px">'+
+        '<option value="all"'+(N.fDist==='all'?' selected':'')+'>Tất cả khách hàng key</option>';
+    dists().forEach(function(d){
+      html+='<option value="'+esc(d.dist_id)+'"'+(N.fDist===d.dist_id?' selected':'')+'>'+esc(d.dist_name)+' · '+esc(d.region)+' ['+d.channel+']</option>';
+    });
+    html+='</select>'+
+      '<button onclick="NppDash.load(true)" style="padding:8px 14px;background:transparent;color:var(--gray2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px">↻ Làm mới</button>'+
+      '<span style="font-size:11px;color:var(--gray2)">Cập nhật: '+esc(N.an.generated_at||'')+'</span></div>';
+
+    // KPI cards
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px">';
+    html+=kpi('Tồn kho hiện tại', fmt1(kOnHand)+' <span style="font-size:12px;color:var(--gray2)">thùng</span>', 'khách GT: tự tính từ tồn đầu + nhập − bán');
+    html+=kpi('SKU sắp hết (WOC &lt; '+ (N.an.woc_low||2) +' tuần)', '<span style="color:'+(kLow>0?'#ff6b6b':'#4caf82')+'">'+kLow+'</span>', kLow>0?'cần push đơn ngay':'ổn định');
+    html+=kpi('Sell-out tuần này', fmt1(kThis)+' <span style="font-size:12px;color:var(--gray2)">thùng</span>', delta!=null?('so tuần trước: <b style="color:'+(delta>=0?'#4caf82':'#ff6b6b')+'">'+(delta>=0?'+':'')+delta+'%</b>'):'—');
+    html+=kpi('Đề xuất đặt hàng', '<span style="color:#FFE140">'+fmt1(kSuggest)+'</span> <span style="font-size:12px;color:var(--gray2)">thùng</span>', 'cover mục tiêu theo NPP');
+    html+='</div>';
+
+    // charts
+    html+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:16px">'+
+      '<div class="chart-card"><h3>📈 Sell-out theo tuần (thùng) — 12 tuần</h3><div class="chart-wrap h260"><canvas id="nppChartWeekly"></canvas></div></div>'+
+      '<div class="chart-card"><h3>📦 Tồn kho hiện tại (thùng)</h3><div class="chart-wrap h260"><canvas id="nppChartStock"></canvas></div></div>'+
+    '</div>';
+
+    // bảng phân tích SKU
+    html+='<div class="chart-card" style="margin-bottom:16px"><h3>⚡ Phân tích tồn & đề xuất đơn hàng — khách GT</h3>'+
+      '<div style="overflow-x:auto"><table><thead><tr><th>NPP</th><th>Mã hàng</th><th class="num">Tồn</th><th class="num">TB/tuần (4w)</th><th>Xu hướng</th><th>WOC</th><th class="num">Đề xuất</th></tr></thead><tbody>';
+    var rows=[];
+    gt.forEach(function(d){ d.skus.forEach(function(s){ rows.push({d:d,s:s}); }); });
+    rows.sort(function(a,b){ var wa=a.s.woc==null?999:a.s.woc, wb=b.s.woc==null?999:b.s.woc; return wa-wb; });
+    if(!rows.length) html+='<tr><td colspan="7" style="text-align:center;color:var(--gray2)">Chưa có dữ liệu khách GT.</td></tr>';
+    rows.forEach(function(r){
+      var s=r.s;
+      html+='<tr><td style="white-space:nowrap">'+esc(r.d.dist_name)+'</td><td>'+esc(s.product_name)+'</td>'+
+        '<td class="num" style="font-weight:700">'+fmt1(s.on_hand)+'</td>'+
+        '<td class="num">'+fmt1(s.avg4)+'</td>'+
+        '<td>'+trendCell(s.trend_pct)+'</td>'+
+        '<td>'+wocCell(s.woc)+'</td>'+
+        '<td class="num" style="font-weight:800;color:'+(s.suggest>0?'#FFE140':'var(--gray2)')+'">'+(s.suggest>0?('+'+s.suggest):'—')+'</td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+
+    // FS section
+    var fs=vis.filter(function(d){return d.channel==='FS';});
+    if(fs.length){
+      html+='<div class="chart-card" style="margin-bottom:16px"><h3>🍽️ Khách Food Service — tồn cuối tháng gần nhất</h3>'+
+        '<div style="overflow-x:auto"><table><thead><tr><th>Khách hàng</th><th>Mã hàng</th><th>Tháng</th><th class="num">Tồn cuối (thùng)</th></tr></thead><tbody>';
+      var any=false;
+      fs.forEach(function(d){ d.skus.forEach(function(s){ any=true;
+        html+='<tr><td style="white-space:nowrap">'+esc(d.dist_name)+'</td><td>'+esc(s.product_name)+'</td><td>'+esc(s.last_month||'—')+'</td><td class="num" style="font-weight:700">'+fmt1(s.on_hand)+'</td></tr>';
+      });});
+      if(!any) html+='<tr><td colspan="4" style="text-align:center;color:var(--gray2)">Chưa nhập tồn cuối tháng.</td></tr>';
+      html+='</tbody></table></div></div>';
+    }
+
+    // đơn nhập hàng gần đây
+    html+='<div class="chart-card"><h3>🛒 Nhập hàng gần đây (giá trị · KM · chiết khấu)</h3>'+
+      '<div style="overflow-x:auto"><table><thead><tr><th>Ngày đặt</th><th>NPP</th><th class="num">Số mã</th><th class="num">Thùng</th><th class="num">Giá trị đơn</th><th>KM / CK</th><th>Nhận hàng</th></tr></thead><tbody>';
+    var orders={}, ids=[];
+    var sinVis=N.fDist==='all'?N.sin:N.sin.filter(function(r){return String(r.dist_id)===N.fDist;});
+    sinVis.forEach(function(r){ var oid=r.order_id||r.stockin_id; if(!orders[oid]){orders[oid]={m:r,lines:[]};ids.push(oid);} orders[oid].lines.push(r); });
+    if(!ids.length) html+='<tr><td colspan="7" style="text-align:center;color:var(--gray2)">Chưa có đơn nhập hàng.</td></tr>';
+    ids.slice(0,20).forEach(function(oid){
+      var o=orders[oid], mt=o.m, cases=0;
+      o.lines.forEach(function(l){ cases+=parseFloat(l.qty_cases)||0; });
+      var km=[mt.promotion,mt.discount].filter(Boolean).join(' · ');
+      html+='<tr><td style="white-space:nowrap">'+esc(mt.order_date||'')+'</td><td style="white-space:nowrap">'+esc(mt.dist_name||'')+'</td>'+
+        '<td class="num">'+o.lines.length+'</td><td class="num">'+fmt1(cases)+'</td>'+
+        '<td class="num" style="font-weight:700">'+(mt.order_value?fmtVND(mt.order_value):'—')+'</td>'+
+        '<td style="max-width:220px">'+esc(km||'—')+'</td>'+
+        '<td>'+(mt.received_date?esc(mt.received_date):'<span style="color:#ffb74d">⏳ chưa nhận</span>')+'</td></tr>';
+    });
+    html+='</tbody></table></div></div>';
+
+    body.innerHTML=html;
+    drawCharts(weeks, gt, vis);
+  }
+
+  function kpi(label, value, sub){
+    return '<div class="chart-card" style="padding:14px 16px"><div style="font-size:11px;color:var(--gray2);text-transform:uppercase;letter-spacing:.05em">'+label+'</div>'+
+      '<div style="font-size:24px;font-weight:800;margin-top:4px">'+value+'</div>'+
+      (sub?'<div style="font-size:11.5px;color:var(--gray2);margin-top:2px">'+sub+'</div>':'')+'</div>';
+  }
+  function trendCell(pct){
+    if(pct==null) return '<span style="color:var(--gray2)">—</span>';
+    if(pct>10) return '<span style="color:#4caf82;font-weight:700">↑ +'+pct+'%</span>';
+    if(pct<-10) return '<span style="color:#ff6b6b;font-weight:700">↓ '+pct+'%</span>';
+    return '<span style="color:var(--gray2)">→ '+(pct>=0?'+':'')+pct+'%</span>';
+  }
+  function wocCell(w){
+    if(w==null) return '<span style="color:var(--gray2)">—</span>';
+    var low=(N.an&&N.an.woc_low)||2, high=(N.an&&N.an.woc_high)||6;
+    if(w<low)  return '<span style="color:#ff6b6b;font-weight:800">🔴 '+fmt1(w)+' tuần</span>';
+    if(w>high) return '<span style="color:#64b5f6;font-weight:700">🔵 '+fmt1(w)+' tuần</span>';
+    return '<span style="color:#4caf82;font-weight:700">🟢 '+fmt1(w)+' tuần</span>';
+  }
+
+  function drawCharts(weeks, gt, vis){
+    try{
+      var labels=weeks.map(wkLabel);
+      var datasets=[];
+      if(N.fDist==='all'){
+        gt.forEach(function(d,i){
+          var data=weeks.map(function(w){ var t=0; d.skus.forEach(function(s){ t+=(s.weekly&&s.weekly[w])||0; }); return t; });
+          datasets.push({label:d.dist_name,data:data,borderColor:CLR[i%CLR.length],backgroundColor:CLR[i%CLR.length]+'33',tension:.3,fill:false,pointRadius:2});
+        });
+      } else {
+        var d=gt[0]||vis[0];
+        if(d&&d.channel==='GT'){
+          var top=d.skus.slice().sort(function(a,b){return (b.avg4||0)-(a.avg4||0);}).slice(0,8);
+          top.forEach(function(s,i){
+            datasets.push({label:s.product_name,data:weeks.map(function(w){return (s.weekly&&s.weekly[w])||0;}),borderColor:CLR[i%CLR.length],backgroundColor:CLR[i%CLR.length]+'33',tension:.3,fill:false,pointRadius:2});
+          });
+        }
+      }
+      if(typeof mkChart==='function' && datasets.length)
+        mkChart('nppChartWeekly','line',labels,datasets,{plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:10}}}});
+
+      // stock bar
+      var sl,sd;
+      if(N.fDist==='all'){
+        sl=vis.map(function(d){return d.dist_name;});
+        sd=vis.map(function(d){return (d.totals&&d.totals.on_hand)||0;});
+      } else {
+        var dd=vis[0]; var top15=(dd?dd.skus:[]).slice().sort(function(a,b){return (b.on_hand||0)-(a.on_hand||0);}).slice(0,15);
+        sl=top15.map(function(s){return s.product_name;});
+        sd=top15.map(function(s){return s.on_hand||0;});
+      }
+      if(typeof mkChart==='function' && sl.length)
+        mkChart('nppChartStock','bar',sl,[{label:'Tồn (thùng)',data:sd,backgroundColor:'rgba(74,158,191,.7)',borderColor:'#4A9EBF',borderWidth:1,borderRadius:4}],{indexAxis:'y',plugins:{legend:{display:false}}});
+    }catch(e){}
+  }
+})();
+</script>
+<!-- ===== /📦 NPP GT DASHBOARD MODULE ===== -->
+
 </body>
 </html>
