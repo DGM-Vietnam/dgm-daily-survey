@@ -1009,8 +1009,7 @@ function renderTypeCards(team) {
   } else if (team.startsWith('GT')) {
     html += `<div class="type-cards">
       <div class="type-card" onclick="startGTDaily()"><div class="icon">📊</div><div class="title">Daily Survey</div><div class="desc">Khảo sát điểm bán GT hàng ngày</div></div>
-      <div class="type-card" onclick="startGTNew()"><div class="icon">➕</div><div class="title">Điểm Bán Mới</div><div class="desc">Khảo sát & chào hàng điểm mới</div></div>
-      <div class="type-card" onclick="startGTOpenNew()" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">🏆</div><div class="title" style="color:#2e7d32">Mở Mới Thành Công</div><div class="desc">Đã chốt được điểm bán mới</div></div>
+      <div class="type-card" onclick="startGTNew()" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">➕</div><div class="title" style="color:#2e7d32">Điểm Bán Mới</div><div class="desc">Khảo sát điểm mới — tick nếu đã chốt đơn</div></div>
       <div class="type-card" onclick="startGTOther()"><div class="icon">📝</div><div class="title">Công việc khác</div><div class="desc">Ghi nhận hoạt động GT khác</div></div>
     </div>`;
   } else if (team === 'MT/GT') {
@@ -1018,8 +1017,7 @@ function renderTypeCards(team) {
       <div class="type-card" onclick="startMT('daily')"><div class="icon">🏪</div><div class="title">MT Daily</div><div class="desc">Khảo sát điểm MT hàng ngày</div></div>
       <div class="type-card" onclick="startMT('other')"><div class="icon">📝</div><div class="title">MT Khác</div><div class="desc">Công việc MT khác</div></div>
       <div class="type-card" onclick="showGTRegionPicker()"><div class="icon">📊</div><div class="title">GT Daily</div><div class="desc">Khảo sát điểm GT hàng ngày</div></div>
-      <div class="type-card" onclick="showGTRegionPicker('new')"><div class="icon">➕</div><div class="title">GT Điểm Mới</div><div class="desc">Khảo sát điểm bán mới GT</div></div>
-      <div class="type-card" onclick="showGTRegionPicker('opennew')" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">🏆</div><div class="title" style="color:#2e7d32">GT Mở Mới TC</div><div class="desc">Chốt được điểm bán GT mới</div></div>
+      <div class="type-card" onclick="showGTRegionPicker('new')" style="border-color:#2e7d32;background:#e8f5e9"><div class="icon">➕</div><div class="title" style="color:#2e7d32">GT Điểm Mới</div><div class="desc">Điểm mới GT — tick nếu đã chốt đơn</div></div>
       <div class="type-card" onclick="showGTRegionPicker('other')"><div class="icon">📝</div><div class="title">GT Khác</div><div class="desc">Công việc GT khác</div></div>
     </div>`;
   } else {
@@ -1058,10 +1056,8 @@ function pickGTRegion(region, mode) {
   // Temporarily override user.team for GT form rendering, also save _gtRegion for session restore
   const originalTeam = state.user.team;
   state.user = { ...state.user, team: region, _gtRegion: region };
-  if (mode === 'new') {
+  if (mode === 'new' || mode === 'opennew') {
     startGTNew();
-  } else if (mode === 'opennew') {
-    startGTOpenNew();
   } else if (mode === 'other') {
     startGTOther();
   } else {
@@ -1637,21 +1633,76 @@ function startGTNew() {
   initGPS();
 }
 
+// Tỉnh/Tp tự nhận theo region (GT North→Hà Nội, Central→Đà Nẵng, South→TP.HCM)
+function gtnewProvinceOf(region) {
+  if (region === 'GT North')   return 'Hà Nội';
+  if (region === 'GT Central') return 'Đà Nẵng';
+  if (region === 'GT South')   return 'TP.HCM';
+  return '';
+}
+// Danh sách chợ có sẵn theo region (từ storelist động)
+function gtnewMarketsFor(region) {
+  var rd = region === 'GT Central' ? (typeof GT_CENTRAL!=='undefined'?GT_CENTRAL:{})
+         : region === 'GT North'   ? (typeof GT_NORTH!=='undefined'?GT_NORTH:{})
+         : (typeof GT_SOUTH!=='undefined'?GT_SOUTH:{});
+  return Object.keys(rd || {}).sort();
+}
+// Chọn "＋ Chợ mới" → hiện ô nhập tay
+function onGtnewMarketChange() {
+  var sel = document.getElementById('gtnew_market_sel');
+  var box = document.getElementById('gtnew_market_new');
+  if (!sel || !box) return;
+  box.style.display = (sel.value === '__NEW__') ? 'block' : 'none';
+  if (sel.value === '__NEW__') { box.focus(); } else { box.value = ''; }
+}
+// Lấy tên chợ cuối cùng (chọn sẵn hoặc nhập mới)
+function gtnewGetMarket() {
+  var sel = document.getElementById('gtnew_market_sel');
+  if (!sel) return '';
+  if (sel.value === '__NEW__') {
+    var box = document.getElementById('gtnew_market_new');
+    return box && box.value ? box.value.trim() : '';
+  }
+  return sel.value || '';
+}
+
 function renderGTNewForm(region) {
   const content = document.getElementById('gtnewContent');
   const products = ["Đậu sốt cà","Puree cà chua","Đậu trắng","Đậu gà","Cá ngừ","Cá trích","Cá thu","Bắp","Nước cốt dừa","Tương ớt Sriracha"];
   const bizTypes = ["Tiệm tạp hóa","Siêu thị mini / CVS","Nhà buôn (bán sỉ)","Sạp trong chợ","Nhà hàng / Khách sạn"];
   const potentials = ["Cao - Nên mở ngay","Trung bình - Theo dõi thêm","Thấp - Không phù hợp"];
+  const province = gtnewProvinceOf(region);
+  const markets  = gtnewMarketsFor(region);
+  const roStyle  = "background:#f1f5f9;color:#475569;font-weight:600;cursor:not-allowed";
 
   content.innerHTML = `
     <div class="card">
       <h3>📍 Thông tin điểm bán</h3>
       <div class="field required"><label>Ngày khảo sát</label>${dateFieldHTML('gtnew_date')}</div>
       <div class="field required"><label>Tên điểm bán</label>
-        <input type="text" id="gtnew_store" placeholder="Tên cửa hàng, sạp...">
+        <input type="text" id="gtnew_store" placeholder="Tên cửa hàng, sạp, đại lý...">
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="field" style="flex:1"><label>Tỉnh / Tp</label>
+          <input type="text" id="gtnew_province" value="${escHtml(province)}" readonly style="${roStyle}">
+        </div>
+        <div class="field" style="flex:1"><label>Kênh bán</label>
+          <input type="text" id="gtnew_channel" value="GT" readonly style="${roStyle}">
+        </div>
+      </div>
+      <div class="field"><label>Khu vực (Channel_Region)</label>
+        <input type="text" id="gtnew_region" value="${escHtml(region||'')}" readonly style="${roStyle}">
+      </div>
+      <div class="field"><label>Tên chợ</label>
+        <select id="gtnew_market_sel" onchange="onGtnewMarketChange()">
+          <option value="">— Chọn chợ —</option>
+          ${markets.map(m=>`<option value="${escHtml(m)}">${escHtml(m)}</option>`).join('')}
+          <option value="__NEW__">＋ Chợ mới (tự nhập)</option>
+        </select>
+        <input type="text" id="gtnew_market_new" placeholder="Nhập tên chợ mới..." style="display:none;margin-top:6px">
       </div>
       <div class="field"><label>Địa chỉ</label>
-        <input type="text" id="gtnew_addr" placeholder="Địa chỉ cụ thể">
+        <input type="text" id="gtnew_addr" placeholder="Địa chỉ cụ thể, số nhà, đường...">
       </div>
       <div class="field required"><label>Hình thức kinh doanh</label>
         <div class="chips" id="gtnew_biztype">
@@ -1663,33 +1714,58 @@ function renderGTNewForm(region) {
       </div>
     </div>
     <div class="card">
-      <h3>🛒 Sản phẩm chào hàng</h3>
-      <div class="field required" style="margin-bottom:0"><label>Sản phẩm chào hàng</label></div><div class="chips" id="gtnew_products">
-        ${products.map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
+      <h3>📞 Thông tin liên hệ</h3>
+      <div class="field"><label>Người liên hệ / Chủ cửa hàng</label>
+        <input type="text" id="gtnew_contact" placeholder="Họ tên chủ sạp...">
+      </div>
+      <div class="field"><label>Số điện thoại</label>
+        <input type="tel" id="gtnew_phone" placeholder="0909..." inputmode="tel">
       </div>
     </div>
     <div class="card">
-      <h3>⭐ Đánh giá & Hình ảnh</h3>
-      <div class="field required"><label>Tiềm năng</label>
+      <h3>🛒 Chào hàng & Đơn đầu tiên</h3>
+      <div class="field required" style="margin-bottom:0"><label>Sản phẩm đã chào</label></div>
+      <div class="chips" id="gtnew_products">
+        ${products.map(v=>`<span class="chip" onclick="toggleChip(this)">${v}</span>`).join('')}
+      </div>
+      <div class="field" style="margin-top:12px"><label>Đơn hàng đầu tiên (số lượng, giá trị)</label>
+        <textarea id="gtnew_firstorder" placeholder="VD: 3 thùng đậu sốt cà + 2 thùng cá ngừ, tổng 1.2tr... (bắt buộc nếu tick mở mới thành công)" style="min-height:80px"></textarea>
+      </div>
+    </div>
+    <div class="card">
+      <h3>📷 Hình ảnh <span class="store-count-badge zero" id="gtnew_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc ít nhất 1 hình. Tối đa 30 hình từ thư viện.</p>
+      <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
+        📁 Chọn hình từ thư viện
+        <input type="file" id="gtnew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gtnew')">
+      </label>
+      <div class="photo-compress-bar" id="gtnew_compress_bar"><div class="photo-compress-fill" id="gtnew_compress_fill"></div></div>
+      <p style="font-size:11px;color:var(--text2);margin-top:4px" id="gtnew_compress_msg"></p>
+      <div id="gtnew_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h3>⭐ Đánh giá tiềm năng</h3>
+      <div class="field required"><label>Tiềm năng điểm bán</label>
         <div class="chips" id="gtnew_potential">
           ${potentials.map(v=>`<span class="chip" onclick="selectChip(this,'gtnew_potential')">${v}</span>`).join('')}
         </div>
+        <p style="font-size:11px;color:var(--text2);margin-top:6px">Dùng để đánh giá chất lượng điểm mới & phân tích tỷ lệ convert sau này.</p>
       </div>
-      <div class="divider"></div>
+    </div>
+    <div class="card">
+      <h3>📝 Ghi chú thêm</h3>
       <div class="field"><label>Ghi chú & nhận xét</label>
-        <textarea id="gtnew_note" placeholder="Mô tả tiềm năng, ghi chú đặc biệt..."></textarea>
+        <textarea id="gtnew_note" placeholder="Thông tin đặc biệt, tiềm năng, cơ hội..."></textarea>
       </div>
-      <div class="field">
-        <h3 style="font-size:14px;font-weight:600;margin-bottom:8px">📷 Hình ảnh <span class="store-count-badge zero" id="gtnew_photo_count_badge">0/30</span> <span style="color:#f00;font-size:12px">*</span></h3>
-        <p style="font-size:12px;color:var(--text2);margin-bottom:10px">Bắt buộc. Chọn tối đa 30 hình từ thư viện.</p>
-        <label style="display:block;width:100%;padding:14px;border:2px dashed var(--primary);border-radius:10px;background:var(--primary-light);color:var(--primary);font-size:14px;font-weight:600;cursor:pointer;text-align:center">
-          📁 Chọn hình từ thư viện
-          <input type="file" id="gtnew_photo_input" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this,'gtnew')">
-        </label>
-        <div class="photo-compress-bar" id="gtnew_compress_bar"><div class="photo-compress-fill" id="gtnew_compress_fill"></div></div>
-        <p style="font-size:11px;color:var(--text2);margin-top:4px" id="gtnew_compress_msg"></p>
-        <div id="gtnew_photo_preview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
-      </div>
+    </div>
+    <div class="card" style="border:2px solid #2e7d32;background:#e8f5e9">
+      <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0">
+        <input type="checkbox" id="gtnew_success" style="width:22px;height:22px;flex-shrink:0;margin-top:2px;accent-color:#2e7d32">
+        <span>
+          <span style="font-weight:700;color:#2e7d32;font-size:15px">🏆 Xác nhận mở mới thành công</span>
+          <span style="display:block;font-size:12px;color:#555;margin-top:2px">Tick nếu đã CHỐT ĐƠN. Điểm bán sẽ được ghi nhận là mở mới thành công và tự thêm vào Storelist để chăm sóc tiếp.</span>
+        </span>
+      </label>
     </div>`;
 }
 
@@ -1844,46 +1920,64 @@ async function submitGT() {
   );
 }
 
-// ============ SUBMIT GT NEW ============
+// ============ SUBMIT GT NEW (gộp: Điểm mới + Mở mới thành công) ============
 async function submitGTNew() {
   const store = (function(){var _e=document.getElementById('gtnew_store');return _e&&_e.value?_e.value.trim():''})();
   if (!store) { toast('⚠️ Vui lòng nhập tên điểm bán'); return; }
   if (!getChips('gtnew_biztype')) { toast('⚠️ Vui lòng chọn Hình thức kinh doanh'); return; }
-  if (!getChips('gtnew_products')) { toast('⚠️ Vui lòng chọn Sản phẩm chào hàng'); return; }
+  if (!getChips('gtnew_products')) { toast('⚠️ Vui lòng chọn Sản phẩm đã chào'); return; }
   if (!getChips('gtnew_potential')) { toast('⚠️ Vui lòng chọn Đánh giá tiềm năng'); return; }
 
-  const payload = {
-    type: 'GT_NewCustomer',
+  var _gnp = Object.keys(state.photos).filter(function(k){return k.startsWith('gtnew_');});
+  if (_gnp.length === 0) { toast('⚠️ Vui lòng upload ít nhất 1 hình'); return; }
+
+  const region   = state.user._gtRegion || state.user.team;
+  const province = gtnewProvinceOf(region);
+  const market   = gtnewGetMarket();
+  const addr     = (document.getElementById('gtnew_addr')?document.getElementById('gtnew_addr').value:'').trim() || '';
+  const contact  = (document.getElementById('gtnew_contact')?document.getElementById('gtnew_contact').value:'').trim() || '';
+  const phone    = (document.getElementById('gtnew_phone')?document.getElementById('gtnew_phone').value:'').trim() || '';
+  const firstOrd = (document.getElementById('gtnew_firstorder')?document.getElementById('gtnew_firstorder').value:'').trim() || '';
+  const note     = (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'').trim() || '';
+  const isSuccess = !!(document.getElementById('gtnew_success') && document.getElementById('gtnew_success').checked);
+
+  // Nếu tick "mở mới thành công" → yêu cầu đơn đầu tiên (giống Mở Mới TC cũ)
+  if (isSuccess && !firstOrd) { toast('⚠️ Đã tick mở mới thành công — vui lòng nhập thông tin đơn đầu tiên'); return; }
+
+  // Trường chung cho cả 2 nhánh. Backend Code.gs tự append Storelist khi type=GT_OpenNew
+  // (đọc province/market/region từ payload) → KHÔNG cần POST phụ ở client.
+  const base = {
     date: getDateValue('gtnew_date'),
-    salesperson: state.user.name,
-    salesName: state.user.name,
-    salesId: state.user.name,
-    channel: 'GT',
-    team: state.user.team,
-    region: state.user.team,
-    store_name: store,
-    storeName: store,
-    tenDiemBan: store,
-    diemBan: store,
-    address: (document.getElementById('gtnew_addr')?document.getElementById('gtnew_addr').value:'') || '',
-    hinhThucKD: getChips('gtnew_biztype'),
-    biz_type: getChips('gtnew_biztype'),
-    sanPham: getChips('gtnew_products'),
-    products_pitched: getChips('gtnew_products'),
-    tienNang: getChips('gtnew_potential'),
-    potential: getChips('gtnew_potential'),
-    ghiChu: (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'') || '',
-    note: (document.getElementById('gtnew_note')?document.getElementById('gtnew_note').value:'') || '',
+    salesperson: state.user.name, salesName: state.user.name, salesId: state.user.name,
+    channel: 'GT', team: state.user.team, region: region, channel_region: region,
+    province: province, cho: market, market: market,
+    store_name: store, storeName: store, tenDiemBan: store, diemBan: store,
+    address: addr,
+    hinhThucKD: getChips('gtnew_biztype'), biz_type: getChips('gtnew_biztype'),
+    sanPham: getChips('gtnew_products'), products_pitched: getChips('gtnew_products'),
+    tienNang: getChips('gtnew_potential'), potential: getChips('gtnew_potential'),
+    contactName: contact, contact_name: contact, phone: phone,
+    firstOrder: firstOrd, first_order: firstOrd,
+    ghiChu: note, note: note,
     gps: state.gps ? `${state.gps.lat},${state.gps.lng}` : '',
-    soHinh: Object.keys(state.photos).length,
-    photos: state.photos
+    soHinh: Object.keys(state.photos).length, photos: state.photos
   };
-  var _gnp=Object.keys(state.photos).filter(function(k){return k.startsWith('gtnew_');});
-  if(_gnp.length===0){toast('⚠️ Vui lòng upload ít nhất 1 hình');return;}
-  fraudPreSubmit(
-    (state.user && state.user.name) || payload.salesperson || '',
-    async function() { await sendData(payload, 'GT New Customer'); }
-  );
+
+  if (isSuccess) {
+    // NHÁNH MỞ MỚI THÀNH CÔNG → GT_OpenNew (Code.gs tự đẩy Storelist status=ACTIVE)
+    const payload = Object.assign({ type: 'GT_OpenNew' }, base);
+    fraudPreSubmit(
+      (state.user && state.user.name) || payload.salesperson || '',
+      async function() { await sendData(payload, 'GT Mở mới thành công'); }
+    );
+  } else {
+    // NHÁNH ĐIỂM MỚI (khách tiềm năng, chưa chốt) → GT_NewCustomer, KHÔNG đẩy Storelist
+    const payload = Object.assign({ type: 'GT_NewCustomer' }, base);
+    fraudPreSubmit(
+      (state.user && state.user.name) || payload.salesperson || '',
+      async function() { await sendData(payload, 'GT New Customer'); }
+    );
+  }
 }
 
 // ============ GT OTHER TASKS ============
