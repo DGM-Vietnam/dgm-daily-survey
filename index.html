@@ -3989,7 +3989,7 @@ function confirmFraudSubmit() {
     var u={}; try{ u=state.user||{}; }catch(e){}
     var key=(String(u.title||'')+' '+String(u.role||'')).toLowerCase();
     var team=String(u.team||'').toLowerCase();
-    var isLead=/leader|manager|trưởng|truong|giám sát|giam sat|asm|quản lý|quan ly|supervisor|\bsup\b|\bss\b/.test(key);
+    var isLead=/leader|manager|trưởng|truong|giám sát|giam sat|asm|quản lý|quan ly|supervisor|sales\s*rep|\bsup\b|\brep\b|\bss\b/.test(key);
     if(!isLead) return false;
     return /gt/.test(team) || /manager/.test(key);
   }
@@ -4138,19 +4138,24 @@ function confirmFraudSubmit() {
     t.innerHTML=html;
   }
 
-  D.open=function(){
+  D.open=function(keepState){
     if(!canUse()){ tt('Module này dành cho nhân viên kênh GT'); return; }
     ensureOverlay().classList.add('show');
-    D._tab='over';
+    if(!keepState) D._tab='over';
     $id('distBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
     load(false).then(function(){ paintPicker(); render(); })
       .catch(function(){ $id('distBody').innerHTML='<div class="dspm-empty">Không tải được dữ liệu.</div>'; });
   };
-  D.close=function(){ var ov=$id('distOverlay'); if(ov) ov.classList.remove('show'); };
+  D.close=function(){ var ov=$id('distOverlay'); if(ov) ov.classList.remove('show'); distClearSess_(); };
   D.tab=function(k){ D._tab=k; render(); };
   D.pick=function(id){ D._distId=id; D._tab='over'; render(); };
 
+  // v1.2: lưu vị trí đang đứng (overlay + KH + tab) để refresh xong quay lại đúng chỗ
+  function distSaveSess_(){ try{ sessionStorage.setItem('dgm_dist_sess', JSON.stringify({open:1,distId:D._distId,tab:D._tab})); }catch(e){} }
+  function distClearSess_(){ try{ sessionStorage.removeItem('dgm_dist_sess'); }catch(e){} }
+
   function render(){
+    distSaveSess_();
     paintTabs();
     var m=curDist();
     if(!m){ $id('distBody').innerHTML='<div class="dspm-empty">Chưa có khách hàng. Thêm dòng trong sheet Dist_Master.</div>'; return; }
@@ -4567,6 +4572,28 @@ function confirmFraudSubmit() {
       $id('distBody').innerHTML=html;
     }).catch(function(){ $id('distBody').innerHTML='<div class="dspm-empty">Không tải được lịch sử.</div>'; });
   }
+
+  // v1.2: KHÔI PHỤC SAU REFRESH — nếu trước đó đang đứng trong overlay Tồn kho NPP
+  // thì mở lại đúng KH + tab thay vì rơi về màn hình home.
+  (function restoreDistSess(){
+    var raw=null; try{ raw=sessionStorage.getItem('dgm_dist_sess'); }catch(e){}
+    if(!raw) return;
+    var o=null; try{ o=JSON.parse(raw); }catch(e){}
+    if(!o||!o.open) return;
+    var tries=0;
+    var timer=setInterval(function(){
+      tries++;
+      var ready=false;
+      try{ ready=!!(window.state&&state.user&&state.user.name); }catch(e){}
+      if(ready){
+        clearInterval(timer);
+        if(!canUse()){ distClearSess_(); return; }
+        D._distId=String(o.distId||'');
+        D._tab=String(o.tab||'over');
+        D.open(true);
+      } else if(tries>40){ clearInterval(timer); } // ~10s: chưa đăng nhập lại → bỏ qua
+    },250);
+  })();
 })();
 </script>
 <!-- ===================== /DGM DIST STOCK MODULE ===================== -->
