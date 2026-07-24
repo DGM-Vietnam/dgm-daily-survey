@@ -3983,11 +3983,13 @@ function confirmFraudSubmit() {
   function p2(n){ return (n<10?'0':'')+n; }
 
   // NHẬP LIỆU: chỉ GT Leader + Sales Manager
+  // v1.1 FIX: mở rộng nhận diện leader giống MktBudgetMod — title trong Sales_Team
+  // có thể là "Sup GT South" / "Supervisor" / "Giám sát" / "ASM"… chứ không chỉ "Leader/Trưởng".
   function isEditor(){
     var u={}; try{ u=state.user||{}; }catch(e){}
     var key=(String(u.title||'')+' '+String(u.role||'')).toLowerCase();
     var team=String(u.team||'').toLowerCase();
-    var isLead=/leader|manager|trưởng|truong/.test(key);
+    var isLead=/leader|manager|trưởng|truong|giám sát|giam sat|asm|quản lý|quan ly|supervisor|\bsup\b|\bss\b/.test(key);
     if(!isLead) return false;
     return /gt/.test(team) || /manager/.test(key);
   }
