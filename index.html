@@ -601,14 +601,31 @@ document.addEventListener('DOMContentLoaded', () => {
   _refreshLogoutBtn(); // v7: hiện nút Đăng xuất nếu đã ghi nhớ đăng nhập
 
   // Khôi phục session sau refresh hoặc khi quay lại từ app khác
+  // v8.1: sessionStorage mất (tab bị kill) → dùng bản sao localStorage còn hạn
   try {
-    var saved = sessionStorage.getItem('dgm_session');
+    var saved = null;
+    try { saved = sessionStorage.getItem('dgm_session'); } catch(e){}
+    if (!saved) {
+      try {
+        var _lsRaw = localStorage.getItem(SESS_LS_KEY);
+        if (_lsRaw) {
+          var _lsSess = JSON.parse(_lsRaw);
+          if (_lsSess && _lsSess.user && (!_lsSess.ts || (Date.now() - _lsSess.ts) < SESS_MAX_AGE_MS)) {
+            saved = _lsRaw;
+          } else {
+            localStorage.removeItem(SESS_LS_KEY);
+          }
+        }
+      } catch(e){}
+    }
     if (saved) {
       var sess = JSON.parse(saved);
       if (sess.user && sess.screen) {
         // v4.4: chặn khôi phục session của tên không có trong danh sách nhân viên
         if (!isValidStaff(sess.user.name)) {
           try { sessionStorage.removeItem('dgm_session'); } catch(e){}
+          try { localStorage.removeItem(SESS_LS_KEY); } catch(e){}
+          try { localStorage.removeItem('dgm_dist_sess'); } catch(e){}
           try { localStorage.removeItem(AUTH_KEY); } catch(e){}
           throw new Error('invalid staff session');
         }
@@ -702,6 +719,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Lưu session đầy đủ khi chuyển màn hình
+// v8.1 FIX DỨT ĐIỂM: lưu song song vào localStorage (sessionStorage bị mất khi
+// trình duyệt kill tab — rất hay xảy ra trên mobile/PWA → refresh là văng về home).
+var SESS_LS_KEY = 'dgm_session_v2';
+var SESS_MAX_AGE_MS = 20*3600*1000; // vị trí lưu tối đa 20 giờ
 var _origGoTo = goTo;
 goTo = function(id) {
   _origGoTo(id);
@@ -709,15 +730,19 @@ goTo = function(id) {
     // Không lưu session cho màn hình thành công/login để tránh restore sai
     if (id === 'scSuccess' || id === 'scLogin') {
       sessionStorage.removeItem('dgm_session');
+      try { localStorage.removeItem(SESS_LS_KEY); } catch(e){}
       if (id === 'scLogin') _refreshLogoutBtn();
       return;
     }
-    sessionStorage.setItem('dgm_session', JSON.stringify({
+    var payload = JSON.stringify({
       user: state.user,
       screen: id,
       mtMode: state.mtMode || null,
-      gtRegion: (state.user && state.user._gtRegion) || null
-    }));
+      gtRegion: (state.user && state.user._gtRegion) || null,
+      ts: Date.now()
+    });
+    sessionStorage.setItem('dgm_session', payload);
+    try { localStorage.setItem(SESS_LS_KEY, payload); } catch(e){}
   } catch(e) {}
 };
 
@@ -985,6 +1010,9 @@ function _onPinKey(ev){ if (ev && ev.key === 'Enter') verifyPin(); }
 function logout(){
   try { localStorage.removeItem(AUTH_KEY); } catch(e){}
   try { sessionStorage.removeItem('dgm_session'); } catch(e){}
+  try { localStorage.removeItem(SESS_LS_KEY); } catch(e){}
+  try { sessionStorage.removeItem('dgm_dist_sess'); } catch(e){}
+  try { localStorage.removeItem('dgm_dist_sess'); } catch(e){}
   state.user = null;
   _refreshLogoutBtn();
   goTo('scLogin');
@@ -2185,7 +2213,32 @@ function forceRefreshStores() {
 // Dùng GET no-cors → Apps Script doGet(e) nhận e.parameter.data
 // Không thể xác nhận server response với no-cors → dùng Image ping trick
 // để detect lỗi network vs success
+// v8.1 CHỐNG GỬI TRÙNG: (1) khóa in-flight — đang gửi thì bấm thêm chỉ hiện toast;
+// (2) chữ ký nội dung — survey y hệt vừa gửi xong trong 2 phút sẽ không gửi lại.
+var _dgmSendBusy = false, _dgmLastSig = '', _dgmLastSigAt = 0;
 async function sendData(payload, label) {
+  if (_dgmSendBusy) { toast('⏳ Đang gửi dữ liệu… vui lòng chờ, không bấm lại'); return; }
+  var sig = '';
+  try {
+    sig = JSON.stringify({
+      t: payload.type, d: payload.date, s: payload.salesperson || '',
+      st: payload.storeName || payload.store_name || payload.location_note || '',
+      c: payload.content || payload.ghiChu || '', n: Object.keys(payload.photos || {}).length
+    });
+  } catch(e) { sig = ''; }
+  if (sig && sig === _dgmLastSig && (Date.now() - _dgmLastSigAt) < 120000) {
+    toast('⚠️ Survey này vừa gửi thành công rồi — không gửi lại để tránh trùng');
+    return;
+  }
+  _dgmSendBusy = true;
+  try {
+    await _sendDataCore(payload, label);
+    _dgmLastSig = sig; _dgmLastSigAt = Date.now();
+  } finally {
+    _dgmSendBusy = false;
+  }
+}
+async function _sendDataCore(payload, label) {
   // Fraud: inject flag if flagged
   if (window._fraudFlagData) {
     payload.device_id = getDeviceFingerprint();
@@ -4034,6 +4087,20 @@ function confirmFraudSubmit() {
     return out;
   }
 
+  // v2.1 CHỐNG BẤM LẶP: khóa nút Lưu trong lúc gọi GAS (cold-start có thể mất vài giây)
+  function distLock_(btnId){
+    if(D._busy) { tt('⏳ Đang lưu… vui lòng chờ, không bấm lại'); return false; }
+    D._busy=true;
+    var b=$id(btnId||'distBtnSave');
+    if(b){ b.disabled=true; b.setAttribute('data-txt', b.textContent); b.textContent='⏳ Đang lưu… vui lòng chờ'; b.style.opacity='0.55'; b.style.cursor='wait'; }
+    return true;
+  }
+  function distUnlock_(btnId){
+    D._busy=false;
+    var b=$id(btnId||'distBtnSave');
+    if(b){ b.disabled=false; var t=b.getAttribute('data-txt'); if(t) b.textContent=t; b.style.opacity='1'; b.style.cursor='pointer'; }
+  }
+
   // ---------- gắn thẻ vào menu ----------
   D.injectCard=function(team){
     try{
@@ -4150,9 +4217,10 @@ function confirmFraudSubmit() {
   D.tab=function(k){ D._tab=k; render(); };
   D.pick=function(id){ D._distId=id; D._tab='over'; render(); };
 
-  // v1.2: lưu vị trí đang đứng (overlay + KH + tab) để refresh xong quay lại đúng chỗ
-  function distSaveSess_(){ try{ sessionStorage.setItem('dgm_dist_sess', JSON.stringify({open:1,distId:D._distId,tab:D._tab})); }catch(e){} }
-  function distClearSess_(){ try{ sessionStorage.removeItem('dgm_dist_sess'); }catch(e){} }
+  // v1.2→v2.1: lưu vị trí đang đứng (overlay + KH + tab) vào localStorage
+  // (sessionStorage mất khi tab bị kill trên mobile/PWA → refresh là văng về home)
+  function distSaveSess_(){ try{ localStorage.setItem('dgm_dist_sess', JSON.stringify({open:1,distId:D._distId,tab:D._tab,ts:Date.now()})); }catch(e){} }
+  function distClearSess_(){ try{ localStorage.removeItem('dgm_dist_sess'); }catch(e){} try{ sessionStorage.removeItem('dgm_dist_sess'); }catch(e){} }
 
   function render(){
     distSaveSess_();
@@ -4340,7 +4408,7 @@ function confirmFraudSubmit() {
             'đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||''), row.notes);
         });
         html+='</div>'+addSkuBar()+
-          '<button onclick="DistMod.saveOpening()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn đầu</button></div>';
+          '<button id="distBtnSave" onclick="DistMod.saveOpening()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn đầu</button></div>';
         $id('distBody').innerHTML=html;
       });
   }
@@ -4349,10 +4417,10 @@ function confirmFraudSubmit() {
     var m=curDist(); if(!m) return;
     var lines=collectLines();
     if(!lines.length){ tt('Chưa nhập số cho mã nào'); return; }
-    tt('Đang lưu…');
+    if(!distLock_()) return;
     sendChunks({ type:'DIST_OPENING_BATCH', dist_id:m.dist_id, effective_date:($id('distOpenDate')||{}).value||todayStr(), entered_by:me() }, lines)
-      .then(function(n){ tt('✅ Đã lưu tồn đầu '+n+' mã'); reloadThen('over'); })
-      .catch(function(e){ tt('❌ '+e.message); });
+      .then(function(n){ distUnlock_(); tt('✅ Đã lưu tồn đầu '+n+' mã'); reloadThen('over'); })
+      .catch(function(e){ distUnlock_(); tt('❌ '+e.message); });
   };
 
   // ===== TAB: BÁN RA TUẦN =====
@@ -4390,7 +4458,7 @@ function confirmFraudSubmit() {
             'đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||''), row.notes);
         });
         html+='</div>'+addSkuBar()+
-          '<button onclick="DistMod.saveSellout()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu bán ra tuần</button></div>';
+          '<button id="distBtnSave" onclick="DistMod.saveSellout()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu bán ra tuần</button></div>';
         $id('distBody').innerHTML=html;
         var wsel=$id('distWeek');
         if(wsel){ wsel.onchange=function(){ D._selWeek=this.value; renderSellout(m); }; }
@@ -4403,10 +4471,10 @@ function confirmFraudSubmit() {
     var wkObj=null; lastWeeks(10).forEach(function(w){ if(w.iso===wk) wkObj=w; });
     var lines=collectLines();
     if(!lines.length){ tt('Chưa nhập số bán cho mã nào'); return; }
-    tt('Đang lưu…');
+    if(!distLock_()) return;
     sendChunks({ type:'DIST_SELLOUT_BATCH', dist_id:m.dist_id, week_iso:wk, week_start:wkObj?wkObj.start:'', entered_by:me() }, lines)
-      .then(function(n){ tt('✅ Đã lưu bán ra '+n+' mã — '+wk); reloadThen('over'); })
-      .catch(function(e){ tt('❌ '+e.message); });
+      .then(function(n){ distUnlock_(); tt('✅ Đã lưu bán ra '+n+' mã — '+wk); reloadThen('over'); })
+      .catch(function(e){ distUnlock_(); tt('❌ '+e.message); });
   };
 
   // ===== TAB: NHẬP HÀNG =====
@@ -4428,7 +4496,7 @@ function confirmFraudSubmit() {
       '<input type="text" id="siNote" placeholder="Ghi chú thêm…" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:13.5px;margin:4px 0 8px">'+
       '<div style="font-weight:800;color:'+THEME+';margin:6px 0 2px">Mã hàng trong đơn (SL thùng)</div>'+
       '<div id="distLines"></div>'+addSkuBar()+
-      '<button onclick="DistMod.saveStockIn()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu đơn nhập hàng</button></div>';
+      '<button id="distBtnSave" onclick="DistMod.saveStockIn()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu đơn nhập hàng</button></div>';
     $id('distBody').innerHTML=html;
   }
   D.saveStockIn=function(){
@@ -4436,8 +4504,8 @@ function confirmFraudSubmit() {
     var m=curDist(); if(!m) return;
     var lines=collectLines().filter(function(l){return l.qty>0;});
     if(!lines.length){ tt('Đơn chưa có mã hàng nào (SL > 0)'); return; }
+    if(!distLock_()) return;
     var orderId='ORD-'+Date.now().toString(36).toUpperCase()+'-'+Math.floor(Math.random()*900+100);
-    tt('Đang lưu…');
     sendChunks({
       type:'DIST_STOCKIN', dist_id:m.dist_id, order_id:orderId,
       order_date:($id('siOrderDate')||{}).value||todayStr(),
@@ -4448,8 +4516,8 @@ function confirmFraudSubmit() {
       notes:($id('siNote')||{}).value||'',
       entered_by:me()
     }, lines)
-      .then(function(n){ tt('✅ Đã lưu đơn '+n+' mã hàng'); reloadThen('over'); })
-      .catch(function(e){ tt('❌ '+e.message); });
+      .then(function(n){ distUnlock_(); tt('✅ Đã lưu đơn '+n+' mã hàng'); reloadThen('over'); })
+      .catch(function(e){ distUnlock_(); tt('❌ '+e.message); });
   };
 
   // ===== TAB: TỒN CUỐI THÁNG (FS) =====
@@ -4486,7 +4554,7 @@ function confirmFraudSubmit() {
             'đã lưu '+fmt1(parseFloat(row.closing_qty_cases))+' · '+esc(row.entered_by||''), row.notes);
         });
         html+='</div>'+addSkuBar()+
-          '<button onclick="DistMod.saveMonthEnd()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn cuối tháng</button></div>';
+          '<button id="distBtnSave" onclick="DistMod.saveMonthEnd()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn cuối tháng</button></div>';
         $id('distBody').innerHTML=html;
         var msel=$id('distMonth');
         if(msel){ msel.onchange=function(){ D._selMonth=this.value; renderMonthEnd(m); }; }
@@ -4498,10 +4566,10 @@ function confirmFraudSubmit() {
     var month=($id('distMonth')||{}).value||''; D._selMonth=month;
     var lines=collectLines();
     if(!lines.length){ tt('Chưa nhập tồn cho mã nào'); return; }
-    tt('Đang lưu…');
+    if(!distLock_()) return;
     sendChunks({ type:'DIST_MONTHEND_BATCH', dist_id:m.dist_id, month:month, entered_by:me() }, lines)
-      .then(function(n){ tt('✅ Đã lưu tồn cuối '+month+' — '+n+' mã'); reloadThen('over'); })
-      .catch(function(e){ tt('❌ '+e.message); });
+      .then(function(n){ distUnlock_(); tt('✅ Đã lưu tồn cuối '+month+' — '+n+' mã'); reloadThen('over'); })
+      .catch(function(e){ distUnlock_(); tt('❌ '+e.message); });
   };
 
   // ===== TAB: SO SÁNH VÙNG (mọi nhân viên GT xem được) =====
@@ -4619,7 +4687,7 @@ function confirmFraudSubmit() {
             (mt.order_value?'<span style="font-weight:800;color:'+THEME+'">'+fmtVND(mt.order_value)+'</span>':'')+'</div>'+
           '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+o.lines.map(function(l){
             return esc(l.product_name)+' ×'+l.qty_cases+
-              (canFix&&l.stockin_id?' <span onclick="DistMod.editStockInLine(\''+esc(String(l.stockin_id))+'\')" style="cursor:pointer;color:'+THEME+';font-weight:800">✎</span>':'');
+              (canFix&&l.stockin_id?' <span onclick="DistMod.editStockInLine(\''+esc(String(l.stockin_id))+'\',this)" style="cursor:pointer;color:'+THEME+';font-weight:800">✎</span>':'');
           }).join(' · ')+'</div>'+
           ((mt.promotion||mt.discount)?'<div style="font-size:11px;color:#e65100;margin-top:2px">'+esc(mt.promotion||'')+(mt.discount?(' · CK: '+esc(mt.discount)):'')+'</div>':'')+
           '<div style="font-size:10.5px;color:#90a4ae">'+(mt.received_date?('Nhận: '+esc(mt.received_date)+' · '):'⏳ chưa nhận hàng · ')+'bởi '+esc(mt.entered_by||'')+'</div>'+
@@ -4654,33 +4722,60 @@ function confirmFraudSubmit() {
     }).catch(function(){ $id('distBody').innerHTML='<div class="dspm-empty">Không tải được lịch sử.</div>'; });
   }
 
-  // v2: sửa SL 1 dòng đơn nhập (chỉ editor) — backend lưu vết ✎ vào notes dòng đó
-  D.editStockInLine=function(sid){
+  // v2.1: sửa SL 1 dòng đơn nhập bằng Ô SỬA INLINE (prompt() bị chặn trên một số
+  // WebView/PWA Android). Chỉ editor thấy nút ✎; backend lưu vết ✎ vào notes dòng đó.
+  D.editStockInLine=function(sid, el){
     if(!isEditor()){ tt('Chỉ GT Leader / Sales Manager được sửa'); return; }
     var l=(D._sinById||{})[String(sid)]; if(!l){ tt('Không tìm thấy dòng đơn'); return; }
+    var old=$id('sinEditor'); if(old&&old.parentNode) old.parentNode.removeChild(old);
+    var host=el&&el.parentNode; if(!host){ return; }
     var cur=String(l.qty_cases);
-    var v=prompt('Sửa SL nhập (THÙNG) — '+l.product_name+'\nSố hiện tại: '+cur, cur);
-    if(v==null) return;
-    var q=parseFloat(String(v).replace(/,/g,'.'));
+    var box=document.createElement('div');
+    box.id='sinEditor';
+    box.setAttribute('style','margin-top:8px;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;background:#f4faf8');
+    box.innerHTML='<div style="font-size:12px;font-weight:800;color:'+THEME+';margin-bottom:6px">✎ Sửa SL nhập — '+esc(l.product_name)+'</div>'+
+      '<div style="font-size:11px;color:#607d8b;margin-bottom:6px">Số hiện tại: <b>'+esc(cur)+'</b> thùng · hệ thống sẽ lưu vết ai sửa</div>'+
+      '<div style="display:flex;gap:8px;align-items:center">'+
+        '<input type="number" min="0" step="1" inputmode="numeric" id="sinEditQty" value="'+esc(cur)+'" '+
+          'style="flex:1;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:8px;font-size:15px;font-weight:800;text-align:center;color:'+THEME+'">'+
+        '<button onclick="DistMod.applyStockInEdit(\''+esc(String(sid))+'\')" style="padding:10px 14px;border:none;border-radius:8px;background:'+THEME+';color:#fff;font-weight:800;font-size:13px;cursor:pointer">💾 Lưu</button>'+
+        '<button onclick="DistMod.cancelStockInEdit()" style="padding:10px 12px;border:1.5px solid '+THEME_SOFT+';border-radius:8px;background:#fff;color:#607d8b;font-weight:700;font-size:13px;cursor:pointer">Hủy</button>'+
+      '</div>';
+    host.insertAdjacentElement('afterend', box);
+    var inp=$id('sinEditQty'); if(inp){ inp.focus(); inp.select&&inp.select(); }
+  };
+  D.cancelStockInEdit=function(){ var b=$id('sinEditor'); if(b&&b.parentNode) b.parentNode.removeChild(b); };
+  D.applyStockInEdit=function(sid){
+    var l=(D._sinById||{})[String(sid)]; if(!l){ tt('Không tìm thấy dòng đơn'); return; }
+    var cur=String(l.qty_cases);
+    var v=($id('sinEditQty')||{}).value;
+    var q=parseFloat(String(v==null?'':v).replace(/,/g,'.'));
     if(isNaN(q)||q<0){ tt('Số lượng không hợp lệ'); return; }
-    if(q===parseFloat(cur)){ tt('Số không thay đổi'); return; }
-    tt('Đang lưu…');
+    if(q===parseFloat(cur)){ tt('Số không thay đổi'); D.cancelStockInEdit(); return; }
+    if(D._busy){ tt('⏳ Đang lưu… vui lòng chờ'); return; }
+    D._busy=true;
+    var eb=$id('sinEditor'); if(eb){ Array.prototype.forEach.call(eb.querySelectorAll('button'),function(b){b.disabled=true;b.style.opacity='0.55';}); }
     send({ type:'DIST_STOCKIN_EDIT', stockin_id:String(sid), qty:q, entered_by:me() })
       .then(function(res){
+        D._busy=false;
         if(!res||!res.ok) throw new Error((res&&res.error)||'Lỗi lưu');
         tt('✅ Đã sửa '+l.product_name+': '+cur+' → '+q+' thùng');
         load(true).then(function(){ render(); });
       })
-      .catch(function(e){ tt('❌ '+e.message); });
+      .catch(function(e){ D._busy=false; var eb2=$id('sinEditor'); if(eb2){ Array.prototype.forEach.call(eb2.querySelectorAll('button'),function(b){b.disabled=false;b.style.opacity='1';}); } tt('❌ '+e.message); });
   };
 
-  // v1.2: KHÔI PHỤC SAU REFRESH — nếu trước đó đang đứng trong overlay Tồn kho NPP
-  // thì mở lại đúng KH + tab thay vì rơi về màn hình home.
+  // v2.1: KHÔI PHỤC SAU REFRESH — nếu trước đó đang đứng trong overlay Tồn kho NPP
+  // thì mở lại đúng KH + tab thay vì rơi về màn hình home. Đọc localStorage (bền
+  // qua cả trường hợp tab bị kill), có hạn 20 giờ.
   (function restoreDistSess(){
-    var raw=null; try{ raw=sessionStorage.getItem('dgm_dist_sess'); }catch(e){}
+    var raw=null;
+    try{ raw=localStorage.getItem('dgm_dist_sess'); }catch(e){}
+    if(!raw){ try{ raw=sessionStorage.getItem('dgm_dist_sess'); }catch(e){} }
     if(!raw) return;
     var o=null; try{ o=JSON.parse(raw); }catch(e){}
     if(!o||!o.open) return;
+    if(o.ts && (Date.now()-o.ts) > 20*3600*1000){ distClearSess_(); return; } // quá hạn
     var tries=0;
     var timer=setInterval(function(){
       tries++;
