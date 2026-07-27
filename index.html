@@ -4271,14 +4271,29 @@ function confirmFraudSubmit() {
     host.insertAdjacentHTML('beforeend', lineRow({product_id:p.id||'',product_name:p.name_vi},'',''));
     $id('distAddSku').value='';
   };
-  function lineRow(p, val, sub){
+  function lineRow(p, val, sub, audit){
     var key=(p.product_id||p.product_name).toLowerCase();
     return '<div data-key="'+esc(key)+'" data-pid="'+esc(p.product_id||'')+'" data-pname="'+esc(p.product_name)+'" style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #e5f0ee">'+
       '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:700">'+esc(p.product_name)+'</div>'+
-        (sub?'<div style="font-size:10.5px;color:#90a4ae">'+sub+'</div>':'')+'</div>'+
+        (sub?'<div style="font-size:10.5px;color:#90a4ae">'+sub+'</div>':'')+
+        (audit?auditHtml(audit):'')+'</div>'+
       '<input type="number" min="0" step="1" inputmode="numeric" class="dist-qty" value="'+esc(val)+'" placeholder="—" '+
         'style="width:76px;padding:9px 6px;border:1.5px solid '+THEME_SOFT+';border-radius:8px;font-size:15px;font-weight:800;text-align:center;color:'+THEME+'">'+
     '</div>';
+  }
+  // v2 AUDIT: notes trên sheet chứa vết dạng "✎ cũ→mới · người · dd/MM HH:mm" nối bằng ' | '
+  // → hiện chữ nghiêng nhỏ dưới mỗi dòng để track ai đã sửa gì.
+  function auditParts(notes){
+    return String(notes||'').split('|').map(function(s){return s.trim();}).filter(function(s){return s.indexOf('\u270E')===0;});
+  }
+  function auditHtml(notes, limit){
+    var parts=auditParts(notes); if(!parts.length) return '';
+    parts=parts.slice(-(limit||3)); // chỉ hiện tối đa 3 vết gần nhất cho gọn
+    return '<div style="font-size:10px;color:#b0885e;font-style:italic;line-height:1.5;margin-top:2px">'+parts.map(esc).join('<br>')+'</div>';
+  }
+  function baseNote(notes){
+    var s=String(notes||'').split('|').map(function(x){return x.trim();}).filter(function(x){return x&&x.indexOf('\u270E')!==0;});
+    return s.join(' · ');
   }
   function collectLines(){
     var out=[];
@@ -4293,20 +4308,41 @@ function confirmFraudSubmit() {
   }
 
   // ===== TAB: TỒN ĐẦU =====
+  // v2: đọc trực tiếp Dist_Opening để prefill số đã lưu (sửa tại chỗ) + hiện vết sửa ✎
   function renderOpening(m){
-    var an=curAn(), uni=skuUniverse(an);
-    var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">⚙️ Tồn đầu theo mã (THÙNG)</div>'+
-      '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Nhập 1 lần khi khởi tạo. Nhập lại mã cũ = ghi đè (sửa sai). Tồn hiện tại sẽ tự tính = Tồn đầu + Nhập − Bán ra.</div>'+
-      '<label style="font-size:11.5px;font-weight:700;color:#607d8b">Ngày hiệu lực</label>'+
-      '<input type="date" id="distOpenDate" value="'+todayStr()+'" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;margin:4px 0 6px">'+
-      '<div id="distLines">';
-    uni.list.forEach(function(p){
-      var opening=''; if(an) an.skus.forEach(function(s){ if((s.product_id||s.product_name)===(p.product_id||p.product_name)) opening=s.opening||''; });
-      html+=lineRow(p, opening===0?'0':opening, 'tồn đầu hiện lưu: '+fmt1(opening===''?null:opening));
-    });
-    html+='</div>'+addSkuBar()+
-      '<button onclick="DistMod.saveOpening()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn đầu</button></div>';
-    $id('distBody').innerHTML=html;
+    $id('distBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
+    fetch(state.scriptUrl+'?action=getDistOpening&dist_id='+encodeURIComponent(m.dist_id)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).catch(function(){return null;})
+      .then(function(res){
+        if(D._tab!=='open') return; // user đã chuyển tab
+        var saved={}; ((res&&res.ok&&res.items)||[]).forEach(function(r){
+          var k=(String(r.product_id||'').trim()||String(r.product_name||'').trim().toLowerCase());
+          if(!saved[k]) saved[k]=r; // items đã sort mới→cũ, giữ bản mới nhất
+        });
+        var an=curAn(), uni=skuUniverse(an);
+        var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">⚙️ Tồn đầu theo mã (THÙNG)</div>'+
+          '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Sửa trực tiếp số trong ô rồi bấm Lưu — hệ thống ghi đè và <i>tự lưu vết ✎ ai sửa, sửa từ bao nhiêu thành bao nhiêu</i>. Tồn hiện tại tự tính = Tồn đầu + Nhập − Bán ra.</div>'+
+          '<label style="font-size:11.5px;font-weight:700;color:#607d8b">Ngày hiệu lực</label>'+
+          '<input type="date" id="distOpenDate" value="'+todayStr()+'" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;margin:4px 0 6px">'+
+          '<div id="distLines">';
+        var used={};
+        uni.list.forEach(function(p){
+          var k=(String(p.product_id||'').trim()||String(p.product_name||'').trim().toLowerCase());
+          var row=saved[k]; used[k]=1;
+          var val=row?String(row.qty_cases):'';
+          var sub=row?('đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||'')+(baseNote(row.notes)?' · '+esc(baseNote(row.notes)):'')):'chưa nhập tồn đầu';
+          html+=lineRow(p, val, sub, row?row.notes:'');
+        });
+        // mã có trong Dist_Opening nhưng chưa có trong analysis (mới nhập, chưa reload)
+        Object.keys(saved).forEach(function(k){
+          if(used[k]) return; var row=saved[k];
+          html+=lineRow({product_id:row.product_id||'',product_name:row.product_name||''}, String(row.qty_cases),
+            'đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||''), row.notes);
+        });
+        html+='</div>'+addSkuBar()+
+          '<button onclick="DistMod.saveOpening()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn đầu</button></div>';
+        $id('distBody').innerHTML=html;
+      });
   }
   D.saveOpening=function(){
     if(!isEditor()){ tt('Chỉ GT Leader / Sales Manager được nhập liệu'); return; }
@@ -4320,31 +4356,45 @@ function confirmFraudSubmit() {
   };
 
   // ===== TAB: BÁN RA TUẦN =====
+  // v2: đọc Dist_Sellout của tuần đang chọn → prefill số đã lưu (kể cả 0) để sửa + hiện vết ✎
   function renderSellout(m){
-    var an=curAn(), uni=skuUniverse(an);
     var wks=lastWeeks(10);
-    var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">📈 Bán ra trong tuần (THÙNG)</div>'+
-      '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Chọn tuần → nhập số bán ra theo mã. Nhập lại tuần cũ = ghi đè. Nhập 0 nếu tuần đó không bán.</div>'+
-      '<select id="distWeek" onchange="DistMod.tab(\'out\')" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;font-weight:700;color:'+THEME+';margin-bottom:6px">';
     var sel=D._selWeek||wks[0].iso;
-    wks.forEach(function(w){ html+='<option value="'+w.iso+'"'+(w.iso===sel?' selected':'')+'>'+esc(w.label)+'</option>'; });
-    html+='</select><div id="distLines">';
-    uni.list.forEach(function(p){
-      var pre='';
-      if(an) an.skus.forEach(function(s){
-        if((s.product_id||s.product_name)===(p.product_id||p.product_name)){
-          var q=s.weekly&&s.weekly[sel]; if(q!=null&&q!==0) pre=q; else if(q===0&&s.weekly.hasOwnProperty(sel)) pre='';
-          // chỉ prefill khi đã từng ghi tuần này (weekly luôn trả 0 mặc định → không phân biệt được;
-          // để an toàn: prefill nếu q>0, còn 0/chưa nhập để trống)
-        }
+    $id('distBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
+    fetch(state.scriptUrl+'?action=getDistSellout&dist_id='+encodeURIComponent(m.dist_id)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).catch(function(){return null;})
+      .then(function(res){
+        if(D._tab!=='out') return;
+        var saved={}; ((res&&res.ok&&res.items)||[]).forEach(function(r){
+          if(String(r.week_iso)!==sel) return;
+          var k=(String(r.product_id||'').trim()||String(r.product_name||'').trim().toLowerCase());
+          if(!saved[k]) saved[k]=r;
+        });
+        var an=curAn(), uni=skuUniverse(an);
+        var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">📈 Bán ra trong tuần (THÙNG)</div>'+
+          '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Chọn tuần → nhập/sửa số bán ra theo mã. Sửa số đã nhập = ghi đè, hệ thống <i>tự lưu vết ✎</i>. Nhập 0 nếu tuần đó không bán.</div>'+
+          '<select id="distWeek" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;font-weight:700;color:'+THEME+';margin-bottom:6px">';
+        wks.forEach(function(w){ html+='<option value="'+w.iso+'"'+(w.iso===sel?' selected':'')+'>'+esc(w.label)+'</option>'; });
+        html+='</select><div id="distLines">';
+        var used={};
+        uni.list.forEach(function(p){
+          var k=(String(p.product_id||'').trim()||String(p.product_name||'').trim().toLowerCase());
+          var row=saved[k]; used[k]=1;
+          var val=row?String(row.qty_cases):'';
+          var sub=row?('đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||'')):'';
+          html+=lineRow(p, val, sub, row?row.notes:'');
+        });
+        Object.keys(saved).forEach(function(k){
+          if(used[k]) return; var row=saved[k];
+          html+=lineRow({product_id:row.product_id||'',product_name:row.product_name||''}, String(row.qty_cases),
+            'đã lưu '+fmt1(parseFloat(row.qty_cases))+' · '+esc(row.entered_by||''), row.notes);
+        });
+        html+='</div>'+addSkuBar()+
+          '<button onclick="DistMod.saveSellout()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu bán ra tuần</button></div>';
+        $id('distBody').innerHTML=html;
+        var wsel=$id('distWeek');
+        if(wsel){ wsel.onchange=function(){ D._selWeek=this.value; renderSellout(m); }; }
       });
-      html+=lineRow(p, pre, '');
-    });
-    html+='</div>'+addSkuBar()+
-      '<button onclick="DistMod.saveSellout()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu bán ra tuần</button></div>';
-    $id('distBody').innerHTML=html;
-    var wsel=$id('distWeek');
-    if(wsel){ wsel.onchange=function(){ D._selWeek=this.value; renderSellout(m); }; }
   }
   D.saveSellout=function(){
     if(!isEditor()){ tt('Chỉ GT Leader / Sales Manager được nhập liệu'); return; }
@@ -4403,28 +4453,44 @@ function confirmFraudSubmit() {
   };
 
   // ===== TAB: TỒN CUỐI THÁNG (FS) =====
+  // v2: đọc Dist_MonthEnd của tháng đang chọn → prefill số đã lưu để sửa + hiện vết ✎
   function renderMonthEnd(m){
-    var an=curAn(), uni=skuUniverse(an);
     var months=lastMonths(6), sel=D._selMonth||months[0].key;
-    var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">📅 Tồn cuối tháng (THÙNG) — khách FS</div>'+
-      '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Chỉ cần nhập tồn cuối mỗi tháng. Nhập lại tháng cũ = ghi đè.</div>'+
-      '<select id="distMonth" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;font-weight:700;color:'+THEME+';margin-bottom:6px">';
-    months.forEach(function(mo){ html+='<option value="'+mo.key+'"'+(mo.key===sel?' selected':'')+'>'+esc(mo.label)+'</option>'; });
-    html+='</select><div id="distLines">';
-    uni.list.forEach(function(p){
-      var pre='';
-      if(an) an.skus.forEach(function(s){
-        if((s.product_id||s.product_name)===(p.product_id||p.product_name)){
-          var q=s.monthly&&s.monthly['close:'+sel]; if(q!=null) pre=q;
-        }
+    $id('distBody').innerHTML='<div class="dspm-empty">Đang tải…</div>';
+    fetch(state.scriptUrl+'?action=getDistMonthEnd&dist_id='+encodeURIComponent(m.dist_id)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();}).catch(function(){return null;})
+      .then(function(res){
+        if(D._tab!=='close') return;
+        var saved={}; ((res&&res.ok&&res.items)||[]).forEach(function(r){
+          if(String(r.month)!==sel) return;
+          var k=(String(r.product_id||'').trim()||String(r.product_name||'').trim().toLowerCase());
+          if(!saved[k]) saved[k]=r;
+        });
+        var an=curAn(), uni=skuUniverse(an);
+        var html='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:6px">📅 Tồn cuối tháng (THÙNG) — khách FS</div>'+
+          '<div style="font-size:11.5px;color:#607d8b;margin-bottom:8px">Chỉ cần nhập tồn cuối mỗi tháng. Sửa số đã nhập = ghi đè, hệ thống <i>tự lưu vết ✎</i>.</div>'+
+          '<select id="distMonth" style="width:100%;padding:10px;border:1.5px solid '+THEME_SOFT+';border-radius:10px;font-size:14px;font-weight:700;color:'+THEME+';margin-bottom:6px">';
+        months.forEach(function(mo){ html+='<option value="'+mo.key+'"'+(mo.key===sel?' selected':'')+'>'+esc(mo.label)+'</option>'; });
+        html+='</select><div id="distLines">';
+        var used={};
+        uni.list.forEach(function(p){
+          var k=(String(p.product_id||'').trim()||String(p.product_name||'').trim().toLowerCase());
+          var row=saved[k]; used[k]=1;
+          var val=row?String(row.closing_qty_cases):'';
+          var sub=row?('đã lưu '+fmt1(parseFloat(row.closing_qty_cases))+' · '+esc(row.entered_by||'')):'';
+          html+=lineRow(p, val, sub, row?row.notes:'');
+        });
+        Object.keys(saved).forEach(function(k){
+          if(used[k]) return; var row=saved[k];
+          html+=lineRow({product_id:row.product_id||'',product_name:row.product_name||''}, String(row.closing_qty_cases),
+            'đã lưu '+fmt1(parseFloat(row.closing_qty_cases))+' · '+esc(row.entered_by||''), row.notes);
+        });
+        html+='</div>'+addSkuBar()+
+          '<button onclick="DistMod.saveMonthEnd()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn cuối tháng</button></div>';
+        $id('distBody').innerHTML=html;
+        var msel=$id('distMonth');
+        if(msel){ msel.onchange=function(){ D._selMonth=this.value; renderMonthEnd(m); }; }
       });
-      html+=lineRow(p, pre, '');
-    });
-    html+='</div>'+addSkuBar()+
-      '<button onclick="DistMod.saveMonthEnd()" style="width:100%;padding:13px;border:none;border-radius:10px;background:'+THEME+';color:#fff;font-weight:800;font-size:14.5px;cursor:pointer">💾 Lưu tồn cuối tháng</button></div>';
-    $id('distBody').innerHTML=html;
-    var msel=$id('distMonth');
-    if(msel){ msel.onchange=function(){ D._selMonth=this.value; renderMonthEnd(m); }; }
   }
   D.saveMonthEnd=function(){
     if(!isEditor()){ tt('Chỉ GT Leader / Sales Manager được nhập liệu'); return; }
@@ -4527,6 +4593,8 @@ function confirmFraudSubmit() {
       var sin=(res[0]&&res[0].ok)?res[0].items:[];
       var oth=(res[1]&&res[1].ok)?res[1].items:[];
       var html='';
+      // v2: giữ map dòng đơn theo stockin_id để sửa SL
+      D._sinById={}; sin.forEach(function(r){ if(r.stockin_id) D._sinById[String(r.stockin_id)]=r; });
       // đơn nhập gộp theo order_id
       var orders={}, orderIds=[];
       sin.forEach(function(r){
@@ -4534,17 +4602,28 @@ function confirmFraudSubmit() {
         if(!orders[oid]){ orders[oid]={ meta:r, lines:[] }; orderIds.push(oid); }
         orders[oid].lines.push(r);
       });
-      html+='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:4px">🛒 Đơn nhập hàng gần đây</div>';
+      var canFix=isEditor();
+      html+='<div class="dspm-card"><div style="font-weight:800;color:'+THEME+';margin-bottom:4px">🛒 Đơn nhập hàng gần đây'+(canFix?' <span style="font-size:10.5px;font-weight:400;color:#90a4ae">(bấm ✎ để sửa SL nhập sai)</span>':'')+'</div>';
       if(!orderIds.length) html+='<div style="font-size:12px;color:#90a4ae;padding:6px 0">Chưa có đơn nhập.</div>';
       orderIds.slice(0,15).forEach(function(oid){
         var o=orders[oid], mt=o.meta, cases=0;
         o.lines.forEach(function(l){ cases+=parseFloat(l.qty_cases)||0; });
+        var auditAll='';
+        o.lines.forEach(function(l){
+          auditParts(l.notes).slice(-2).forEach(function(a){
+            auditAll+='<div style="font-size:10px;color:#b0885e;font-style:italic;line-height:1.5">'+esc(l.product_name)+': '+esc(a)+'</div>';
+          });
+        });
         html+='<div style="padding:9px 0;border-bottom:1px solid #e5f0ee">'+
           '<div style="display:flex;justify-content:space-between"><b style="font-size:13px">'+esc(mt.order_date||'')+' · '+o.lines.length+' mã · '+fmt1(cases)+' thùng</b>'+
             (mt.order_value?'<span style="font-weight:800;color:'+THEME+'">'+fmtVND(mt.order_value)+'</span>':'')+'</div>'+
-          '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+o.lines.map(function(l){return esc(l.product_name)+' ×'+l.qty_cases;}).join(' · ')+'</div>'+
+          '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+o.lines.map(function(l){
+            return esc(l.product_name)+' ×'+l.qty_cases+
+              (canFix&&l.stockin_id?' <span onclick="DistMod.editStockInLine(\''+esc(String(l.stockin_id))+'\')" style="cursor:pointer;color:'+THEME+';font-weight:800">✎</span>':'');
+          }).join(' · ')+'</div>'+
           ((mt.promotion||mt.discount)?'<div style="font-size:11px;color:#e65100;margin-top:2px">'+esc(mt.promotion||'')+(mt.discount?(' · CK: '+esc(mt.discount)):'')+'</div>':'')+
           '<div style="font-size:10.5px;color:#90a4ae">'+(mt.received_date?('Nhận: '+esc(mt.received_date)+' · '):'⏳ chưa nhận hàng · ')+'bởi '+esc(mt.entered_by||'')+'</div>'+
+          auditAll+
         '</div>';
       });
       html+='</div>';
@@ -4553,9 +4632,10 @@ function confirmFraudSubmit() {
         if(!oth.length) html+='<div style="font-size:12px;color:#90a4ae;padding:6px 0">Chưa có dữ liệu.</div>';
         var byMonth={}; oth.forEach(function(r){ (byMonth[r.month]=byMonth[r.month]||[]).push(r); });
         Object.keys(byMonth).sort().reverse().slice(0,6).forEach(function(mo){
-          var tot=0; byMonth[mo].forEach(function(r){ tot+=parseFloat(r.closing_qty_cases)||0; });
+          var tot=0, aud=''; byMonth[mo].forEach(function(r){ tot+=parseFloat(r.closing_qty_cases)||0;
+            auditParts(r.notes).slice(-2).forEach(function(a){ aud+='<div style="font-size:10px;color:#b0885e;font-style:italic;line-height:1.5">'+esc(r.product_name)+': '+esc(a)+'</div>'; }); });
           html+='<div style="padding:8px 0;border-bottom:1px solid #e5f0ee"><b style="font-size:13px">'+esc(mo)+'</b> — '+byMonth[mo].length+' mã · '+fmt1(tot)+' thùng'+
-            '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+byMonth[mo].map(function(r){return esc(r.product_name)+': '+r.closing_qty_cases;}).join(' · ')+'</div></div>';
+            '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+byMonth[mo].map(function(r){return esc(r.product_name)+': '+r.closing_qty_cases;}).join(' · ')+'</div>'+aud+'</div>';
         });
         html+='</div>';
       } else {
@@ -4563,15 +4643,36 @@ function confirmFraudSubmit() {
         if(!oth.length) html+='<div style="font-size:12px;color:#90a4ae;padding:6px 0">Chưa có dữ liệu.</div>';
         var byWk={}; oth.forEach(function(r){ (byWk[r.week_iso]=byWk[r.week_iso]||[]).push(r); });
         Object.keys(byWk).sort().reverse().slice(0,8).forEach(function(wk){
-          var tot=0; byWk[wk].forEach(function(r){ tot+=parseFloat(r.qty_cases)||0; });
+          var tot=0, aud=''; byWk[wk].forEach(function(r){ tot+=parseFloat(r.qty_cases)||0;
+            auditParts(r.notes).slice(-2).forEach(function(a){ aud+='<div style="font-size:10px;color:#b0885e;font-style:italic;line-height:1.5">'+esc(r.product_name)+': '+esc(a)+'</div>'; }); });
           html+='<div style="padding:8px 0;border-bottom:1px solid #e5f0ee"><b style="font-size:13px">'+esc(wk)+'</b> — '+byWk[wk].length+' mã · '+fmt1(tot)+' thùng'+
-            '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+byWk[wk].map(function(r){return esc(r.product_name)+': '+r.qty_cases;}).join(' · ')+'</div></div>';
+            '<div style="font-size:11px;color:#607d8b;margin-top:2px">'+byWk[wk].map(function(r){return esc(r.product_name)+': '+r.qty_cases;}).join(' · ')+'</div>'+aud+'</div>';
         });
         html+='</div>';
       }
       $id('distBody').innerHTML=html;
     }).catch(function(){ $id('distBody').innerHTML='<div class="dspm-empty">Không tải được lịch sử.</div>'; });
   }
+
+  // v2: sửa SL 1 dòng đơn nhập (chỉ editor) — backend lưu vết ✎ vào notes dòng đó
+  D.editStockInLine=function(sid){
+    if(!isEditor()){ tt('Chỉ GT Leader / Sales Manager được sửa'); return; }
+    var l=(D._sinById||{})[String(sid)]; if(!l){ tt('Không tìm thấy dòng đơn'); return; }
+    var cur=String(l.qty_cases);
+    var v=prompt('Sửa SL nhập (THÙNG) — '+l.product_name+'\nSố hiện tại: '+cur, cur);
+    if(v==null) return;
+    var q=parseFloat(String(v).replace(/,/g,'.'));
+    if(isNaN(q)||q<0){ tt('Số lượng không hợp lệ'); return; }
+    if(q===parseFloat(cur)){ tt('Số không thay đổi'); return; }
+    tt('Đang lưu…');
+    send({ type:'DIST_STOCKIN_EDIT', stockin_id:String(sid), qty:q, entered_by:me() })
+      .then(function(res){
+        if(!res||!res.ok) throw new Error((res&&res.error)||'Lỗi lưu');
+        tt('✅ Đã sửa '+l.product_name+': '+cur+' → '+q+' thùng');
+        load(true).then(function(){ render(); });
+      })
+      .catch(function(e){ tt('❌ '+e.message); });
+  };
 
   // v1.2: KHÔI PHỤC SAU REFRESH — nếu trước đó đang đứng trong overlay Tồn kho NPP
   // thì mở lại đúng KH + tab thay vì rơi về màn hình home.
