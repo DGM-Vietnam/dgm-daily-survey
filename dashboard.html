@@ -2774,5 +2774,429 @@ function renderGiftLog(){
 </script>
 <!-- ===== /📦 NPP GT DASHBOARD MODULE ===== -->
 
+<!-- ===================== SALES KPI & CƠ HỘI — MODULE MỚI (CỘNG THÊM, KHÔNG ĐỤNG CODE CŨ) =====================
+     Cách gắn vào dashboard.html:
+       1. Mở file dashboard.html
+       2. Kéo xuống SÁT DÒNG CUỐI CÙNG, tìm dòng "</body>" và "</html>"
+       3. Dán TOÀN BỘ khối này vào NGAY PHÍA TRÊN dòng "</body>"
+       4. Lưu / Commit lại — không cần sửa gì khác, không cần deploy lại Apps Script
+     Module này tự thêm 1 tab mới "🎯 KPI & Cơ hội" vào thanh tab, hiện cho CẢ 3 loại tài khoản
+     (Manager / Trade Marketing / Sales) vì đây là thông tin phục vụ trực tiếp đội Sales.
+     Muốn CHỈ Manager/Trade xem được: tìm dòng "t.className='tab';" bên dưới, đổi thành
+     "t.className='tab tab-manager';" là xong (không cần sửa gì khác).
+====================================================================================================== -->
+<style id="saleskpi-style">
+#tab-saleskpi .sk-wrap{max-width:1300px}
+#tab-saleskpi .sk-sec{margin-bottom:26px}
+#tab-saleskpi .sk-sec-h{font-size:11px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.08em;margin:0 0 12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+#tab-saleskpi .sk-sec-h b{color:var(--white);font-family:var(--sans);font-size:13px;text-transform:none;letter-spacing:0}
+#tab-saleskpi .sk-note{font-size:11px;color:var(--gray2);margin:-4px 0 14px;line-height:1.6}
+#tab-saleskpi .sk-filterbar{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:18px;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:10px 14px}
+#tab-saleskpi .sk-filterbar label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.05em;margin-right:2px}
+#tab-saleskpi .sk-tag{padding:5px 13px;border-radius:2px;font-size:11px;font-family:var(--mono);cursor:pointer;border:1px solid var(--border);color:var(--gray2);transition:all .15s}
+#tab-saleskpi .sk-tag.active{background:var(--red);border-color:var(--red);color:#fff}
+#tab-saleskpi .sk-tag:hover:not(.active){border-color:var(--gray2)}
+#tab-saleskpi .sk-search{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:6px 10px;font-size:12px;border-radius:2px;min-width:220px;font-family:var(--sans)}
+#tab-saleskpi .sk-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:10px;font-family:var(--mono);font-weight:700;margin-right:4px;white-space:nowrap}
+#tab-saleskpi .sk-badge.pos{background:rgba(255,107,107,.16);color:#ff8f8f}
+#tab-saleskpi .sk-badge.hsd{background:rgba(245,158,66,.18);color:var(--orange)}
+#tab-saleskpi .sk-badge.never{background:rgba(255,107,107,.22);color:#ff6b6b}
+#tab-saleskpi .sk-badge.stale{background:rgba(245,158,66,.2);color:var(--orange)}
+#tab-saleskpi .sk-badge.hot{background:rgba(76,175,130,.2);color:var(--green)}
+#tab-saleskpi .sk-badge.ok{background:rgba(76,175,130,.15);color:var(--green)}
+#tab-saleskpi .sk-pct-bar{height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden;min-width:70px}
+#tab-saleskpi .sk-pct-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#4caf82,#4A9EBF)}
+#tab-saleskpi .sk-more{font-size:11px;color:var(--gray2);font-family:var(--mono);text-align:center;padding:10px}
+</style>
+
+<script id="saleskpi-script">
+(function(){
+  "use strict";
+
+  var K = {
+    loaded:false, storesLoaded:false, storesRaw:null, storeIndex:null,
+    region:'all',            // bộ lọc vùng dùng chung cho mục 1,2,4,5
+    search4:'', search5:''
+  };
+  window.SalesKPI = K;
+
+  var WD_VN = ['Chủ Nhật','Thứ Hai','Thứ Ba','Thứ Tư','Thứ Năm','Thứ Sáu','Thứ Bảy'];
+  var GAP_DAYS = 30;          // ngưỡng "lâu chưa khảo sát" — tính theo 30 ngày gần nhất (rolling)
+  var CADENCE_WINDOW_DAYS = 90; // cửa sổ 3 tháng gần nhất để tính tần suất khảo sát trung bình/tháng
+
+  /* ---------- tự chèn tab vào thanh tab, không đụng code cũ ---------- */
+  function bootstrap(){
+    if(document.getElementById('tab-saleskpi')) return;
+    var bar=document.getElementById('tabsBar');
+    if(bar){
+      var t=document.createElement('div');
+      t.className='tab';                       // hiện cho CẢ 3 role — đổi thành 'tab tab-manager' nếu muốn chỉ Manager/Trade
+      t.setAttribute('onclick',"switchTab('saleskpi',this)");
+      t.textContent='🎯 KPI & Cơ hội';
+      bar.appendChild(t);
+    }
+    var host=document.getElementById('tab-overview');
+    var parent=host?host.parentNode:document.body;
+    var div=document.createElement('div');
+    div.className='tab-content'; div.id='tab-saleskpi';
+    div.innerHTML='<div class="sk-wrap"><div id="skBody"><div class="empty">Đang tải…</div></div></div>';
+    parent.appendChild(div);
+    if(typeof window.switchTab==='function' && !window.switchTab._skWrapped){
+      var orig=window.switchTab;
+      window.switchTab=function(name,el){ orig(name,el); if(name==='saleskpi'){ K.load(); } };
+      window.switchTab._skWrapped=true;
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootstrap); else bootstrap();
+
+  /* ---------- helpers dùng lại từ dashboard chính (đã có sẵn: esc, fmt, nameKey, regionKey,
+     groupBy, getDS, isToday, isThisMonth, teamPill, todayYMD, toYMD, SCRIPT_URL, RAW) ---------- */
+  function skEsc(s){ try{ return esc(s); }catch(e){ return String(s==null?'':s); } }
+  function skFmt(n){ try{ return fmt(n); }catch(e){ return String(n); } }
+  function skNorm(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+  function skDaysBetween(a,b){ return Math.round((new Date(b)-new Date(a))/86400000); }
+  function skIsYTD(r){ var d=getDS(r); if(!d) return false; return d.slice(0,4)===String(new Date().getFullYear()); }
+  function skRegionMatch(rg){
+    if(K.region==='all') return true;
+    var v=(rg||'').toLowerCase();
+    if(K.region==='south') return v.indexOf('south')>=0||v.indexOf('nam')>=0;
+    if(K.region==='central') return v.indexOf('central')>=0||v.indexOf('trung')>=0;
+    if(K.region==='north') return v.indexOf('north')>=0||v.indexOf('bắc')>=0;
+    return true;
+  }
+
+  /* ---------- nạp dữ liệu Storelist (getStores) 1 lần, dùng cho mục 4 & 5 ---------- */
+  function ensureStores(cb){
+    if(K.storesLoaded){ cb(); return; }
+    fetch(SCRIPT_URL+'?action=getStores&_t='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(j){
+        K.storesRaw = (j&&j.status==='ok') ? j : {MT_CHAINS:{},GT_NORTH:{},GT_CENTRAL:{},GT_SOUTH:{}};
+        buildStoreIndex(); K.storesLoaded=true; cb();
+      })
+      .catch(function(){
+        K.storesRaw={MT_CHAINS:{},GT_NORTH:{},GT_CENTRAL:{},GT_SOUTH:{}};
+        buildStoreIndex(); K.storesLoaded=true; cb();
+      });
+  }
+  function buildStoreIndex(){
+    var idx={};
+    [['GT_NORTH','GT North'],['GT_CENTRAL','GT Central'],['GT_SOUTH','GT South']].forEach(function(pair){
+      var data=K.storesRaw[pair[0]]||{};
+      Object.keys(data).forEach(function(market){
+        (data[market]||[]).forEach(function(storeName){
+          var key=skNorm(storeName);
+          if(!idx[key]) idx[key]={name:storeName, market:market, region:pair[1]};
+        });
+      });
+    });
+    K.storeIndex=idx;
+  }
+
+  /* ---------- xây danh sách "lượt ghé" từng điểm bán từ dữ liệu GT_Daily
+     (1 phiếu khảo sát có thể chọn NHIỀU điểm bán, nối nhau bằng " | ") ---------- */
+  function skBuildVisits(){
+    var visits=[];
+    (RAW.gt_daily||[]).forEach(function(r){
+      var d=getDS(r); if(!d) return;
+      var salesperson=nameKey(r);
+      var marketHint=r['Chợ / Khu Vực']||'';
+      var regionHint=regionKey(r)||'';
+      var parts=String(r['Điểm Bán']||'').split('|');
+      parts.forEach(function(raw){
+        var s=raw.trim(); if(!s) return;
+        var key=skNorm(s);
+        var info=K.storeIndex[key];
+        var dt=new Date(d+'T00:00:00');
+        visits.push({
+          storeKey:key,
+          store: info?info.name:s,
+          market: info?info.market:marketHint,
+          region: info?info.region:regionHint,
+          date:d, dow: isNaN(dt.getTime())?null:dt.getDay(),
+          salesperson: salesperson,
+          matched: !!info
+        });
+      });
+    });
+    return visits;
+  }
+
+  /* ================= MỤC 1 — GT: Điểm mở mới thành công theo vùng/NV ================= */
+  function skOpenNewRows(){
+    var today=todayYMD();
+    var byRep={};
+    (RAW.gt_opennew||[]).forEach(function(r){
+      if(!skRegionMatch(regionKey(r))) return;
+      var n=nameKey(r), rg=regionKey(r)||'GT';
+      if(!byRep[n]) byRep[n]={name:n, region:rg, today:0, month:0, ytd:0};
+      var d=getDS(r);
+      if(d===today) byRep[n].today++;
+      if(isThisMonth(r)) byRep[n].month++;
+      if(skIsYTD(r)) byRep[n].ytd++;
+    });
+    return Object.keys(byRep).map(function(k){return byRep[k];}).sort(function(a,b){return b.ytd-a.ytd || b.month-a.month;});
+  }
+  function skOpenNewByRegion(rows){
+    var by={};
+    rows.forEach(function(r){
+      if(!by[r.region]) by[r.region]={region:r.region, today:0, month:0, ytd:0};
+      by[r.region].today+=r.today; by[r.region].month+=r.month; by[r.region].ytd+=r.ytd;
+    });
+    return Object.keys(by).map(function(k){return by[k];}).sort(function(a,b){return b.ytd-a.ytd;});
+  }
+  function renderSection1(){
+    var rows=skOpenNewRows();
+    var byRegion=skOpenNewByRegion(rows);
+    var tot={today:0,month:0,ytd:0};
+    rows.forEach(function(r){ tot.today+=r.today; tot.month+=r.month; tot.ytd+=r.ytd; });
+    var h='<div class="sk-sec"><div class="sk-sec-h"><b>1 · GT — Điểm mở mới thành công</b><span>theo vùng &amp; nhân viên</span></div>';
+    h+='<div class="scorecards">'+
+        '<div class="sc green"><div class="sc-label">Mở mới hôm nay</div><div class="sc-value">'+tot.today+'</div></div>'+
+        '<div class="sc blue"><div class="sc-label">Lũy kế tháng này</div><div class="sc-value">'+tot.month+'</div></div>'+
+        '<div class="sc yellow"><div class="sc-label">Tổng từ đầu năm</div><div class="sc-value">'+tot.ytd+'</div></div>'+
+       '</div>';
+    h+='<div class="tbl-card"><h3>Theo vùng</h3><table><thead><tr><th>Vùng</th><th class="num">Hôm nay</th><th class="num">Tháng này</th><th class="num">Từ đầu năm</th></tr></thead><tbody>';
+    h+=byRegion.map(function(r){ return '<tr><td>'+teamPill(r.region)+' '+skEsc(r.region)+'</td><td class="num">'+(r.today||'—')+'</td><td class="num">'+(r.month||'—')+'</td><td class="num"><strong>'+r.ytd+'</strong></td></tr>'; }).join('')||'<tr><td colspan="4" class="empty">Chưa có dữ liệu</td></tr>';
+    h+='</tbody></table></div>';
+    h+='<div class="tbl-card"><h3>Theo nhân viên (xếp theo lũy kế năm)</h3><table><thead><tr><th>#</th><th>Nhân viên</th><th>Vùng</th><th class="num">Hôm nay</th><th class="num">Tháng này</th><th class="num">Từ đầu năm</th></tr></thead><tbody>';
+    h+=rows.map(function(r,i){ return '<tr><td class="rank">'+(i+1)+'</td><td>'+skEsc(r.name)+'</td><td>'+teamPill(r.region)+'</td><td class="num">'+(r.today||'—')+'</td><td class="num">'+(r.month||'—')+'</td><td class="num"><strong>'+r.ytd+'</strong></td></tr>'; }).join('')||'<tr><td colspan="6" class="empty">Chưa có dữ liệu</td></tr>';
+    h+='</tbody></table></div></div>';
+    return h;
+  }
+
+  /* ================= MỤC 2 — GT: Điểm chào hàng tiềm năng "Cao — nên mở ngay" ================= */
+  function skHotLeads(){
+    return (RAW.gt_new||[]).filter(function(r){
+      if(!skRegionMatch(regionKey(r))) return false;
+      var pot=skNorm(r['Tiềm Năng']||'');
+      return pot.indexOf('cao')===0;
+    }).sort(function(a,b){ return String(b['Timestamp']||'').localeCompare(String(a['Timestamp']||'')); });
+  }
+  function renderSection2(){
+    var leads=skHotLeads();
+    var byRegion={};
+    leads.forEach(function(r){ var rg=regionKey(r)||'GT'; byRegion[rg]=(byRegion[rg]||0)+1; });
+    var regions=Object.keys(byRegion).sort(function(a,b){return byRegion[b]-byRegion[a];});
+    var h='<div class="sk-sec"><div class="sk-sec-h"><b>2 · GT — Điểm chào hàng tiềm năng "Cao — nên mở ngay"</b><span>'+leads.length+' điểm</span></div>';
+    h+='<div class="alert-row">'+(regions.length?regions.map(function(rg){return '<span class="alert-chip">'+skEsc(rg)+': <strong>'+byRegion[rg]+'</strong></span>';}).join(''):'<span class="alert-chip ok">✅ Chưa có điểm nào đang chờ — hoặc đã mở hết</span>')+'</div>';
+    h+='<div class="tbl-card"><h3>Danh sách theo dõi — ưu tiên chốt đơn</h3><table><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Vùng</th><th>Tên điểm bán</th><th>Hình thức KD</th><th>Sản phẩm đã chào</th></tr></thead><tbody>';
+    h+=leads.slice(0,300).map(function(r){
+      return '<tr><td style="font-size:11px;font-family:var(--mono);color:var(--gray2)">'+skEsc(getDS(r))+'</td>'+
+        '<td>'+skEsc(nameKey(r))+'</td><td>'+teamPill(regionKey(r))+'</td>'+
+        '<td style="font-weight:600">'+skEsc(r['Tên Điểm Bán']||r['Điểm Bán']||'—')+'</td>'+
+        '<td style="color:var(--gray2);font-size:12px">'+skEsc(r['Hình Thức KD']||'—')+'</td>'+
+        '<td style="color:var(--blue);font-size:11px">'+skEsc(r['Sản Phẩm Chào Hàng']||'—')+'</td></tr>';
+    }).join('')||'<tr><td colspan="6" class="empty">Chưa có điểm tiềm năng cao đang chờ</td></tr>';
+    h+='</tbody></table>'+(leads.length>300?'<div class="sk-more">Hiển thị 300/'+leads.length+' — thu hẹp bằng bộ lọc vùng phía trên</div>':'')+'</div></div>';
+    return h;
+  }
+
+  /* ================= MỤC 3 — MT: Điểm bán có vấn đề (vị trí thấp / HSD<50%) theo khách hàng ================= */
+  function skMtIssues(){
+    var latestByStore={};
+    (RAW.mt_daily||[]).forEach(function(r){
+      var chain=r['Chain']||''; var store=r['Điểm Bán']||'';
+      var key=chain+'\u00a6'+store; var d=getDS(r);
+      if(!latestByStore[key] || d>latestByStore[key]._d){ r._d=d; latestByStore[key]=r; }
+    });
+    var byChain={};
+    Object.keys(latestByStore).forEach(function(key){
+      var r=latestByStore[key];
+      var tb=String(r['Trưng Bày']||''); var hsd=String(r['HSD']||'');
+      var posBad = tb.indexOf('Vị trí thấp')>=0;
+      var hsdBad = hsd.indexOf('<50%')>=0;
+      if(!posBad && !hsdBad) return;
+      var chain=r['Chain']||'(Khác)';
+      if(!byChain[chain]) byChain[chain]=[];
+      byChain[chain].push({ store:r['Điểm Bán']||'', rep:nameKey(r), date:getDS(r), posBad:posBad, hsdBad:hsdBad });
+    });
+    return byChain;
+  }
+  function renderSection3(){
+    var byChain=skMtIssues();
+    var chains=Object.keys(byChain).sort(function(a,b){ return byChain[b].length-byChain[a].length; });
+    var totalStores=0, totalPos=0, totalHsd=0;
+    chains.forEach(function(c){ byChain[c].forEach(function(s){ totalStores++; if(s.posBad) totalPos++; if(s.hsdBad) totalHsd++; }); });
+    var h='<div class="sk-sec"><div class="sk-sec-h"><b>3 · MT — Điểm bán đang có vấn đề (theo khảo sát gần nhất)</b><span>'+totalStores+' điểm · '+totalPos+' vị trí thấp · '+totalHsd+' HSD&lt;50%</span></div>';
+    h+='<div class="sk-note">Dựa trên LẦN KHẢO SÁT GẦN NHẤT của từng điểm bán (không phải mọi lần khảo sát trong quá khứ) — phản ánh tình trạng hiện tại.</div>';
+    if(!chains.length){
+      h+='<div class="tbl-card"><div class="empty">✅ Không có điểm bán MT nào đang bị vị trí thấp hoặc HSD&lt;50% ở lần khảo sát gần nhất.</div></div>';
+    } else {
+      chains.forEach(function(chain){
+        var list=byChain[chain].sort(function(a,b){return String(b.date).localeCompare(String(a.date));});
+        h+='<div class="tbl-card"><h3>'+skEsc(chain)+' · '+list.length+' điểm</h3><table><thead><tr><th>Điểm bán</th><th>Vấn đề</th><th>Nhân viên</th><th>Ngày khảo sát gần nhất</th></tr></thead><tbody>';
+        h+=list.map(function(s){
+          return '<tr><td style="font-weight:600">'+skEsc(s.store)+'</td><td>'+
+            (s.posBad?'<span class="sk-badge pos">Vị trí thấp</span>':'')+
+            (s.hsdBad?'<span class="sk-badge hsd">HSD&lt;50%</span>':'')+
+            '</td><td>'+skEsc(s.rep)+'</td><td style="font-family:var(--mono);font-size:11px;color:var(--gray2)">'+skEsc(s.date)+'</td></tr>';
+        }).join('');
+        h+='</tbody></table></div>';
+      });
+    }
+    h+='</div>';
+    return h;
+  }
+
+  /* ================= MỤC 4 — GT: Chợ / điểm bán chưa khảo sát (coverage gap) ================= */
+  function skCoverageRows(){
+    var visits=skBuildVisits().filter(function(v){return v.matched;});
+    var lastByStore={};
+    visits.forEach(function(v){
+      if(!lastByStore[v.storeKey] || v.date>lastByStore[v.storeKey]) lastByStore[v.storeKey]=v.date;
+    });
+    var today=todayYMD();
+    var rows=[];
+    Object.keys(K.storeIndex).forEach(function(key){
+      var info=K.storeIndex[key];
+      if(!skRegionMatch(info.region)) return;
+      var last=lastByStore[key]||null;
+      var daysSince = last ? skDaysBetween(last, today) : null;
+      rows.push({ store:info.name, market:info.market, region:info.region, lastDate:last, daysSince:daysSince });
+    });
+    return rows;
+  }
+  function renderSection4(){
+    var rows=skCoverageRows();
+    var byMarket={};
+    rows.forEach(function(r){
+      var k=r.region+'\u00a6'+r.market;
+      if(!byMarket[k]) byMarket[k]={region:r.region, market:r.market, total:0, never:0, stale:0};
+      var b=byMarket[k]; b.total++;
+      if(r.daysSince==null) b.never++; else if(r.daysSince>GAP_DAYS) b.stale++;
+    });
+    var marketRows=Object.keys(byMarket).map(function(k){return byMarket[k];})
+      .sort(function(a,b){ return (b.never+b.stale)-(a.never+a.stale); });
+
+    var gapRows=rows.filter(function(r){ return r.daysSince==null || r.daysSince>GAP_DAYS; })
+      .sort(function(a,b){ var da=a.daysSince==null?99999:a.daysSince, db=b.daysSince==null?99999:b.daysSince; return db-da; });
+    var q=skNorm(K.search4);
+    var gapFiltered = q ? gapRows.filter(function(r){ return skNorm(r.store).indexOf(q)>=0 || skNorm(r.market).indexOf(q)>=0; }) : gapRows;
+
+    var h='<div class="sk-sec"><div class="sk-sec-h"><b>4 · GT — Chợ &amp; điểm bán chưa khảo sát</b><span>ngưỡng: quá '+GAP_DAYS+' ngày hoặc chưa từng khảo sát</span></div>';
+    h+='<div class="sk-note">"Chưa khảo sát" = quá '+GAP_DAYS+' ngày kể từ lần khảo sát gần nhất (tính theo ngày thực tế, không theo tháng dương lịch) — số ngày cụ thể được hiển thị ở cột cuối để tự đối chiếu.</div>';
+    h+='<div class="tbl-card"><h3>Tổng hợp theo chợ</h3><table><thead><tr><th>Vùng</th><th>Chợ</th><th class="num">Tổng điểm trong DB</th><th class="num">Chưa từng khảo sát</th><th class="num">&gt;'+GAP_DAYS+' ngày chưa ghé</th><th>% đã phủ (≤'+GAP_DAYS+'ng)</th></tr></thead><tbody>';
+    h+=marketRows.map(function(m){
+      var covered=m.total-m.never-m.stale;
+      var pct=m.total?Math.round(covered/m.total*100):0;
+      return '<tr><td>'+teamPill(m.region)+'</td><td>'+skEsc(m.market)+'</td><td class="num">'+m.total+'</td>'+
+        '<td class="num">'+(m.never?('<span class="sk-badge never">'+m.never+'</span>'):'—')+'</td>'+
+        '<td class="num">'+(m.stale?('<span class="sk-badge stale">'+m.stale+'</span>'):'—')+'</td>'+
+        '<td><div style="display:flex;align-items:center;gap:8px"><div class="sk-pct-bar"><div class="sk-pct-fill" style="width:'+pct+'%"></div></div><span style="font-family:var(--mono);font-size:11px">'+pct+'%</span></div></td></tr>';
+    }).join('')||'<tr><td colspan="6" class="empty">Chưa có dữ liệu Storelist</td></tr>';
+    h+='</tbody></table></div>';
+
+    h+='<div class="tbl-card"><h3>Danh sách điểm bán cần khảo sát lại ('+gapFiltered.length+')</h3>';
+    h+='<div style="padding:12px 18px 0"><input class="sk-search" placeholder="🔍 Tìm điểm bán / chợ…" value="'+skEsc(K.search4)+'" oninput="SalesKPI.setSearch4(this.value)"></div>';
+    h+='<table><thead><tr><th>Vùng</th><th>Chợ</th><th>Điểm bán</th><th>Lần khảo sát gần nhất</th><th class="num">Số ngày chưa ghé</th></tr></thead><tbody>';
+    h+=gapFiltered.slice(0,250).map(function(r){
+      var lbl = r.daysSince==null ? '<span class="sk-badge never">Chưa từng</span>' : '<span class="sk-badge stale">'+r.daysSince+' ngày</span>';
+      return '<tr><td>'+teamPill(r.region)+'</td><td style="font-size:12px;color:var(--gray2)">'+skEsc(r.market)+'</td><td style="font-weight:600">'+skEsc(r.store)+'</td>'+
+        '<td style="font-family:var(--mono);font-size:11px">'+(r.lastDate?skEsc(r.lastDate):'—')+'</td><td class="num">'+lbl+'</td></tr>';
+    }).join('')||'<tr><td colspan="5" class="empty">✅ Không có điểm nào bị bỏ sót theo bộ lọc hiện tại</td></tr>';
+    h+='</tbody></table>'+(gapFiltered.length>250?'<div class="sk-more">Hiển thị 250/'+gapFiltered.length+' — dùng ô tìm kiếm để thu hẹp</div>':'')+'</div></div>';
+    return h;
+  }
+
+  /* ================= MỤC 5 — GT: Tần suất khảo sát trung bình + tuyến (ngày trong tuần hay ghé) ================= */
+  function skCadenceRows(){
+    var visits=skBuildVisits().filter(function(v){return v.matched;});
+    var byStore={};
+    visits.forEach(function(v){
+      if(!skRegionMatch(v.region)) return;
+      if(!byStore[v.storeKey]) byStore[v.storeKey]={store:v.store, market:v.market, region:v.region, dates:[], salesCount:{}, dowCount:[0,0,0,0,0,0,0]};
+      var b=byStore[v.storeKey];
+      b.dates.push(v.date);
+      b.salesCount[v.salesperson]=(b.salesCount[v.salesperson]||0)+1;
+      if(v.dow!=null) b.dowCount[v.dow]++;
+    });
+    var cutoff=toYMD(new Date(Date.now()-CADENCE_WINDOW_DAYS*86400000));
+    var rows=[];
+    Object.keys(byStore).forEach(function(key){
+      var b=byStore[key];
+      var recent=b.dates.filter(function(d){return d>=cutoff;});
+      var usedRecent = recent.length>0;
+      var totalVisits = usedRecent ? recent.length : b.dates.length;
+      var monthsSpan = usedRecent ? (CADENCE_WINDOW_DAYS/30) : Math.max(1, (skDaysBetween(b.dates[0],b.dates[b.dates.length-1])+1)/30);
+      var avgPerMonth = totalVisits/monthsSpan;
+      var bestRep='',bestN=0;
+      Object.keys(b.salesCount).forEach(function(n){ if(b.salesCount[n]>bestN){bestN=b.salesCount[n]; bestRep=n;} });
+      var bestDow=-1,bestDowN=-1;
+      b.dowCount.forEach(function(n,i){ if(n>bestDowN){bestDowN=n; bestDow=i;} });
+      rows.push({
+        store:b.store, market:b.market, region:b.region,
+        totalVisits:b.dates.length, avgPerMonth:avgPerMonth,
+        rep:bestRep, dow: bestDow>=0?WD_VN[bestDow]:'—', windowUsed: usedRecent
+      });
+    });
+    rows.sort(function(a,b){ return b.avgPerMonth-a.avgPerMonth; });
+    return rows;
+  }
+  function renderSection5(){
+    var rows=skCadenceRows();
+    var q=skNorm(K.search5);
+    var filtered = q ? rows.filter(function(r){ return skNorm(r.store).indexOf(q)>=0 || skNorm(r.market).indexOf(q)>=0 || skNorm(r.rep).indexOf(q)>=0; }) : rows;
+    var h='<div class="sk-sec"><div class="sk-sec-h"><b>5 · GT — Tần suất khảo sát &amp; gợi ý tuyến</b><span>'+rows.length+' điểm có lịch sử khảo sát</span></div>';
+    h+='<div class="sk-note">Tần suất tính trên '+CADENCE_WINDOW_DAYS+' ngày gần nhất (nếu có dữ liệu trong khoảng đó), ngược lại lấy toàn bộ lịch sử. "Nhân viên phụ trách" = người ghé nhiều nhất từ trước đến nay. "Ngày hay ghé" = thứ trong tuần xuất hiện nhiều nhất trong lịch sử khảo sát điểm đó — dùng để định hình tuyến, không phải quy định bắt buộc.</div>';
+    h+='<div class="tbl-card"><h3>Điểm bán · Chợ · Nhân viên phụ trách</h3>';
+    h+='<div style="padding:12px 18px 0"><input class="sk-search" placeholder="🔍 Tìm điểm bán / chợ / nhân viên…" value="'+skEsc(K.search5)+'" oninput="SalesKPI.setSearch5(this.value)"></div>';
+    h+='<table><thead><tr><th>Vùng</th><th>Chợ</th><th>Điểm bán</th><th>Nhân viên phụ trách</th><th class="num">TB lượt/tháng</th><th>Ngày hay ghé</th><th class="num">Tổng lượt (toàn kỳ)</th></tr></thead><tbody>';
+    h+=filtered.slice(0,300).map(function(r){
+      return '<tr><td>'+teamPill(r.region)+'</td><td style="font-size:12px;color:var(--gray2)">'+skEsc(r.market)+'</td>'+
+        '<td style="font-weight:600">'+skEsc(r.store)+'</td><td>'+skEsc(r.rep)+'</td>'+
+        '<td class="num"><strong>'+r.avgPerMonth.toFixed(1)+'</strong></td>'+
+        '<td><span class="sk-badge ok">'+skEsc(r.dow)+'</span></td>'+
+        '<td class="num">'+r.totalVisits+'</td></tr>';
+    }).join('')||'<tr><td colspan="7" class="empty">Chưa có đủ lịch sử khảo sát để tính tần suất</td></tr>';
+    h+='</tbody></table>'+(filtered.length>300?'<div class="sk-more">Hiển thị 300/'+filtered.length+' — dùng ô tìm kiếm để thu hẹp</div>':'')+'</div></div>';
+    return h;
+  }
+
+  /* ---------- filter bar dùng chung cho mục 1,2,4,5 ---------- */
+  function renderFilterBar(){
+    var regions=[['all','Tất cả vùng'],['south','GT South'],['central','GT Central'],['north','GT North']];
+    return '<div class="sk-filterbar"><label>Vùng GT:</label>'+
+      regions.map(function(r){ return '<span class="sk-tag'+(K.region===r[0]?' active':'')+'" onclick="SalesKPI.setRegion(\''+r[0]+'\')">'+r[1]+'</span>'; }).join('')+
+      '<span style="margin-left:auto"><button class="btn-sm" onclick="SalesKPI.load(true)">↻ Làm mới</button></span></div>';
+  }
+
+  K.setRegion=function(v){ K.region=v; render(); };
+  K.setSearch4=function(v){ K.search4=v; renderOnly4(); };
+  K.setSearch5=function(v){ K.search5=v; renderOnly5(); };
+
+  // Cập nhật riêng mục 4/5 khi gõ tìm kiếm — khỏi vẽ lại toàn trang, đỡ giật khi đang gõ
+  function renderOnly4(){
+    var el=document.getElementById('sk-sec-4'); if(el) el.outerHTML='<div id="sk-sec-4">'+renderSection4()+'</div>';
+    var input=document.querySelector('#sk-sec-4 .sk-search'); if(input){ input.focus(); var v=input.value; input.value=v; }
+  }
+  function renderOnly5(){
+    var el=document.getElementById('sk-sec-5'); if(el) el.outerHTML='<div id="sk-sec-5">'+renderSection5()+'</div>';
+  }
+
+  function render(){
+    var body=document.getElementById('skBody'); if(!body) return;
+    if(!RAW){ body.innerHTML='<div class="empty">Đang tải dữ liệu chính, quay lại tab này sau vài giây…</div>'; return; }
+    var h='';
+    h+=renderFilterBar();
+    h+=renderSection1();
+    h+=renderSection2();
+    h+=renderSection3();
+    h+='<div id="sk-sec-4">'+renderSection4()+'</div>';
+    h+='<div id="sk-sec-5">'+renderSection5()+'</div>';
+    body.innerHTML=h;
+  }
+
+  K.load = function(force){
+    var body=document.getElementById('skBody');
+    if(!RAW){ if(body) body.innerHTML='<div class="empty">Đang tải dữ liệu chính, thử lại sau vài giây…</div>'; return; }
+    if(K.loaded && !force){ render(); return; }
+    if(body) body.innerHTML='<div class="empty">Đang tải danh sách điểm bán…</div>';
+    ensureStores(function(){ K.loaded=true; render(); });
+  };
+})();
+</script>
+<!-- ===================== /SALES KPI & CƠ HỘI MODULE ===================== -->
+
 </body>
 </html>
