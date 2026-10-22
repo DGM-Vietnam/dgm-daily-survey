@@ -3198,5 +3198,285 @@ function renderGiftLog(){
 </script>
 <!-- ===================== /SALES KPI & CƠ HỘI MODULE ===================== -->
 
+<!-- ===================== 🏪 MẠNG LƯỚI ĐIỂM BÁN — MODULE MỚI (CỘNG THÊM, KHÔNG ĐỤNG CODE CŨ) =====================
+     Cách gắn vào dashboard.html:
+       1. Mở dashboard.html, kéo xuống cuối file, tìm dòng "</body>"
+       2. Dán TOÀN BỘ khối này vào NGAY PHÍA TRÊN dòng "</body>"
+       3. Lưu / Commit — KHÔNG cần sửa / deploy lại Apps Script (dùng action=getStores + dữ liệu survey có sẵn)
+     Tab "🏪 Mạng lưới điểm bán" hiện cho CẢ 3 loại tài khoản (Manager / Trade / Sales).
+     Logic:
+       - Danh sách store / chain / chợ: Storelist (action=getStores), gộp trùng theo chain|chợ + tên.
+       - Active = store có survey (MT_Daily / GT_Daily) trong kỳ chọn (mặc định 3 tháng gần nhất, hoặc từng tháng).
+       - Mở mới YTD = GT_OpenNew từ 01/01 năm nay (gộp trùng theo vùng + tên điểm).
+       - Tỉnh/TP: chỉ áp cho GT theo vùng (North = Hà Nội, South = TP.HCM, Central = Huế & Đà Nẵng).
+================================================================================================================ -->
+<style id="storenet-style">
+#tab-storenet .sn-wrap{max-width:1300px}
+#tab-storenet .sn-filterbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--border);border-radius:4px;padding:10px 14px;margin-bottom:18px}
+#tab-storenet .sn-filterbar label{font-size:10px;font-family:var(--mono);color:var(--gray2);text-transform:uppercase;letter-spacing:.05em}
+#tab-storenet .sn-select{background:var(--bg);border:1px solid var(--border);color:var(--white);padding:6px 10px;font-size:12px;border-radius:2px;font-family:var(--mono)}
+#tab-storenet .sn-note{font-size:11px;color:var(--gray2);margin:-4px 0 14px;line-height:1.6}
+#tab-storenet .sn-bar-wrap{display:flex;align-items:center;gap:8px;min-width:120px}
+#tab-storenet .sn-bar{flex:1;height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden}
+#tab-storenet .sn-bar>span{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#4caf82,#4A9EBF)}
+#tab-storenet .sn-pct{font-family:var(--mono);font-size:11px;min-width:36px;text-align:right}
+#tab-storenet tr.sn-total td{font-weight:700;background:rgba(255,255,255,.04);border-top:1px solid var(--border)}
+#tab-storenet details.sn-det{background:var(--card);border:1px solid var(--border);border-radius:4px;margin-bottom:10px}
+#tab-storenet details.sn-det summary{cursor:pointer;padding:12px 16px;font-size:13px;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#tab-storenet details.sn-det summary::-webkit-details-marker{display:none}
+#tab-storenet details.sn-det summary small{font-family:var(--mono);font-size:11px;color:var(--gray2);font-weight:400}
+#tab-storenet .sn-city{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-family:var(--mono);background:rgba(74,158,191,.15);color:#7dd3f0;margin:1px 3px 1px 0}
+</style>
+
+<script id="storenet-script">
+(function(){
+  "use strict";
+  var S = { loaded:false, stores:null, period:'3m' };
+  window.StoreNet = S;
+
+  var GT_REGIONS = ['GT North','GT Central','GT South'];
+  var REGION_CITIES = { 'GT North':['Hà Nội'], 'GT Central':['Huế','Đà Nẵng'], 'GT South':['TP.HCM'] };
+
+  function e(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function norm(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+  function n(v){ return Number(v||0).toLocaleString('vi-VN'); }
+  function pct(a,b){ return b>0 ? Math.round(a/b*100) : 0; }
+  function bar(a,b){ var p=pct(a,b); return '<div class="sn-bar-wrap"><div class="sn-bar"><span style="width:'+p+'%"></span></div><span class="sn-pct">'+p+'%</span></div>'; }
+  function ds(r){ try{ return getDS(r); }catch(x){ return String(r['Ngày']||'').slice(0,10); } }
+  function pad(x){ return (x<10?'0':'')+x; }
+  function regionOf(txt){
+    var v=String(txt||'').toLowerCase();
+    if(v.indexOf('north')>=0||v.indexOf('bắc')>=0) return 'GT North';
+    if(v.indexOf('central')>=0||v.indexOf('trung')>=0) return 'GT Central';
+    if(v.indexOf('south')>=0||v.indexOf('nam')>=0) return 'GT South';
+    return '';
+  }
+
+  /* ---------- tự chèn tab ---------- */
+  function bootstrap(){
+    if(document.getElementById('tab-storenet')) return;
+    var bar=document.getElementById('tabsBar');
+    if(bar){
+      var t=document.createElement('div');
+      t.className='tab';   // cả 3 role đều thấy
+      t.setAttribute('onclick',"switchTab('storenet',this)");
+      t.textContent='🏪 Mạng lưới điểm bán';
+      bar.appendChild(t);
+    }
+    var host=document.getElementById('tab-overview');
+    var parent=host?host.parentNode:document.body;
+    var div=document.createElement('div');
+    div.className='tab-content'; div.id='tab-storenet';
+    div.innerHTML='<div class="sn-wrap"><div id="snBody"><div class="empty">Đang tải…</div></div></div>';
+    parent.appendChild(div);
+    if(typeof window.switchTab==='function' && !window.switchTab._snWrapped){
+      var orig=window.switchTab;
+      window.switchTab=function(name,el){ orig(name,el); if(name==='storenet'){ S.load(); } };
+      window.switchTab._snWrapped=true;
+    }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootstrap); else bootstrap();
+
+  /* ---------- kỳ lọc active ---------- */
+  function periodRange(){
+    var now=new Date();
+    if(S.period==='3m'){
+      var st=new Date(now.getFullYear(),now.getMonth()-2,1);
+      return { from:st.getFullYear()+'-'+pad(st.getMonth()+1)+'-01',
+               to:now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate()),
+               label:'3 tháng gần nhất ('+pad(st.getMonth()+1)+'/'+st.getFullYear()+' → nay)' };
+    }
+    var y=+S.period.slice(0,4), m=+S.period.slice(5,7);
+    var last=new Date(y,m,0).getDate();
+    return { from:S.period+'-01', to:S.period+'-'+pad(last), label:'Tháng '+m+'/'+y };
+  }
+  function inPeriod(r,rg){ var d=ds(r); return !!d && d>=rg.from && d<=rg.to; }
+
+  /* ---------- universe từ Storelist ---------- */
+  function buildUniverse(raw){
+    var U={ mt:{}, gt:{}, mtKey:{}, gtKey:{}, mtName:{}, gtName:{} };
+    // MT
+    var mc=raw.MT_CHAINS||{};
+    Object.keys(mc).forEach(function(chain){
+      var c=String(chain).trim(); if(!c) return;
+      var obj=U.mt[c]||(U.mt[c]={chain:c,stores:{}});
+      (mc[chain]||[]).forEach(function(s){
+        var k=norm(c)+'|'+norm(s); if(!norm(s)||U.mtKey[k]) return;
+        U.mtKey[k]={chain:c,store:s}; obj.stores[k]=1;
+        (U.mtName[norm(s)]=U.mtName[norm(s)]||[]).push(k);
+      });
+    });
+    // GT
+    [['GT North','GT_NORTH'],['GT Central','GT_CENTRAL'],['GT South','GT_SOUTH']].forEach(function(p){
+      var rg=p[0], data=raw[p[1]]||{};
+      var R=U.gt[rg]=U.gt[rg]||{region:rg,markets:{}};
+      Object.keys(data).forEach(function(mk){
+        var m=String(mk).trim(); if(!m) return;
+        var M=R.markets[m]||(R.markets[m]={market:m,stores:{}});
+        (data[mk]||[]).forEach(function(s){
+          var k=rg+'|'+norm(m)+'|'+norm(s); if(!norm(s)||U.gtKey[k]) return;
+          U.gtKey[k]={region:rg,market:m,store:s}; M.stores[k]=1;
+          (U.gtName[norm(s)]=U.gtName[norm(s)]||[]).push(k);
+        });
+      });
+    });
+    return U;
+  }
+  function splitStores(v){ return String(v||'').split('|').map(function(x){return x.trim();}).filter(Boolean); }
+
+  /* ---------- tính toán ---------- */
+  function compute(){
+    var U=buildUniverse(S.stores), rg=periodRange();
+    var mtActive={}, gtActive={}, mtOut={}, gtOut={};
+
+    // MT survey: chain|store, fallback theo tên nếu tên là duy nhất
+    ((RAW&&RAW.mt_daily)||[]).forEach(function(r){
+      if(!inPeriod(r,rg)) return;
+      var c=norm(r['Chain']);
+      splitStores(r['Điểm Bán']).forEach(function(s){
+        var k=c+'|'+norm(s);
+        if(U.mtKey[k]){ mtActive[k]=1; return; }
+        var cand=U.mtName[norm(s)];
+        if(cand&&cand.length===1){ mtActive[cand[0]]=1; return; }
+        mtOut[c+'|'+norm(s)]=1;
+      });
+    });
+    // GT survey: vùng|chợ|store, fallback theo tên trong vùng (rồi toàn GT) nếu duy nhất
+    ((RAW&&RAW.gt_daily)||[]).forEach(function(r){
+      if(!inPeriod(r,rg)) return;
+      var reg=regionOf(r['Khu Vực']||r['Team']), mk=norm(r['Chợ / Khu Vực']);
+      splitStores(r['Điểm Bán']).forEach(function(s){
+        var ns=norm(s);
+        if(reg){ var k=reg+'|'+mk+'|'+ns; if(U.gtKey[k]){ gtActive[k]=1; return; } }
+        else { var hit=GT_REGIONS.filter(function(R){return U.gtKey[R+'|'+mk+'|'+ns];});
+               if(hit.length===1){ gtActive[hit[0]+'|'+mk+'|'+ns]=1; return; } }
+        var cand=(U.gtName[ns]||[]);
+        var inReg=reg?cand.filter(function(x){return x.indexOf(reg+'|')===0;}):cand;
+        if(inReg.length===1){ gtActive[inReg[0]]=1; return; }
+        if(!reg&&cand.length===1){ gtActive[cand[0]]=1; return; }
+        gtOut[(reg||'?')+'|'+mk+'|'+ns]=1;
+      });
+    });
+
+    // Mở mới YTD
+    var yr=String(new Date().getFullYear()), openYTD={'GT North':{},'GT Central':{},'GT South':{}};
+    ((RAW&&RAW.gt_opennew)||[]).forEach(function(r){
+      if(ds(r).slice(0,4)!==yr) return;
+      var reg=regionOf(r['Khu Vực']||r['Team']); if(!reg) return;
+      var nm=norm(r['Tên Điểm Bán']||r['Điểm Bán']); if(!nm) return;
+      openYTD[reg][nm]=1;
+    });
+
+    // MT tổng hợp
+    var mtRows=Object.keys(U.mt).map(function(c){
+      var keys=Object.keys(U.mt[c].stores);
+      return { chain:c, stores:keys.length, active:keys.filter(function(k){return mtActive[k];}).length };
+    }).filter(function(x){return x.stores>0;}).sort(function(a,b){return b.stores-a.stores;});
+    var mt={ chains:mtRows.length, stores:0, active:0, rows:mtRows, outside:Object.keys(mtOut).length };
+    mtRows.forEach(function(x){ mt.stores+=x.stores; mt.active+=x.active; });
+
+    // GT tổng hợp
+    var gt={ regions:[], stores:0, active:0, markets:0, mActive:0, openYTD:0, outside:Object.keys(gtOut).length, cities:{} };
+    GT_REGIONS.forEach(function(R){
+      var reg=U.gt[R]||{markets:{}};
+      var mRows=Object.keys(reg.markets).map(function(m){
+        var keys=Object.keys(reg.markets[m].stores);
+        return { market:m, stores:keys.length, active:keys.filter(function(k){return gtActive[k];}).length };
+      }).filter(function(x){return x.stores>0;}).sort(function(a,b){return b.active-a.active||b.stores-a.stores;});
+      var o={ region:R, markets:mRows.length, mActive:0, stores:0, active:0,
+              openYTD:Object.keys(openYTD[R]).length, cities:REGION_CITIES[R], rows:mRows };
+      mRows.forEach(function(x){ o.stores+=x.stores; o.active+=x.active; if(x.active>0) o.mActive++; });
+      if(o.stores>0) o.cities.forEach(function(c){ gt.cities[c]=1; });
+      gt.regions.push(o);
+      gt.stores+=o.stores; gt.active+=o.active; gt.markets+=o.markets; gt.mActive+=o.mActive; gt.openYTD+=o.openYTD;
+    });
+    return { rg:rg, mt:mt, gt:gt };
+  }
+
+  /* ---------- render ---------- */
+  function monthOptions(){
+    var set={};
+    ((RAW&&RAW.mt_daily)||[]).concat((RAW&&RAW.gt_daily)||[]).forEach(function(r){ var d=ds(r); if(d&&d.length>=7) set[d.slice(0,7)]=1; });
+    return Object.keys(set).sort().reverse().slice(0,12);
+  }
+  function render(){
+    var body=document.getElementById('snBody'); if(!body) return;
+    var R=compute(), mt=R.mt, gt=R.gt;
+    var totalStores=mt.stores+gt.stores, totalActive=mt.active+gt.active;
+    var cities=Object.keys(gt.cities);
+    var h='';
+
+    // filter
+    h+='<div class="sn-filterbar"><label>Kỳ tính "active":</label><select class="sn-select" onchange="StoreNet.setPeriod(this.value)">'+
+       '<option value="3m"'+(S.period==='3m'?' selected':'')+'>3 tháng gần nhất</option>'+
+       monthOptions().map(function(m){ return '<option value="'+m+'"'+(S.period===m?' selected':'')+'>Tháng '+(+m.slice(5,7))+'/'+m.slice(0,4)+'</option>'; }).join('')+
+       '</select><span style="font-size:11px;color:var(--gray2);font-family:var(--mono)">'+e(R.rg.label)+'</span>'+
+       '<span style="margin-left:auto"><button class="btn-sm" onclick="StoreNet.load(true)">↻ Làm mới</button></span></div>';
+    h+='<div class="sn-note">Active = điểm bán có ít nhất 1 lần survey trong kỳ chọn. Danh sách điểm bán lấy từ Storelist (đã gộp trùng).</div>';
+
+    // tổng công ty
+    h+='<div class="sec">Toàn công ty</div><div class="scorecards">'+
+      '<div class="sc"><div class="sc-label">Tổng điểm bán</div><div class="sc-value">'+n(totalStores)+'</div><div class="sc-sub">MT '+n(mt.stores)+' · GT '+n(gt.stores)+'</div></div>'+
+      '<div class="sc yellow"><div class="sc-label">Chain + Chợ</div><div class="sc-value">'+n(mt.chains+gt.markets)+'</div><div class="sc-sub">'+mt.chains+' chain · '+gt.markets+' chợ</div></div>'+
+      '<div class="sc green"><div class="sc-label">Điểm active</div><div class="sc-value">'+n(totalActive)+'</div><div class="sc-sub">'+pct(totalActive,totalStores)+'% tổng điểm</div></div>'+
+      '<div class="sc blue"><div class="sc-label">Tỉnh/TP (GT)</div><div class="sc-value">'+cities.length+'</div><div class="sc-sub">'+e(cities.join(', ')||'—')+'</div></div>'+
+      '<div class="sc orange"><div class="sc-label">🏆 Mở mới YTD</div><div class="sc-value">'+n(gt.openYTD)+'</div><div class="sc-sub">GT · năm '+new Date().getFullYear()+'</div></div>'+
+      '</div>';
+
+    // MT
+    h+='<div class="sec">MT — Modern Trade</div><div class="scorecards">'+
+      '<div class="sc"><div class="sc-label">Khách hàng (chain)</div><div class="sc-value">'+mt.chains+'</div></div>'+
+      '<div class="sc yellow"><div class="sc-label">Tổng store</div><div class="sc-value">'+n(mt.stores)+'</div></div>'+
+      '<div class="sc green"><div class="sc-label">Store có survey</div><div class="sc-value">'+n(mt.active)+'</div><div class="sc-sub">'+pct(mt.active,mt.stores)+'% có NV chăm sóc</div></div>'+
+      '</div>';
+    h+='<div class="tbl-card"><h3>Store theo khách hàng</h3><div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Khách hàng</th><th class="num">Store</th><th class="num">Có survey</th><th class="num">Chưa survey</th><th>% phủ</th></tr></thead><tbody>'+
+      (mt.rows.map(function(x,i){ return '<tr><td class="rank">'+(i+1)+'</td><td>'+e(x.chain)+'</td><td class="num">'+n(x.stores)+'</td><td class="num">'+(x.active||'—')+'</td><td class="num">'+(x.stores-x.active||'—')+'</td><td>'+bar(x.active,x.stores)+'</td></tr>'; }).join('')||'<tr><td colspan="6" class="empty">Chưa có dữ liệu Storelist MT</td></tr>')+
+      '<tr class="sn-total"><td></td><td>TỔNG MT</td><td class="num">'+n(mt.stores)+'</td><td class="num">'+n(mt.active)+'</td><td class="num">'+n(mt.stores-mt.active)+'</td><td>'+bar(mt.active,mt.stores)+'</td></tr>'+
+      '</tbody></table></div></div>';
+    if(mt.outside) h+='<div class="sn-note">ℹ️ '+mt.outside+' điểm MT được survey nhưng không khớp tên trong Storelist (không tính vào active).</div>';
+
+    // GT
+    h+='<div class="sec">GT — General Trade theo vùng</div>';
+    h+='<div class="tbl-card"><h3>Tổng hợp theo vùng</h3><div style="overflow-x:auto"><table><thead><tr><th>Vùng</th><th>Tỉnh/TP</th><th class="num">Chợ</th><th class="num">Chợ active</th><th class="num">Điểm bán</th><th class="num">Điểm active</th><th>% phủ</th><th class="num">🏆 Mở mới YTD</th></tr></thead><tbody>'+
+      gt.regions.map(function(o){
+        return '<tr><td>'+teamPillSafe(o.region)+' '+e(o.region)+'</td><td>'+o.cities.map(function(c){return '<span class="sn-city">'+e(c)+'</span>';}).join('')+'</td>'+
+          '<td class="num">'+n(o.markets)+'</td><td class="num">'+n(o.mActive)+'</td><td class="num">'+n(o.stores)+'</td><td class="num">'+n(o.active)+'</td>'+
+          '<td>'+bar(o.active,o.stores)+'</td><td class="num" style="color:#4caf82;font-weight:700">'+(o.openYTD||'—')+'</td></tr>';
+      }).join('')+
+      '<tr class="sn-total"><td>TỔNG GT</td><td>'+cities.length+' tỉnh/TP</td><td class="num">'+n(gt.markets)+'</td><td class="num">'+n(gt.mActive)+'</td><td class="num">'+n(gt.stores)+'</td><td class="num">'+n(gt.active)+'</td><td>'+bar(gt.active,gt.stores)+'</td><td class="num" style="color:#4caf82">'+n(gt.openYTD)+'</td></tr>'+
+      '</tbody></table></div></div>';
+    if(gt.outside) h+='<div class="sn-note">ℹ️ '+gt.outside+' điểm GT được survey nhưng không có trong Storelist (nhập thủ công) — không tính vào active.</div>';
+
+    // chi tiết chợ từng vùng
+    gt.regions.forEach(function(o){
+      if(!o.rows.length) return;
+      h+='<details class="sn-det"><summary><span>'+e(o.region)+' — chi tiết '+o.markets+' chợ</span><small>'+n(o.active)+'/'+n(o.stores)+' điểm active · '+o.mActive+'/'+o.markets+' chợ active</small></summary>'+
+        '<div style="overflow-x:auto"><table><thead><tr><th>#</th><th>Chợ</th><th class="num">Điểm bán</th><th class="num">Active</th><th>% phủ</th></tr></thead><tbody>'+
+        o.rows.map(function(x,i){ return '<tr><td class="rank">'+(i+1)+'</td><td>'+e(x.market)+'</td><td class="num">'+n(x.stores)+'</td><td class="num">'+(x.active||'—')+'</td><td>'+bar(x.active,x.stores)+'</td></tr>'; }).join('')+
+        '</tbody></table></div></details>';
+    });
+
+    body.innerHTML=h;
+  }
+  function teamPillSafe(r){ try{ return teamPill(r); }catch(x){ return ''; } }
+
+  S.setPeriod=function(v){ S.period=v||'3m'; render(); };
+  S.load=function(force){
+    var body=document.getElementById('snBody');
+    if(typeof RAW==='undefined'||!RAW){ if(body) body.innerHTML='<div class="empty">Đang tải dữ liệu chính, thử lại sau vài giây…</div>'; return; }
+    if(S.loaded&&!force){ render(); return; }
+    if(body) body.innerHTML='<div class="empty">Đang tải danh sách điểm bán…</div>';
+    fetch(SCRIPT_URL+'?action=getStores&_t='+Date.now())
+      .then(function(r){return r.json();})
+      .then(function(j){
+        if(!j||j.status!=='ok') throw new Error((j&&j.error)||'getStores lỗi');
+        S.stores=j; S.loaded=true; render();
+      })
+      .catch(function(err){ if(body) body.innerHTML='<div class="empty">Không tải được Storelist: '+e(err.message||err)+' <button class="btn-sm" onclick="StoreNet.load(true)">Thử lại</button></div>'; });
+  };
+})();
+</script>
+<!-- ===================== /🏪 MẠNG LƯỚI ĐIỂM BÁN MODULE ===================== -->
+
 </body>
 </html>
