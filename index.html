@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>DGM Sales Survey v4.5</title>
+<title>DGM Sales Survey v4.6</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -2869,6 +2869,10 @@ function confirmFraudSubmit() {
 .dspm-seg button.on-n{background:#ffebee;border-color:#c62828;color:#c62828}
 .dspm-toggle{display:flex;align-items:center;gap:10px;padding:11px;border:1.5px solid #ddd;border-radius:10px;background:#fff;font-size:14px;font-weight:600}
 .dspm-toggle input{width:20px;height:20px}
+/* ★ Báo cáo nhanh MKT */
+.dspm-seg button.on-src{background:#f3e5f5;border-color:#6a1b9a;color:#6a1b9a}
+.dspm-req{color:#C8102E}
+.dspm-hint{font-size:12px;color:#888;margin-top:4px;line-height:1.4}
 </style>
 
 <script id="dspm-script">
@@ -2891,6 +2895,14 @@ function confirmFraudSubmit() {
   }
   function userRegion(){
     try{ var t=String((state.user&&state.user.team)||'').trim(); return t.indexOf('GT')===0 ? t : ''; }catch(e){ return ''; }
+  }
+  // ★ Loại chương trình: 'MKT' (báo cáo nhanh, không duyệt) | 'DISPLAY' (trưng bày)
+  function campMode(name){
+    var m=(DisplayMod._cfg&&DisplayMod._cfg.campaign_modes)||{};
+    var v=String(m[name]||'').toUpperCase();
+    if(v==='MKT'||v==='DISPLAY') return v;
+    var s=String(name||'').toLowerCase();
+    return (s.indexOf('biển hiệu')>=0||s.indexOf('bien hieu')>=0||s.indexOf('decal')>=0)?'MKT':'DISPLAY';
   }
   function regionData(region){
     try{
@@ -2923,6 +2935,15 @@ function confirmFraudSubmit() {
         c2.onclick=function(){ DisplayMod.openReport(); };
         c2.innerHTML='<div class="icon">📋</div><div class="title" style="color:#1565c0">Báo cáo Trưng bày</div><div class="desc">Báo cáo định kỳ điểm trưng bày</div>';
         host.appendChild(c2);
+      }
+      // ★ Thẻ BÁO CÁO NHANH MKT (Biển hiệu / Decal) — Sales Rep (leader) / Manager
+      if(canEnroll() && !host.querySelector('[data-dspm="mkt"]')){
+        var c3 = document.createElement('div');
+        c3.className='type-card'; c3.setAttribute('data-dspm','mkt');
+        c3.style.cssText='border-color:#6a1b9a;background:#faf5fc';
+        c3.onclick=function(){ DisplayMod.openMkt(); };
+        c3.innerHTML='<div class="icon">📸</div><div class="title" style="color:#6a1b9a">Báo cáo nhanh MKT</div><div class="desc">Biển hiệu · Decal xe — chụp ảnh là xong</div>';
+        host.appendChild(c3);
       }
     }catch(e){}
   };
@@ -2993,7 +3014,7 @@ function confirmFraudSubmit() {
     var h='';
     h+='<div class="dspm-card">';
     h+='<div class="dspm-label">Tên chương trình</div>';
-    var camps=(DisplayMod._cfg&&DisplayMod._cfg.campaigns)||[];
+    var camps=((DisplayMod._cfg&&DisplayMod._cfg.campaigns)||[]).filter(function(c){ return campMode(c)!=='MKT'; }); // ★ CT MKT đi luồng Báo cáo nhanh
     if(!camps.length) camps=['Trưng bày điểm bán 2026'];
     var isOtherCamp=!!(DisplayMod._campaign&&camps.indexOf(DisplayMod._campaign)<0);
     h+='<select class="dspm-select" id="dspmCampaignSel" onchange="DisplayMod.onCampaign(this.value)">'+
@@ -3409,6 +3430,175 @@ function confirmFraudSubmit() {
     }catch(err){}
   }
   setTimeout(resumePendingPhotos_, 6000);
+
+  // ══════ ★ BÁO CÁO NHANH MKT (Biển hiệu / Dán decal xe…) ══════
+  // 1 lần gửi = đăng ký + báo cáo. Không duyệt, không chấm điểm.
+  // Bắt buộc: chương trình + tên điểm + ≥1 ảnh. Còn lại tùy chọn.
+  // Điểm: chọn từ danh sách chợ (Storelist) HOẶC nhập thủ công (chỉ CT MKT).
+  var MKT_MAX_PHOTOS=10;
+  DisplayMod._mk=null; DisplayMod._mkDone=[];
+
+  function mkNorm(s){ return String(s||'').trim().toLowerCase().replace(/\s+/g,' '); }
+  function mkCamps(){ return ((DisplayMod._cfg&&DisplayMod._cfg.campaigns)||[]).filter(function(c){ return campMode(c)==='MKT'; }); }
+
+  DisplayMod.openMkt=function(){
+    ensureOverlay().classList.add('show');
+    $id('dspmOverlay').querySelector('.dspm-head h2').textContent='Báo cáo nhanh MKT';
+    var sv=$id('dspmSave'); sv.style.display='none';
+    $id('dspmBody').innerHTML='<div class="dspm-empty">Đang tải dữ liệu…</div>';
+    DisplayMod._photos={};
+    DisplayMod._mk={campaign:'',src:'list',market:'',outlet:'',name:'',address:'',qty:'',date:tnow(),notes:'',gps:''};
+    try{ if(state.gps) DisplayMod._mk.gps=state.gps.lat+','+state.gps.lng; }catch(e){}
+    try{ navigator.geolocation && navigator.geolocation.getCurrentPosition(function(p){ if(DisplayMod._mk) DisplayMod._mk.gps=p.coords.latitude.toFixed(6)+','+p.coords.longitude.toFixed(6); },function(){},{enableHighAccuracy:true,timeout:10000,maximumAge:60000}); }catch(e){}
+    loadData().then(function(){
+      var r=userRegion();
+      if(r){ DisplayMod._region=r; renderMkt(); }
+      else {
+        var regions=[['GT South','GT Miền Nam 🟢'],['GT Central','GT Miền Trung 🟡'],['GT North','GT Miền Bắc 🟣']];
+        $id('dspmBody').innerHTML='<div class="dspm-card"><div class="dspm-label">Chọn khu vực GT</div>'+
+          regions.map(function(x){return '<button class="dspm-rg" onclick="DisplayMod.pickRegionMkt(\''+x[0]+'\')">'+x[1]+'</button>';}).join('')+'</div>';
+      }
+    }).catch(function(){ $id('dspmBody').innerHTML='<div class="dspm-empty">Không tải được dữ liệu. Thử lại sau.</div>'; });
+  };
+  DisplayMod.pickRegionMkt=function(r){ DisplayMod._region=r; renderMkt(); };
+
+  // Tải các điểm MKT đã báo cáo trong vùng (để cảnh báo trùng — làm nền, lỗi thì bỏ qua)
+  function loadMkDone(){
+    DisplayMod._mkDone=[];
+    try{
+      fetch(state.scriptUrl+'?action=getDisplayEnrollments&status=done&region='+encodeURIComponent(DisplayMod._region)+'&_t='+Date.now(),{mode:'cors'})
+        .then(function(r){return r.json();})
+        .then(function(res){ DisplayMod._mkDone=(res&&res.ok&&res.enrollments)?res.enrollments:[]; })
+        .catch(function(){});
+    }catch(e){}
+  }
+
+  function renderMkt(){
+    var mk=DisplayMod._mk, camps=mkCamps();
+    loadMkDone();
+    if(!camps.length){
+      $id('dspmBody').innerHTML='<div class="dspm-empty">Chưa có chương trình MKT.<br>Thêm chương trình vào sheet <b>Campaign_Master</b>, cột <b>report_mode</b> ghi <b>MKT</b>, rồi mở lại app.</div>';
+      $id('dspmSave').style.display='none'; return;
+    }
+    if(!mk.campaign && camps.length===1) mk.campaign=camps[0];
+    var h='<div class="dspm-card">';
+    h+='<div class="dspm-label">Chương trình <span class="dspm-req">*</span></div>';
+    h+='<select class="dspm-select" onchange="DisplayMod._mk.campaign=this.value"><option value="">— Chọn chương trình —</option>'+
+       camps.map(function(c){return '<option value="'+esc(c)+'"'+(mk.campaign===c?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select>';
+    h+='<div class="dspm-label">Khu vực</div><input class="dspm-input" value="'+esc(DisplayMod._region)+'" disabled>';
+    h+='<div class="dspm-label">Địa điểm <span class="dspm-req">*</span></div>';
+    h+='<div class="dspm-seg" id="mkSrc">'+
+       '<button data-v="list" onclick="DisplayMod.mkSrc(\'list\')">📋 Danh sách chợ</button>'+
+       '<button data-v="manual" onclick="DisplayMod.mkSrc(\'manual\')">✍️ Nhập thủ công</button></div>';
+    h+='<div id="mkLoc" style="margin-top:8px"></div>';
+    h+='</div>';
+
+    h+='<div class="dspm-card">';
+    h+='<div class="dspm-label">Ảnh <span class="dspm-req">* ít nhất 1 ảnh</span> <span class="dspm-pill" id="mkPhCnt">0</span></div>';
+    h+='<div class="dspm-ph" id="dspmExtraWrap">'+photoSlot('extra_'+Date.now(),'+ Thêm ảnh',true)+'</div>';
+    h+='<div class="dspm-hint">Tối đa '+MKT_MAX_PHOTOS+' ảnh. Nên có 1 ảnh toàn cảnh + 1 ảnh cận.</div>';
+    h+='</div>';
+
+    h+='<div class="dspm-card">';
+    h+='<div class="dspm-row"><div><div class="dspm-label">Ngày thực hiện</div><input class="dspm-input" type="date" value="'+esc(mk.date)+'" onchange="DisplayMod._mk.date=this.value"></div>'+
+       '<div><div class="dspm-label">Số lượng</div><input class="dspm-input" type="number" min="0" placeholder="VD: 1" value="'+esc(mk.qty)+'" oninput="DisplayMod._mk.qty=this.value"></div></div>';
+    h+='<div class="dspm-label">Ghi chú</div><textarea class="dspm-input" rows="2" placeholder="VD: biển số xe, kích thước biển, vị trí…" oninput="DisplayMod._mk.notes=this.value">'+esc(mk.notes)+'</textarea>';
+    h+='</div>';
+
+    $id('dspmBody').innerHTML=h;
+    var sv=$id('dspmSave'); sv.style.display=''; sv.disabled=false; sv.textContent='Gửi báo cáo'; sv.setAttribute('onclick','DisplayMod.submitMkt()');
+    DisplayMod.mkSrc(mk.src);
+  }
+
+  DisplayMod.mkSrc=function(src){
+    var mk=DisplayMod._mk; if(!mk) return;
+    mk.src=(src==='manual')?'manual':'list';
+    var seg=$id('mkSrc');
+    if(seg) seg.querySelectorAll('button').forEach(function(b){ b.className=(b.getAttribute('data-v')===mk.src)?'on-src':''; });
+    renderMkLoc();
+  };
+
+  function renderMkLoc(){
+    var mk=DisplayMod._mk, box=$id('mkLoc'); if(!box||!mk) return;
+    if(mk.src==='manual'){
+      box.innerHTML=
+        '<div class="dspm-label">Tên điểm / tên khách <span class="dspm-req">*</span></div>'+
+        '<input class="dspm-input" placeholder="VD: Đại lý Tâm Phát, xe tải anh Hùng…" value="'+esc(mk.name)+'" oninput="DisplayMod._mk.name=this.value">'+
+        '<div class="dspm-label">Địa chỉ / khu vực</div>'+
+        '<input class="dspm-input" placeholder="Số nhà, đường, phường/xã… (không bắt buộc)" value="'+esc(mk.address)+'" oninput="DisplayMod._mk.address=this.value">'+
+        '<div class="dspm-hint">Điểm nhập tay chỉ dùng để thống kê chương trình, không thêm vào danh sách điểm bán.</div>';
+      return;
+    }
+    var rd=regionData(DisplayMod._region), markets=Object.keys(rd).sort();
+    var h='<div class="dspm-label">Chọn chợ</div><select class="dspm-select" onchange="DisplayMod.mkMarket(this.value)"><option value="">— Chọn chợ —</option>'+
+      markets.map(function(m){return '<option value="'+esc(m)+'"'+(mk.market===m?' selected':'')+'>'+esc(m)+'</option>';}).join('')+'</select>';
+    if(mk.market){
+      var outlets=(rd[mk.market]||[]).slice().sort();
+      h+='<div class="dspm-label">Chọn điểm bán</div>';
+      h+=outlets.length?('<select class="dspm-select" onchange="DisplayMod._mk.outlet=this.value"><option value="">— Chọn điểm bán —</option>'+
+        outlets.map(function(o){return '<option value="'+esc(o)+'"'+(mk.outlet===o?' selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>')
+        :'<div class="dspm-empty">Chợ này chưa có điểm bán.</div>';
+    }
+    h+='<div class="dspm-hint">Không tìm thấy điểm? Chọn <b>✍️ Nhập thủ công</b>.</div>';
+    box.innerHTML=h;
+  }
+  DisplayMod.mkMarket=function(m){ DisplayMod._mk.market=m; DisplayMod._mk.outlet=''; renderMkLoc(); };
+
+  // đếm ảnh (cập nhật nhãn) — chạy nhẹ mỗi 700ms khi form MKT đang mở
+  setInterval(function(){
+    try{ var c=$id('mkPhCnt'); if(c&&DisplayMod._mk) c.textContent=Object.keys(DisplayMod._photos||{}).length; }catch(e){}
+  },700);
+
+  DisplayMod.submitMkt=function(){
+    var mk=DisplayMod._mk; if(!mk) return;
+    var camp=String(mk.campaign||'').trim();
+    if(!camp){ tt('⚠️ Chọn chương trình'); return; }
+    var name, market='', src;
+    if(mk.src==='manual'){
+      name=String(mk.name||'').trim(); src='MANUAL'; market='Ngoài danh sách';
+      if(!name){ tt('⚠️ Nhập tên điểm / tên khách'); return; }
+    } else {
+      name=String(mk.outlet||'').trim(); src='STORELIST'; market=mk.market||'';
+      if(!market){ tt('⚠️ Chọn chợ (hoặc chuyển sang Nhập thủ công)'); return; }
+      if(!name){ tt('⚠️ Chọn điểm bán'); return; }
+    }
+    var keys=Object.keys(DisplayMod._photos||{});
+    if(!keys.length){ tt('⚠️ Cần ít nhất 1 ảnh'); return; }
+    if(keys.length>MKT_MAX_PHOTOS){ tt('⚠️ Tối đa '+MKT_MAX_PHOTOS+' ảnh — xoá bớt '+(keys.length-MKT_MAX_PHOTOS)+' ảnh'); return; }
+
+    // cảnh báo trùng: cùng chương trình + cùng điểm đã báo cáo
+    var dup=(DisplayMod._mkDone||[]).filter(function(e){ return mkNorm(e.campaign_name)===mkNorm(camp) && mkNorm(e.outlet_name)===mkNorm(name); })[0];
+    if(dup && !confirm('Điểm "'+name+'" đã có báo cáo "'+camp+'" ngày '+(dup.date_start||dup.created_at||'?')+' (bởi '+(dup.sales_rep||'?')+').\nVẫn gửi thêm báo cáo?')) return;
+
+    // ảnh: 4 ảnh đầu → photo_1..4, còn lại → ảnh bổ sung
+    var photos={}, ex=0;
+    keys.forEach(function(k,i){ if(i<4) photos['photo_'+(i+1)]=DisplayMod._photos[k]; else photos['extra_'+(++ex)+'_'+Date.now()]=DisplayMod._photos[k]; });
+
+    var who=(state.user&&state.user.name)||'';
+    var rdate=mk.date||tnow();
+    var reportId='RPT-'+rdate.replace(/-/g,'')+'-'+Date.now().toString().slice(-6);
+    var payload={type:'MKT_QUICK_REPORT', report_id:reportId, campaign_name:camp, region:DisplayMod._region,
+      salesman:who, sales_rep:who, market:market, outlet_name:name, outlet_source:src,
+      address:(src==='MANUAL'?String(mk.address||'').trim():''), qty:mk.qty||'', report_date:rdate,
+      notes:String(mk.notes||'').trim(), gps:mk.gps||''};
+
+    var btn=$id('dspmSave'); btn.disabled=true; btn.textContent='Đang gửi…';
+    var b64=btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    fetch(state.scriptUrl+'?data='+encodeURIComponent(b64)+'&_t='+Date.now(),{mode:'cors'})
+      .then(function(r){return r.json();})
+      .then(function(res){
+        if(res&&res.ok){
+          DisplayMod.close();
+          DisplayMod._mk=null; DisplayMod._photos={};
+          uploadReportPhotosBg({report_id:res.report_id||reportId}, photos, payload);
+          tt('✅ Đã gửi báo cáo "'+name+'". Ảnh đang tải lên — giữ app mở nhé.');
+        } else {
+          btn.disabled=false; btn.textContent='Gửi báo cáo';
+          tt('⚠️ Gửi lỗi'+(res&&res.error?(': '+res.error):'')+'. Thử lại.');
+        }
+      })
+      .catch(function(){ btn.disabled=false; btn.textContent='Gửi báo cáo'; tt('⚠️ Mất mạng — chưa gửi được. Bấm Gửi lại khi có sóng.'); });
+  };
 
   DisplayMod.close=function(){ var ov=$id('dspmOverlay'); if(ov) ov.classList.remove('show'); };
 })();

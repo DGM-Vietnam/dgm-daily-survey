@@ -707,6 +707,18 @@ tr:hover td{background:rgba(255,255,255,.025);}
       <select id="dspFilterEval" onchange="renderDisplayReports()"><option value="">Tất cả trạng thái</option><option>Chưa chấm</option><option>Đạt</option><option>Không đạt</option></select>
     </div>
     <div id="dspReports"></div>
+    <!-- ★ CHƯƠNG TRÌNH MKT (Biển hiệu / Decal…) — báo cáo nhanh, không chấm điểm -->
+    <div class="sec" style="margin-top:28px">📸 Chương trình MKT — Biển hiệu / Decal <span id="mktCount"></span></div>
+    <div class="dsp-flt">
+      <select id="mktFCamp" onchange="renderMkt()"><option value="">Tất cả chương trình</option></select>
+      <select id="mktFRegion" onchange="renderMkt()"><option value="">Tất cả vùng</option><option>GT South</option><option>GT Central</option><option>GT North</option></select>
+      <select id="mktFSrc" onchange="renderMkt()"><option value="">Mọi nguồn điểm</option><option value="STORELIST">Trong danh sách</option><option value="MANUAL">Nhập thủ công</option></select>
+    </div>
+    <div class="tbl-card">
+      <table><thead><tr><th>Chương trình</th><th>Vùng</th><th class="num">Số điểm</th><th class="num">Trong DS</th><th class="num">Nhập tay</th><th class="num">Số lượng</th><th class="num">Người thực hiện</th><th>Gần nhất</th></tr></thead>
+      <tbody id="mktSummary"><tr><td colspan="8" style="text-align:center;color:#888">Đang tải…</td></tr></tbody></table>
+    </div>
+    <div id="mktList"></div>
   </div>
   <!-- TAB TẶNG QUÀ (ĐỢT 2 — manager + trade) -->
   <div class="tab-content" id="tab-gift">
@@ -1925,8 +1937,12 @@ async function loadDisplay(force){
     ]);
     DISP_ENR=(r[0]&&r[0].ok&&r[0].enrollments)?r[0].enrollments:[];
     DISP_RPT=(r[1]&&r[1].ok&&r[1].reports)?r[1].reports:[];
+    // ★ Tách chương trình MKT (báo cáo nhanh, không chấm điểm) khỏi số liệu trưng bày
+    MKT_ENR=DISP_ENR.filter(isMktRec); MKT_RPT=DISP_RPT.filter(isMktRec);
+    DISP_ENR=DISP_ENR.filter(function(x){return !isMktRec(x);}); DISP_RPT=DISP_RPT.filter(function(x){return !isMktRec(x);});
     DISP_LOADED=true;
     renderDisplaySummary(); renderDisplayCoverage(); renderDisplayReports();
+    try{ renderMkt(); }catch(e){ console.warn('renderMkt',e); }
   }catch(e){ if(sum) sum.innerHTML='<tr><td colspan="10" style="text-align:center;color:#c00">Lỗi tải dữ liệu</td></tr>'; }
 }
 
@@ -2063,6 +2079,84 @@ function dspReportCard(rp, full){
     (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
     '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+
     '<div class="dsp-cms">'+cms+'</div>'+ctrl+'</div>';
+}
+
+// ══════════════════════════════════════════════════════════
+// ★ CHƯƠNG TRÌNH MKT (Biển hiệu / Decal…) — chỉ thống kê, không chấm
+// ══════════════════════════════════════════════════════════
+let MKT_ENR=[], MKT_RPT=[], MKT_SHOW=40;
+function isMktRec(x){ return String((x&&x.report_mode)||'').toUpperCase()==='MKT'; }
+function mktEnr(id){ for(var i=0;i<MKT_ENR.length;i++){ if(MKT_ENR[i].enroll_id===id) return MKT_ENR[i]; } return null; }
+function mktPhotoIds(rp){
+  var ids=[rp.photo_1_id,rp.photo_2_id,rp.photo_3_id,rp.photo_4_id].filter(Boolean);
+  var ex=rp.photo_extra_arr; if(!Array.isArray(ex)){ try{ ex=JSON.parse(rp.photo_extra_ids||'[]'); }catch(e){ ex=[]; } }
+  if(Array.isArray(ex)) ids=ids.concat(ex.filter(Boolean));
+  return ids;
+}
+function mktRows(){
+  var fc=(document.getElementById('mktFCamp')||{}).value||'';
+  var fr=(document.getElementById('mktFRegion')||{}).value||'';
+  var fs=(document.getElementById('mktFSrc')||{}).value||'';
+  return MKT_RPT.map(function(rp){
+    var e=mktEnr(rp.enroll_id)||{};
+    return { rp:rp, camp:rp.campaign_name||e.campaign_name||'(không tên CT)', region:rp.region||e.region||'',
+      outlet:rp.outlet_name||e.outlet_name||'', market:e.market||'', address:e.address||'',
+      src:(String(e.outlet_source||'').toUpperCase()==='STORELIST')?'STORELIST':'MANUAL',
+      qty:parseFloat(e.frame_qty)||0, who:rp.salesman||e.sales_rep||'', date:rp.report_date||String(rp.timestamp||'').slice(0,10),
+      ts:String(rp.timestamp||rp.report_date||''), notes:rp.notes||e.note||'' };
+  }).filter(function(x){
+    if(fc && x.camp!==fc) return false;
+    if(fr && x.region!==fr) return false;
+    if(fs && x.src!==fs) return false;
+    return true;
+  });
+}
+function renderMkt(){
+  // dropdown chương trình
+  var sel=document.getElementById('mktFCamp');
+  if(sel){
+    var cur=sel.value, camps={};
+    MKT_RPT.forEach(function(rp){ if(rp.campaign_name) camps[rp.campaign_name]=1; });
+    sel.innerHTML='<option value="">Tất cả chương trình</option>'+Object.keys(camps).sort().map(function(c){return '<option'+(c===cur?' selected':'')+'>'+dspEsc(c)+'</option>';}).join('');
+  }
+  var rows=mktRows();
+  var cnt=document.getElementById('mktCount'); if(cnt) cnt.textContent='('+rows.length+' báo cáo)';
+
+  // bảng tổng hợp: chương trình × vùng (số điểm = điểm khác nhau)
+  var g={}, order=[];
+  rows.forEach(function(x){
+    var k=x.camp+'||'+x.region;
+    if(!g[k]){ g[k]={camp:x.camp,region:x.region,pts:{},list:{},man:{},qty:0,who:{},last:''}; order.push(k); }
+    var o=g[k], pk=(x.market+'|'+x.outlet).toLowerCase().trim();
+    o.pts[pk]=1; if(x.src==='MANUAL') o.man[pk]=1; else o.list[pk]=1;
+    o.qty+=x.qty; if(x.who) o.who[x.who]=1; if(x.date>o.last) o.last=x.date;
+  });
+  order.sort(function(a,b){ return g[a].camp.localeCompare(g[b].camp)||g[a].region.localeCompare(g[b].region); });
+  var tot={pts:0,list:0,man:0,qty:0,who:{}};
+  var html=order.map(function(k){
+    var o=g[k], np=Object.keys(o.pts).length, nl=Object.keys(o.list).length, nm=Object.keys(o.man).length;
+    tot.pts+=np; tot.list+=nl; tot.man+=nm; tot.qty+=o.qty; Object.keys(o.who).forEach(function(w){tot.who[w]=1;});
+    return '<tr><td>'+dspEsc(o.camp)+'</td><td>'+dspEsc(o.region)+'</td><td class="num"><b>'+np+'</b></td><td class="num">'+nl+'</td><td class="num">'+nm+'</td><td class="num">'+(o.qty||'—')+'</td><td class="num">'+Object.keys(o.who).length+'</td><td>'+dspEsc(o.last)+'</td></tr>';
+  }).join('');
+  if(order.length>1) html+='<tr style="font-weight:700;background:rgba(255,255,255,.08)"><td>Tổng</td><td></td><td class="num">'+tot.pts+'</td><td class="num">'+tot.list+'</td><td class="num">'+tot.man+'</td><td class="num">'+(tot.qty||'—')+'</td><td class="num">'+Object.keys(tot.who).length+'</td><td></td></tr>';
+  var sum=document.getElementById('mktSummary');
+  if(sum) sum.innerHTML=order.length?html:'<tr><td colspan="8" style="text-align:center;color:#888">Chưa có báo cáo chương trình MKT</td></tr>';
+
+  // danh sách báo cáo (mới nhất trước) kèm ảnh
+  rows.sort(function(a,b){ return b.ts.localeCompare(a.ts); });
+  var box=document.getElementById('mktList'); if(!box) return;
+  var shown=rows.slice(0,MKT_SHOW);
+  box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">'+shown.map(function(x){
+    var ids=mktPhotoIds(x.rp);
+    var ph=ids.map(function(id){ return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img src="'+dspThumb(id)+'" data-id="'+id+'" data-try="0" onerror="dspImgFallback(this)"></a>'; }).join('');
+    var tag=x.src==='MANUAL'?'<span class="dsp-b" style="background:#f3e5f5;color:#6a1b9a">Nhập tay</span>':'<span class="dsp-b" style="background:#e3f2fd;color:#1565c0">Trong DS</span>';
+    var where=x.src==='MANUAL'?(x.address||'—'):(x.market||'');
+    return '<div class="dsp-card" style="margin:0"><div><b>'+dspEsc(x.outlet)+'</b> '+tag+'<br><small style="color:#777">'+dspEsc(where)+'</small><br>'+
+      '<small style="color:#555">'+dspEsc(x.camp)+' · '+dspEsc(x.region)+' · '+dspEsc(x.who)+' · '+dspEsc(x.date)+(x.qty?(' · SL '+x.qty):'')+'</small></div>'+
+      (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
+      (x.notes?'<div style="font-size:12px;color:#555">📝 '+dspEsc(x.notes)+'</div>':'')+'</div>';
+  }).join('')+'</div>'+
+  (rows.length>MKT_SHOW?'<div style="text-align:center;margin:12px 0"><button onclick="MKT_SHOW+=40;renderMkt()" style="padding:8px 16px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer">Xem thêm ('+(rows.length-MKT_SHOW)+')</button></div>':'');
 }
 
 async function doEval(reportId, result){
