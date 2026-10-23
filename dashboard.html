@@ -1937,7 +1937,15 @@ function dspImgFallback(img){
   if(t===0){ img.setAttribute('data-try','1'); img.src='https://lh3.googleusercontent.com/d/'+id+'=w300'; }
   else { img.onerror=null; img.style.opacity=.3; img.style.background='#eee'; img.alt='Ảnh — mở trên Drive'; img.title='Bấm để xem trên Drive'; }
 }
-function dspEnrById(id){ for(var i=0;i<DISP_ENR.length;i++){ if(DISP_ENR[i].enroll_id===id) return DISP_ENR[i]; } return null; }
+// ★ Tra enrollment theo enroll_id (có index, nhanh với vài trăm báo cáo)
+var DSP_ENR_IDX=null, DSP_ENR_SRC=null;
+function dspEnrById(id){
+  if(DSP_ENR_SRC!==DISP_ENR){ DSP_ENR_IDX={}; DISP_ENR.forEach(function(e){ DSP_ENR_IDX[String(e.enroll_id||'').trim()]=e; }); DSP_ENR_SRC=DISP_ENR; }
+  return DSP_ENR_IDX[String(id||'').trim()]||null;
+}
+// ★ Tên chương trình CHUẨN = lấy từ Display_Enrollments (nơi Quy sửa tên trên Google Sheet).
+//   Display_Reports chỉ là bản chép lúc gửi báo cáo → chỉ dùng khi không tìm thấy enrollment.
+function dspCampName(rp){ var e=dspEnrById(rp&&rp.enroll_id); return String((e&&e.campaign_name)||(rp&&rp.campaign_name)||'').trim(); }
 function dspSkuStr(v){ try{ var a=(typeof v==='string')?JSON.parse(v):v; if(Array.isArray(a)) return a.map(function(s){return dspEsc(s.product||s.sku||'?')+'×'+(s.facing!=null?s.facing:s.qty);}).join(', '); if(a&&typeof a==='object') return Object.keys(a).map(function(k){return dspEsc(k)+'×'+a[k];}).join(', '); }catch(e){} return '—'; }
 
 async function loadDisplay(force){
@@ -2031,7 +2039,7 @@ function renderDisplayReports(){
   // ── Nhóm theo enroll_id (cùng điểm bán + cùng chương trình) ──
   var groups={}, order=[];
   list.forEach(function(rp){
-    var k=rp.enroll_id||('__'+rp.report_id);
+    var k=String(rp.enroll_id||'').trim()||('__'+rp.report_id);
     if(!groups[k]){ groups[k]={key:k,reports:[],last:''}; order.push(k); }
     groups[k].reports.push(rp);
     var t=dspRptTime(rp);
@@ -2041,7 +2049,7 @@ function renderDisplayReports(){
   var camps={}, corder=[];
   order.forEach(function(k){
     var g=groups[k], r0=g.reports[0], enr=dspEnrById(r0.enroll_id);
-    var camp=r0.campaign_name||(enr?enr.campaign_name:'')||'(Không tên chương trình)';
+    var camp=dspCampName(r0)||'(Không tên chương trình)';
     if(!camps[camp]){ camps[camp]={name:camp,keys:[],last:'',nRpt:0,pend:0}; corder.push(camp); }
     var c=camps[camp]; c.keys.push(k); c.nRpt+=g.reports.length;
     g.reports.forEach(function(rp){ if(!rp.eval_result) c.pend++; });
@@ -2116,7 +2124,7 @@ function dspReportCard(rp, full){
     else { ctrl='<div style="margin-top:8px;border-top:1px dashed #e0e0e0;padding-top:6px"><div style="font-size:12px;color:#888">Đã chấm bởi <b>'+dspEsc(rp.eval_by||'')+'</b> · '+dspEsc(rp.eval_at||'')+' <button onclick="dspEditEval(\''+rp.report_id+'\')" style="margin-left:8px;background:#eef;border:1px solid #ccd;border-radius:5px;padding:2px 8px;cursor:pointer;font-size:12px">✎ Sửa đánh giá</button></div><div id="edit_'+rp.report_id+'"></div></div>'; }
   }
   return '<div class="dsp-card">'+
-    '<div class="dsp-h"><div><span class="dsp-seqbadge">Lần '+dspEsc(rp.report_seq||'?')+'</span><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+framesInfo+(rp.campaign_name?(' · '+dspEsc(rp.campaign_name)):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
+    '<div class="dsp-h"><div><span class="dsp-seqbadge">Lần '+dspEsc(rp.report_seq||'?')+'</span><b>'+dspEsc(rp.outlet_name)+'</b> '+badge+'<br><small>'+dspEsc(rp.region)+' · '+dspEsc(rp.salesman)+' · '+dspEsc(rp.report_date)+' · lần '+dspEsc(rp.report_seq)+framesInfo+(dspCampName(rp)?(' · '+dspEsc(dspCampName(rp))):'')+(rp.is_final==='TRUE'?' · <b style="color:#c62828">KẾT THÚC</b>':'')+'</small></div>'+
     scoreHtml+'</div>'+
     (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
     '<div class="dsp-sku"><span>Cam kết:</span> '+dspSkuStr(enr?enr.sku_committed:'')+'<br><span>Thực tế:</span> '+dspSkuStr(rp.sku_actual)+'</div>'+
@@ -2128,7 +2136,7 @@ function dspReportCard(rp, full){
 // ══════════════════════════════════════════════════════════
 let MKT_ENR=[], MKT_RPT=[], MKT_SHOW_BY={};
 function isMktRec(x){ return String((x&&x.report_mode)||'').toUpperCase()==='MKT'; }
-function mktEnr(id){ for(var i=0;i<MKT_ENR.length;i++){ if(MKT_ENR[i].enroll_id===id) return MKT_ENR[i]; } return null; }
+function mktEnr(id){ id=String(id||'').trim(); for(var i=0;i<MKT_ENR.length;i++){ if(String(MKT_ENR[i].enroll_id||'').trim()===id) return MKT_ENR[i]; } return null; }
 function mktPhotoIds(rp){
   var ids=[rp.photo_1_id,rp.photo_2_id,rp.photo_3_id,rp.photo_4_id].filter(Boolean);
   var ex=rp.photo_extra_arr; if(!Array.isArray(ex)){ try{ ex=JSON.parse(rp.photo_extra_ids||'[]'); }catch(e){ ex=[]; } }
@@ -2141,7 +2149,7 @@ function mktRows(){
   var fs=(document.getElementById('mktFSrc')||{}).value||'';
   return MKT_RPT.map(function(rp){
     var e=mktEnr(rp.enroll_id)||{};
-    return { rp:rp, camp:rp.campaign_name||e.campaign_name||'(không tên CT)', region:rp.region||e.region||'',
+    return { rp:rp, camp:String(e.campaign_name||rp.campaign_name||'').trim()||'(không tên CT)', region:rp.region||e.region||'',
       outlet:rp.outlet_name||e.outlet_name||'', market:e.market||'', address:e.address||'',
       src:(String(e.outlet_source||'').toUpperCase()==='STORELIST')?'STORELIST':'MANUAL',
       qty:parseFloat(e.frame_qty)||0, who:rp.salesman||e.sales_rep||'', date:rp.report_date||String(rp.timestamp||'').slice(0,10),
@@ -2158,7 +2166,7 @@ function renderMkt(){
   var sel=document.getElementById('mktFCamp');
   if(sel){
     var cur=sel.value, camps={};
-    MKT_RPT.forEach(function(rp){ if(rp.campaign_name) camps[rp.campaign_name]=1; });
+    MKT_RPT.forEach(function(rp){ var e=mktEnr(rp.enroll_id)||{}; var c=String(e.campaign_name||rp.campaign_name||'').trim(); if(c) camps[c]=1; });
     sel.innerHTML='<option value="">Tất cả chương trình</option>'+Object.keys(camps).sort().map(function(c){return '<option'+(c===cur?' selected':'')+'>'+dspEsc(c)+'</option>';}).join('');
   }
   var rows=mktRows();
