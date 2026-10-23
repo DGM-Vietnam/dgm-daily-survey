@@ -659,6 +659,20 @@ tr:hover td{background:rgba(255,255,255,.025);}
   .dsp-group-h b{font-size:15px;color:#1a1a1a}
   .dsp-group-h small{color:#777}
   .dsp-scrollhint{font-size:11px;color:#8a90a5;white-space:nowrap}
+  /* ★ Nhóm theo chương trình — bấm mũi tên mở/thu */
+  .cg{border:1px solid var(--border);border-radius:10px;margin-bottom:12px;background:var(--card);overflow:hidden}
+  .cg-h{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none}
+  .cg-h:hover{background:rgba(255,255,255,.04)}
+  .cg-arrow{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--white);font-size:12px;transition:transform .2s;flex-shrink:0}
+  .cg.open .cg-arrow{transform:rotate(90deg)}
+  .cg-t{flex:1;min-width:0}
+  .cg-t b{font-size:14px;color:var(--white)}
+  .cg-t small{display:block;font-family:var(--mono);font-size:11px;color:var(--gray2);margin-top:2px}
+  .cg-pend{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:10px;background:rgba(245,158,66,.15);color:var(--orange);white-space:nowrap}
+  .cg-b{display:none;padding:4px 12px 12px}
+  .cg.open .cg-b{display:block}
+  .cg-tools{display:flex;gap:8px;margin:0 0 10px}
+  .cg-tools button{padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--gray2);cursor:pointer;font-size:12px}
   .dsp-hscroll{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
   .dsp-hscroll>.dsp-card{flex:0 0 min(380px,86vw);max-width:min(380px,86vw);margin-bottom:0;scroll-snap-align:start;display:flex;flex-direction:column}
   .dsp-hscroll::-webkit-scrollbar{height:8px}
@@ -1992,6 +2006,14 @@ function renderDisplayCoverage(){
   var el=document.getElementById('dspCoverage'); if(el) el.innerHTML=arr.length?rows:'<tr><td colspan="6" style="text-align:center;color:#888">Chưa có báo cáo</td></tr>';
 }
 
+// ★ Thời điểm báo cáo (để sắp xếp mới nhất lên đầu)
+function dspRptTime(rp){ return String(rp.timestamp||rp.report_date||''); }
+function dspRptDate(rp){ return String(rp.report_date||rp.timestamp||'').slice(0,10); }
+// ★ Ghi nhớ nhóm chương trình đang mở/thu (giữ nguyên khi lọc / chấm điểm / làm mới)
+var CG_STATE={};
+function cgIsOpen(ns,name,def){ var k=ns+'||'+name; return (k in CG_STATE)?CG_STATE[k]:!!def; }
+function cgToggle(h){ var el=h.parentNode; var on=!el.classList.contains('open'); el.classList.toggle('open',on); CG_STATE[el.getAttribute('data-cg')+'||'+el.getAttribute('data-name')]=on; }
+function cgAll(ns,on){ document.querySelectorAll('.cg[data-cg="'+ns+'"]').forEach(function(el){ el.classList.toggle('open',on); CG_STATE[ns+'||'+el.getAttribute('data-name')]=on; }); }
 function renderDisplayReports(){
   var fr=(document.getElementById('dspFilterRegion')||{}).value||'';
   var fe=(document.getElementById('dspFilterEval')||{}).value||'';
@@ -2012,26 +2034,46 @@ function renderDisplayReports(){
     var k=rp.enroll_id||('__'+rp.report_id);
     if(!groups[k]){ groups[k]={key:k,reports:[],last:''}; order.push(k); }
     groups[k].reports.push(rp);
-    var t=String(rp.timestamp||rp.report_date||'');
+    var t=dspRptTime(rp);
     if(t>groups[k].last) groups[k].last=t;
   });
-  // Nhóm mới nhất lên đầu; trong nhóm: lần 1 → 2 → 3... (trái → phải)
-  order.sort(function(a,b){ return groups[b].last.localeCompare(groups[a].last); });
-  var html=order.map(function(k){
-    var g=groups[k];
-    g.reports.sort(function(a,b){
-      var sa=parseInt(a.report_seq,10)||0, sb=parseInt(b.report_seq,10)||0;
-      if(sa!==sb) return sa-sb;
-      return String(a.timestamp||'').localeCompare(String(b.timestamp||''));
-    });
-    var r0=g.reports[0], enr=dspEnrById(r0.enroll_id);
-    var camp=r0.campaign_name||(enr?enr.campaign_name:'')||'';
-    var hint=g.reports.length>1?'<span class="dsp-scrollhint">⇄ Kéo ngang để so sánh '+g.reports.length+' lần báo cáo</span>':'';
-    var head='<div class="dsp-group-h"><div><b>'+dspEsc(r0.outlet_name)+'</b>'+
-      '<br><small>'+dspEsc(r0.region)+' · '+dspEsc(r0.salesman)+(camp?(' · '+dspEsc(camp)):'')+
-      (enr&&enr.frame_type?(' · '+dspEsc(enr.frame_type)):'')+' · '+g.reports.length+' lần báo cáo</small></div>'+hint+'</div>';
-    var cards=g.reports.map(function(rp){ return dspReportCard(rp,full); }).join('');
-    return '<div class="dsp-group">'+head+'<div class="dsp-hscroll">'+cards+'</div></div>';
+  // ★ Gom tiếp theo CHƯƠNG TRÌNH — chương trình có báo cáo mới nhất lên đầu
+  var camps={}, corder=[];
+  order.forEach(function(k){
+    var g=groups[k], r0=g.reports[0], enr=dspEnrById(r0.enroll_id);
+    var camp=r0.campaign_name||(enr?enr.campaign_name:'')||'(Không tên chương trình)';
+    if(!camps[camp]){ camps[camp]={name:camp,keys:[],last:'',nRpt:0,pend:0}; corder.push(camp); }
+    var c=camps[camp]; c.keys.push(k); c.nRpt+=g.reports.length;
+    g.reports.forEach(function(rp){ if(!rp.eval_result) c.pend++; });
+    if(g.last>c.last) c.last=g.last;
+  });
+  corder.sort(function(a,b){ return camps[b].last.localeCompare(camps[a].last); });
+  var html='<div class="cg-tools"><button onclick="cgAll(\'dsp\',true)">▾ Mở tất cả</button><button onclick="cgAll(\'dsp\',false)">▸ Thu gọn tất cả</button></div>';
+  html+=corder.map(function(cn,ci){
+    var c=camps[cn];
+    // trong chương trình: điểm có báo cáo mới nhất lên đầu
+    c.keys.sort(function(a,b){ return groups[b].last.localeCompare(groups[a].last); });
+    var body=c.keys.map(function(k){
+      var g=groups[k];
+      // trong 1 điểm: lần báo cáo MỚI NHẤT bên trái
+      g.reports.sort(function(a,b){
+        var t=dspRptTime(b).localeCompare(dspRptTime(a)); if(t) return t;
+        return (parseInt(b.report_seq,10)||0)-(parseInt(a.report_seq,10)||0);
+      });
+      var r0=g.reports[0], enr=dspEnrById(r0.enroll_id);
+      var hint=g.reports.length>1?'<span class="dsp-scrollhint">⇄ Mới nhất bên trái · kéo ngang xem '+g.reports.length+' lần</span>':'';
+      var head='<div class="dsp-group-h"><div><b>'+dspEsc(r0.outlet_name)+'</b>'+
+        '<br><small>'+dspEsc(r0.region)+' · '+dspEsc(r0.salesman)+
+        (enr&&enr.frame_type?(' · '+dspEsc(enr.frame_type)):'')+' · '+g.reports.length+' lần báo cáo · mới nhất '+dspEsc(dspRptDate(r0))+'</small></div>'+hint+'</div>';
+      var cards=g.reports.map(function(rp){ return dspReportCard(rp,full); }).join('');
+      return '<div class="dsp-group">'+head+'<div class="dsp-hscroll">'+cards+'</div></div>';
+    }).join('');
+    var isOpen=cgIsOpen('dsp',cn,ci===0);
+    return '<div class="cg'+(isOpen?' open':'')+'" data-cg="dsp" data-name="'+dspEsc(cn)+'">'+
+      '<div class="cg-h" onclick="cgToggle(this)"><span class="cg-arrow">▶</span>'+
+      '<div class="cg-t"><b>'+dspEsc(cn)+'</b><small>'+c.keys.length+' điểm · '+c.nRpt+' báo cáo · mới nhất '+dspEsc(String(c.last).slice(0,10))+'</small></div>'+
+      (c.pend?'<span class="cg-pend">'+c.pend+' chưa chấm</span>':'')+'</div>'+
+      '<div class="cg-b">'+body+'</div></div>';
   }).join('');
   box.innerHTML=html;
 }
@@ -2084,7 +2126,7 @@ function dspReportCard(rp, full){
 // ══════════════════════════════════════════════════════════
 // ★ CHƯƠNG TRÌNH MKT (Biển hiệu / Decal…) — chỉ thống kê, không chấm
 // ══════════════════════════════════════════════════════════
-let MKT_ENR=[], MKT_RPT=[], MKT_SHOW=40;
+let MKT_ENR=[], MKT_RPT=[], MKT_SHOW_BY={};
 function isMktRec(x){ return String((x&&x.report_mode)||'').toUpperCase()==='MKT'; }
 function mktEnr(id){ for(var i=0;i<MKT_ENR.length;i++){ if(MKT_ENR[i].enroll_id===id) return MKT_ENR[i]; } return null; }
 function mktPhotoIds(rp){
@@ -2142,21 +2184,34 @@ function renderMkt(){
   var sum=document.getElementById('mktSummary');
   if(sum) sum.innerHTML=order.length?html:'<tr><td colspan="8" style="text-align:center;color:#888">Chưa có báo cáo chương trình MKT</td></tr>';
 
-  // danh sách báo cáo (mới nhất trước) kèm ảnh
+  // danh sách báo cáo — gom theo chương trình, mới nhất lên đầu
   rows.sort(function(a,b){ return b.ts.localeCompare(a.ts); });
   var box=document.getElementById('mktList'); if(!box) return;
-  var shown=rows.slice(0,MKT_SHOW);
-  box.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">'+shown.map(function(x){
+  if(!rows.length){ box.innerHTML=''; return; }
+  var cmap={}, cord=[];
+  rows.forEach(function(x){ if(!cmap[x.camp]){ cmap[x.camp]=[]; cord.push(x.camp); } cmap[x.camp].push(x); }); // rows đã sort → cord theo CT mới nhất
+  function card(x){
     var ids=mktPhotoIds(x.rp);
     var ph=ids.map(function(id){ return '<a href="https://drive.google.com/file/d/'+id+'/view" target="_blank" rel="noopener"><img src="'+dspThumb(id)+'" data-id="'+id+'" data-try="0" onerror="dspImgFallback(this)"></a>'; }).join('');
     var tag=x.src==='MANUAL'?'<span class="dsp-b" style="background:#f3e5f5;color:#6a1b9a">Nhập tay</span>':'<span class="dsp-b" style="background:#e3f2fd;color:#1565c0">Trong DS</span>';
     var where=x.src==='MANUAL'?(x.address||'—'):(x.market||'');
     return '<div class="dsp-card" style="margin:0"><div><b>'+dspEsc(x.outlet)+'</b> '+tag+'<br><small style="color:#777">'+dspEsc(where)+'</small><br>'+
-      '<small style="color:#555">'+dspEsc(x.camp)+' · '+dspEsc(x.region)+' · '+dspEsc(x.who)+' · '+dspEsc(x.date)+(x.qty?(' · SL '+x.qty):'')+'</small></div>'+
+      '<small style="color:#555">'+dspEsc(x.region)+' · '+dspEsc(x.who)+' · '+dspEsc(x.date)+(x.qty?(' · SL '+x.qty):'')+'</small></div>'+
       (ph?'<div class="dsp-ph">'+ph+'</div>':'<div style="font-size:12px;color:#bbb;margin:6px 0">Ảnh đang tải lên…</div>')+
       (x.notes?'<div style="font-size:12px;color:#555">📝 '+dspEsc(x.notes)+'</div>':'')+'</div>';
-  }).join('')+'</div>'+
-  (rows.length>MKT_SHOW?'<div style="text-align:center;margin:12px 0"><button onclick="MKT_SHOW+=40;renderMkt()" style="padding:8px 16px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer">Xem thêm ('+(rows.length-MKT_SHOW)+')</button></div>':'');
+  }
+  box.innerHTML='<div class="cg-tools"><button onclick="cgAll(\'mkt\',true)">▾ Mở tất cả</button><button onclick="cgAll(\'mkt\',false)">▸ Thu gọn tất cả</button></div>'+
+    cord.map(function(cn,ci){
+      var list=cmap[cn], lim=MKT_SHOW_BY[cn]||24, shown=list.slice(0,lim);
+      var pts={}; list.forEach(function(x){ pts[(x.market+'|'+x.outlet).toLowerCase()]=1; });
+      var isOpen=cgIsOpen('mkt',cn,ci===0);
+      return '<div class="cg'+(isOpen?' open':'')+'" data-cg="mkt" data-name="'+dspEsc(cn)+'">'+
+        '<div class="cg-h" onclick="cgToggle(this)"><span class="cg-arrow">▶</span>'+
+        '<div class="cg-t"><b>'+dspEsc(cn)+'</b><small>'+Object.keys(pts).length+' điểm · '+list.length+' báo cáo · mới nhất '+dspEsc(list[0].date)+'</small></div></div>'+
+        '<div class="cg-b"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px">'+shown.map(card).join('')+'</div>'+
+        (list.length>lim?'<div style="text-align:center;margin:12px 0"><button data-c="'+dspEsc(cn)+'" onclick="MKT_SHOW_BY[this.getAttribute(\'data-c\')]=('+lim+'+24);renderMkt()" style="padding:8px 16px;border:1px solid #ddd;border-radius:8px;background:#fff;cursor:pointer">Xem thêm ('+(list.length-lim)+')</button></div>':'')+
+        '</div></div>';
+    }).join('');
 }
 
 async function doEval(reportId, result){
